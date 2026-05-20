@@ -1,5 +1,6 @@
 __pycache__/
 *.py[cod]
+.DS_Store
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
@@ -8,6 +9,19 @@ dist/
 build/
 *.egg-info/
 .venv/
+.agent-sync.local/
+.agents/skills/spec-*
+.claude/agents/livespec-*.md
+.claude/rules/*.md
+.claude/rules/livespec/
+.claude/skills/spec-*
+.codex/agents/livespec-*.toml
+.specs/.livespec-path
+.specs/.runs/
+.specs/.previews/
+.specs/preflight-report.md
+test-results/
+playwright-report/
 reports/
 actual-ui-tree.json
 expected-ui-tree.json
