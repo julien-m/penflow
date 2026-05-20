@@ -15,6 +15,8 @@ ALLOWED_KEYS = {
     "entity",
     "variant",
     "test_id",
+    "mask",
+    "mask_text",
     "tolerance",
 }
 
@@ -65,6 +67,8 @@ class Context:
     entity: str | None = None
     variant: str | None = None
     test_id: str | None = None
+    mask: bool | str | None = None
+    mask_text: bool | str | None = None
     tolerance: dict[str, Any] = field(default_factory=dict)
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -184,4 +188,3 @@ def validate_context(node_id: str, node_type: str, context: Context) -> list[Con
         )
 
     return issues
-

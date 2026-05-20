@@ -117,6 +117,119 @@ def test_compare_reports_missing_node(tmp_path: Path) -> None:
     assert any(issue["code"] == "node.missing" for issue in report["issues"])
 
 
+def test_compare_honors_bbox_tolerance(tmp_path: Path) -> None:
+    pen_path = write_json(tmp_path / "ui.pen", sample_pen())
+    expected = expected_tree_from_pen(pen_path)
+    root = expected["screens"][0]["root"]
+
+    tolerated_actual = {
+        "version": 1,
+        "screen_id": "checkout",
+        "viewport": {"width": 390, "height": 844},
+        "root": {
+            **root,
+            "children": [
+                root["children"][0],
+                {**root["children"][1], "bbox": {**root["children"][1]["bbox"], "x": 7}},
+            ],
+        },
+    }
+    report = compare_trees(expected, {"version": 1, "screens": [tolerated_actual]})
+    assert report["status"] == "PASS"
+    assert not any(issue["code"] == "node.bbox.x" for issue in report["issues"])
+
+    drifted_actual = {
+        **tolerated_actual,
+        "root": {
+            **root,
+            "children": [
+                root["children"][0],
+                {**root["children"][1], "bbox": {**root["children"][1]["bbox"], "x": 9}},
+            ],
+        },
+    }
+    report = compare_trees(expected, {"version": 1, "screens": [drifted_actual]})
+    assert any(issue["code"] == "node.bbox.x" for issue in report["issues"])
+
+
+def test_compare_masks_volatile_nodes_and_dynamic_text(tmp_path: Path) -> None:
+    data = sample_pen()
+    data["children"][0]["children"].extend(
+        [
+            {
+                "id": "timer",
+                "type": "text",
+                "content": "12:00",
+                "context": {"semantic_id": "checkout.timer", "role": "timer"},
+            },
+            {
+                "id": "live-total",
+                "type": "text",
+                "content": "$12.00",
+                "context": {
+                    "semantic_id": "checkout.total",
+                    "role": "text",
+                    "variant": "dynamic",
+                },
+            },
+            {
+                "id": "masked-total",
+                "type": "text",
+                "content": "$12.00",
+                "context": {
+                    "semantic_id": "checkout.masked_total",
+                    "role": "text",
+                    "mask_text": True,
+                },
+            },
+            {
+                "id": "volatile-banner",
+                "type": "text",
+                "content": "Limited offer",
+                "context": {
+                    "semantic_id": "checkout.offer",
+                    "role": "text",
+                    "variant": "volatile",
+                },
+            },
+        ]
+    )
+    pen_path = write_json(tmp_path / "ui.pen", data)
+    expected = expected_tree_from_pen(pen_path)
+    root = expected["screens"][0]["root"]
+    children = root["children"]
+    actual_root = {
+        **root,
+        "children": [
+            children[0],
+            children[1],
+            {**children[2], "text": "12:01"},
+            {**children[3], "text": "$13.00"},
+            {**children[4], "text": "$14.00"},
+        ],
+    }
+
+    report = compare_trees(
+        expected,
+        {
+            "version": 1,
+            "screens": [
+                {
+                    "screen_id": "checkout",
+                    "viewport": {"width": 390, "height": 844},
+                    "root": actual_root,
+                }
+            ],
+        },
+    )
+
+    assert report["status"] == "PASS"
+    assert not any(issue["semantic_id"] == "checkout.timer" for issue in report["issues"])
+    assert not any(issue["semantic_id"] == "checkout.total" for issue in report["issues"])
+    assert not any(issue["semantic_id"] == "checkout.masked_total" for issue in report["issues"])
+    assert not any(issue["semantic_id"] == "checkout.offer" for issue in report["issues"])
+
+
 def test_flow_screen_draft_tokens_ir_and_update(tmp_path: Path) -> None:
     flow = {
         "id": "checkout-flow",
@@ -145,4 +258,3 @@ def test_flow_screen_draft_tokens_ir_and_update(tmp_path: Path) -> None:
 
     ir = code_ir_from_contract(screen, expected_tree_from_pen(pen_path))
     assert [component["id"] for component in ir["components"]] == ["checkout.title", "checkout.pay"]
-
