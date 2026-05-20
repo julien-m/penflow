@@ -82,7 +82,10 @@ def test_invalid_context_reports_errors(tmp_path: Path) -> None:
     data["children"][0]["children"][1]["context"]["binding"] = "bad"
     pen_path = write_json(tmp_path / "bad.pen", data)
     issues = validate_pen_context(parse_pen(pen_path))
-    assert {issue.code for issue in issues} == {"context.button_intent_missing", "context.binding_format"}
+    assert {issue.code for issue in issues} == {
+        "context.button_intent_missing",
+        "context.binding_format",
+    }
 
 
 def test_validate_actual_and_compare_pass(tmp_path: Path) -> None:
@@ -238,7 +241,12 @@ def test_flow_screen_draft_tokens_ir_and_update(tmp_path: Path) -> None:
                 "id": "checkout",
                 "components": [
                     {"semantic_id": "checkout.title", "role": "text", "text": "Checkout"},
-                    {"semantic_id": "checkout.pay", "role": "button", "text": "Pay", "intent": "pay"},
+                    {
+                        "semantic_id": "checkout.pay",
+                        "role": "button",
+                        "text": "Pay",
+                        "intent": "pay",
+                    },
                 ],
             }
         ],
@@ -246,15 +254,22 @@ def test_flow_screen_draft_tokens_ir_and_update(tmp_path: Path) -> None:
     assert validate_flow_contract(flow) == []
     screen = screen_contracts_from_flow(flow)[0]
     draft = pencil_draft_from_screen(screen)
+    assert draft["version"] == "2.11"
+    assert isinstance(draft["children"][0]["context"], str)
+    assert draft["children"][0]["children"][0]["textGrowth"] == "fixed-width"
+    assert draft["children"][0]["children"][0]["fill"] == "#111827"
     pen_path = write_json(tmp_path / "draft.pen", draft)
     tokens = extract_design_tokens(pen_path)
-    assert tokens["spacing"] == [16, 24]
+    assert tokens["colors"] == ["#0057FF", "#111827", "#FFFFFF"]
+    assert tokens["spacing"] == [8, 12, 16, 24]
 
-    updates = {"checkout.title": {"content": "Updated"}}
+    updates = {"checkout.title": {"content": "Updated", "context": {"variant": "demo"}}}
     update_path = write_json(tmp_path / "updates.json", updates)
     out_path = tmp_path / "updated.pen"
     update_pen_by_semantic_id(pen_path, json.loads(update_path.read_text()), out_path)
-    assert "Updated" in out_path.read_text()
+    updated = out_path.read_text()
+    assert "Updated" in updated
+    assert "variant=demo" in updated
 
     ir = code_ir_from_contract(screen, expected_tree_from_pen(pen_path))
     assert [component["id"] for component in ir["components"]] == ["checkout.title", "checkout.pay"]

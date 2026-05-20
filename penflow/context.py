@@ -115,6 +115,30 @@ def parse_context_string(raw: str) -> dict[str, Any]:
     return result
 
 
+def format_context_string(context: dict[str, Any]) -> str:
+    """Serialize context to Pencil-compatible `key=value; key=value` shorthand."""
+
+    parts: list[str] = []
+    for key in sorted(context):
+        value = context[key]
+        if value in (None, ""):
+            continue
+        if value is True:
+            parts.append(key)
+            continue
+        if value is False:
+            parts.append(f"{key}=false")
+            continue
+        if isinstance(value, dict):
+            for nested_key in sorted(value):
+                nested_value = value[nested_key]
+                if nested_value not in (None, ""):
+                    parts.append(f"{key}.{nested_key}={nested_value}")
+            continue
+        parts.append(f"{key}={value}")
+    return "; ".join(parts)
+
+
 def infer_role(node_type: str, context: Context) -> str:
     if context.role:
         return str(context.role)
@@ -127,7 +151,9 @@ def validate_context(node_id: str, node_type: str, context: Context) -> list[Con
 
     if context.extra:
         keys = ", ".join(sorted(context.extra))
-        issues.append(ContextIssue("warning", "context.extra_keys", f"unknown context keys: {keys}", node_id))
+        issues.append(
+            ContextIssue("warning", "context.extra_keys", f"unknown context keys: {keys}", node_id)
+        )
 
     if semantic_id and not IDENT_RE.match(str(semantic_id)):
         issues.append(

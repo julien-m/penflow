@@ -13,7 +13,7 @@ authors = [{ name = "Julien M" }]
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "ruff>=0.4", "mypy>=1.0"]
 
 [project.scripts]
 penflow = "penflow.cli:main"
@@ -25,4 +25,3 @@ pythonpath = ["."]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-

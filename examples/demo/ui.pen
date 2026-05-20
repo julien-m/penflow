@@ -1,53 +1,59 @@
 {
-  "version": 1,
+  "version": "2.11",
   "children": [
     {
-      "id": "checkout-screen",
+      "id": "checkoutScreen",
       "type": "frame",
       "name": "checkout",
+      "x": 0,
+      "y": 0,
       "width": 390,
       "height": 844,
       "layout": "vertical",
       "gap": 16,
       "padding": 24,
-      "context": {
-        "semantic_id": "checkout",
-        "role": "screen"
-      },
+      "alignItems": "center",
+      "fill": "#FFFFFF",
+      "context": "role=screen; semantic_id=checkout",
       "children": [
         {
-          "id": "checkout-title-0",
+          "id": "checkoutTitle0",
           "name": "checkout.title",
-          "width": 320,
-          "height": 44,
-          "context": {
-            "semantic_id": "checkout.title",
-            "role": "text"
-          },
+          "context": "role=text; semantic_id=checkout.title",
           "type": "text",
-          "content": "Checkout"
+          "content": "Checkout",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "fontSize": 24,
+          "fontWeight": "600",
+          "fill": "#111827"
         },
         {
-          "id": "checkout-pay-1",
+          "id": "checkoutPay1",
           "name": "checkout.pay",
-          "width": 320,
-          "height": 44,
-          "context": {
-            "semantic_id": "checkout.pay",
-            "role": "button",
-            "intent": "submit_payment"
-          },
+          "context": "intent=submit_payment; role=button; semantic_id=checkout.pay",
           "type": "frame",
           "layout": "horizontal",
+          "width": "fill_container",
+          "height": "fit_content(44)",
+          "padding": [
+            12,
+            16
+          ],
+          "gap": 8,
+          "alignItems": "center",
+          "justifyContent": "center",
+          "cornerRadius": 8,
+          "fill": "#0057FF",
           "children": [
             {
-              "id": "checkout-pay-label",
+              "id": "checkoutPayLabel",
               "type": "text",
               "content": "Pay",
-              "context": {
-                "semantic_id": "checkout.pay.label",
-                "role": "text"
-              }
+              "fontSize": 16,
+              "fontWeight": "600",
+              "fill": "#FFFFFF",
+              "context": "role=text; semantic_id=checkout.pay.label"
             }
           ]
         }

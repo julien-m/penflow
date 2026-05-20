@@ -18,10 +18,10 @@ class BBox:
     @classmethod
     def from_node(cls, data: dict[str, Any]) -> "BBox":
         return cls(
-            x=float(data.get("x", 0) or 0),
-            y=float(data.get("y", 0) or 0),
-            width=float(data.get("width", 0) or 0),
-            height=float(data.get("height", 0) or 0),
+            x=_number_or_zero(data.get("x")),
+            y=_number_or_zero(data.get("y")),
+            width=_number_or_zero(data.get("width")),
+            height=_number_or_zero(data.get("height")),
         )
 
     def to_dict(self) -> dict[str, float]:
@@ -69,3 +69,10 @@ class PenNode:
             "children": [child.to_expected() for child in self.children],
         }
 
+
+def _number_or_zero(value: Any) -> float:
+    if value in (None, ""):
+        return 0
+    if isinstance(value, str):
+        return 0
+    return float(value)

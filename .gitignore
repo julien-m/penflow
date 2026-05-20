@@ -9,6 +9,10 @@ dist/
 build/
 *.egg-info/
 .venv/
+
+# Materialized conventions
+.conventions/
+
 .agent-sync.local/
 .agents/skills/spec-*
 .claude/agents/livespec-*.md
@@ -31,3 +35,4 @@ compare-report.md
 !examples/demo/expected-ui-tree.json
 !examples/demo/compare-report.json
 !examples/demo/compare-report.md
+.idea

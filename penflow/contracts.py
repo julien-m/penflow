@@ -6,7 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .pen import load_pen, parse_pen, update_pen_by_semantic_id
+from .context import format_context_string
+from .pen import parse_pen, update_pen_by_semantic_id
 
 
 def validate_flow_contract(flow: dict[str, Any]) -> list[dict[str, Any]]:
@@ -53,20 +54,24 @@ def screen_contracts_from_flow(flow: dict[str, Any]) -> list[dict[str, Any]]:
 def pencil_draft_from_screen(screen: dict[str, Any]) -> dict[str, Any]:
     viewport = screen.get("viewport", {"width": 390, "height": 844})
     root = {
-        "id": f"{screen['id']}-screen",
+        "id": _node_id(screen["id"], "screen"),
         "type": "frame",
         "name": screen["id"],
+        "x": 0,
+        "y": 0,
         "width": viewport.get("width", 390),
         "height": viewport.get("height", 844),
         "layout": "vertical",
         "gap": 16,
         "padding": 24,
-        "context": {"semantic_id": screen["id"], "role": "screen"},
+        "alignItems": "center",
+        "fill": "#FFFFFF",
+        "context": _context({"semantic_id": screen["id"], "role": "screen"}),
         "children": [],
     }
     for index, component in enumerate(screen.get("components", []) or []):
         root["children"].append(_component_to_pen(component, index))
-    return {"version": 1, "children": [root]}
+    return {"version": "2.11", "children": [root]}
 
 
 def write_pencil_draft(screen_path: str | Path, out_path: str | Path) -> dict[str, Any]:
@@ -84,9 +89,26 @@ def update_pencil(path: str | Path, updates_path: str | Path, out_path: str | Pa
 def extract_design_tokens(pen_path: str | Path) -> dict[str, Any]:
     nodes = [node for root in parse_pen(pen_path) for node in root.walk()]
     tokens: dict[str, Any] = {
-        "colors": sorted({value for node in nodes for key, value in node.visual.items() if key in {"fill", "stroke"}}),
-        "spacing": sorted({value for node in nodes for key, value in node.visual.items() if key in {"gap", "padding"}}),
-        "radius": sorted({node.visual["cornerRadius"] for node in nodes if "cornerRadius" in node.visual}),
+        "colors": sorted(
+            {
+                value
+                for node in nodes
+                for key, value in node.visual.items()
+                if key in {"fill", "stroke"}
+            }
+        ),
+        "spacing": sorted(
+            {
+                spacing
+                for node in nodes
+                for key, value in node.visual.items()
+                if key in {"gap", "padding"}
+                for spacing in _spacing_values(value)
+            }
+        ),
+        "radius": sorted(
+            {node.visual["cornerRadius"] for node in nodes if "cornerRadius" in node.visual}
+        ),
         "typography": sorted(
             {
                 f"{node.visual.get('fontFamily', 'system')}:{node.visual.get('fontSize')}:{node.visual.get('fontWeight', 'regular')}"
@@ -97,19 +119,37 @@ def extract_design_tokens(pen_path: str | Path) -> dict[str, Any]:
     }
     tokens["proposals"] = {
         "primary_color": tokens["colors"][0] if tokens["colors"] else None,
-        "base_spacing": 16 if 16 in tokens["spacing"] else (tokens["spacing"][0] if tokens["spacing"] else None),
+        "base_spacing": 16
+        if 16 in tokens["spacing"]
+        else (tokens["spacing"][0] if tokens["spacing"] else None),
         "base_radius": tokens["radius"][0] if tokens["radius"] else None,
     }
     return tokens
 
 
-def code_ir_from_contract(screen: dict[str, Any], expected_tree: dict[str, Any] | None = None) -> dict[str, Any]:
+def _spacing_values(value: Any) -> list[int | float]:
+    if isinstance(value, (int, float)):
+        return [value]
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, (int, float))]
+    return []
+
+
+def code_ir_from_contract(
+    screen: dict[str, Any], expected_tree: dict[str, Any] | None = None
+) -> dict[str, Any]:
     return {
         "version": 1,
         "screen": screen["id"],
         "viewport": screen.get("viewport", {}),
         "imports": [],
-        "state": sorted({component.get("binding") for component in screen.get("components", []) if component.get("binding")}),
+        "state": sorted(
+            {
+                component.get("binding")
+                for component in screen.get("components", [])
+                if component.get("binding")
+            }
+        ),
         "actions": screen.get("actions", []),
         "components": [
             {
@@ -129,34 +169,77 @@ def _component_to_pen(component: dict[str, Any], index: int) -> dict[str, Any]:
     role = component.get("role", "text")
     semantic_id = component.get("semantic_id") or component.get("id") or f"component-{index}"
     base = {
-        "id": f"{semantic_id.replace('.', '-')}-{index}",
+        "id": _node_id(semantic_id, str(index)),
         "name": semantic_id,
-        "width": component.get("width", 320),
-        "height": component.get("height", 44),
-        "context": {
-            "semantic_id": semantic_id,
-            "role": role,
-            **({"intent": component["intent"]} if component.get("intent") else {}),
-            **({"binding": component["binding"]} if component.get("binding") else {}),
-            **({"repeat": component["repeat"]} if component.get("repeat") else {}),
-        },
+        "context": _context(
+            {
+                "semantic_id": semantic_id,
+                "role": role,
+                **({"intent": component["intent"]} if component.get("intent") else {}),
+                **({"binding": component["binding"]} if component.get("binding") else {}),
+                **({"repeat": component["repeat"]} if component.get("repeat") else {}),
+            }
+        ),
     }
     if role == "button":
-        return {**base, "type": "frame", "layout": "horizontal", "children": [_text_child(semantic_id, component.get("text", "Button"))]}
+        return {
+            **base,
+            "type": "frame",
+            "layout": "horizontal",
+            "width": component.get("width", "fill_container"),
+            "height": "fit_content(44)",
+            "padding": [12, 16],
+            "gap": 8,
+            "alignItems": "center",
+            "justifyContent": "center",
+            "cornerRadius": 8,
+            "fill": "#0057FF",
+            "children": [_text_child(semantic_id, component.get("text", "Button"), fill="#FFFFFF")],
+        }
     if role == "list":
-        return {**base, "type": "frame", "layout": "vertical", "gap": 8, "children": [_text_child(semantic_id, component.get("text", "Item"))]}
-    return {**base, "type": "text", "content": component.get("text", semantic_id)}
-
-
-def _text_child(parent: str, text: str) -> dict[str, Any]:
+        return {
+            **base,
+            "type": "frame",
+            "layout": "vertical",
+            "width": component.get("width", "fill_container"),
+            "height": "fit_content(44)",
+            "gap": 8,
+            "alignItems": "start",
+            "children": [_text_child(semantic_id, component.get("text", "Item"))],
+        }
     return {
-        "id": f"{parent.replace('.', '-')}-label",
+        **base,
+        "type": "text",
+        "content": component.get("text", semantic_id),
+        "textGrowth": "fixed-width",
+        "width": component.get("width", "fill_container"),
+        "fontSize": component.get("fontSize", 24 if index == 0 else 16),
+        "fontWeight": component.get("fontWeight", "600" if index == 0 else "400"),
+        "fill": component.get("fill", "#111827"),
+    }
+
+
+def _text_child(parent: str, text: str, *, fill: str = "#111827") -> dict[str, Any]:
+    return {
+        "id": _node_id(parent, "label"),
         "type": "text",
         "content": text,
-        "context": {"semantic_id": f"{parent}.label", "role": "text"},
+        "fontSize": 16,
+        "fontWeight": "600",
+        "fill": fill,
+        "context": _context({"semantic_id": f"{parent}.label", "role": "text"}),
     }
+
+
+def _context(context: dict[str, Any]) -> str:
+    return format_context_string(context)
+
+
+def _node_id(*parts: str) -> str:
+    raw = "".join(part.title() for part in parts)
+    safe = "".join(char for char in raw if char.isalnum())
+    return safe[:1].lower() + safe[1:] if safe else "node"
 
 
 def _issue(severity: str, path: str, message: str) -> dict[str, str]:
     return {"severity": severity, "path": path, "message": message}
-

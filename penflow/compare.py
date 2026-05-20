@@ -31,13 +31,17 @@ def compare_tree_files(
     actual = normalize_actual_tree(load_tree(actual_path))
     report = compare_trees(expected, actual, threshold=threshold)
     if json_out:
-        Path(json_out).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        Path(json_out).write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
     if markdown_out:
         Path(markdown_out).write_text(report_to_markdown(report), encoding="utf-8")
     return report
 
 
-def compare_trees(expected: dict[str, Any], actual: dict[str, Any], *, threshold: float = 0.9) -> dict[str, Any]:
+def compare_trees(
+    expected: dict[str, Any], actual: dict[str, Any], *, threshold: float = 0.9
+) -> dict[str, Any]:
     actual_schema_issues = validate_actual_tree(actual)
     issues: list[dict[str, Any]] = []
     if actual_schema_issues:
@@ -61,7 +65,9 @@ def compare_trees(expected: dict[str, Any], actual: dict[str, Any], *, threshold
         if actual_screen is None and len(actual_screens) == 1:
             actual_screen = next(iter(actual_screens.values()))
         if actual_screen is None:
-            issues.append(_issue("error", "screen.missing", screen_id, "screen missing in actual tree"))
+            issues.append(
+                _issue("error", "screen.missing", screen_id, "screen missing in actual tree")
+            )
             failed_checks += 1
             total_checks += 1
             continue
@@ -75,15 +81,23 @@ def compare_trees(expected: dict[str, Any], actual: dict[str, Any], *, threshold
             actual_node = actual_nodes.get(semantic_id)
             if actual_node is None:
                 failed_checks += 1
-                issues.append(_issue("error", "node.missing", semantic_id, "node missing in actual tree"))
+                issues.append(
+                    _issue("error", "node.missing", semantic_id, "node missing in actual tree")
+                )
                 continue
             node_issues = compare_node(expected_node, actual_node)
-            failed_checks += sum(1 for issue in node_issues if issue["severity"] in {"error", "warning"})
+            failed_checks += sum(
+                1 for issue in node_issues if issue["severity"] in {"error", "warning"}
+            )
             total_checks += max(0, len(node_issues) - 1)
             issues.extend(node_issues)
 
     score = 1.0 if total_checks == 0 else max(0.0, 1 - (failed_checks / total_checks))
-    status = "PASS" if score >= threshold and not any(i["severity"] == "error" for i in issues) else "FAIL"
+    status = (
+        "PASS"
+        if score >= threshold and not any(i["severity"] == "error" for i in issues)
+        else "FAIL"
+    )
     return {
         "version": 1,
         "status": status,
@@ -112,17 +126,33 @@ def compare_node(expected: dict[str, Any], actual: dict[str, Any]) -> list[dict[
     if not _text_masked(expected):
         expected_text = expected.get("text")
         actual_text = actual.get("text")
-        if expected_text not in (None, "") and actual_text not in (None, "") and expected_text != actual_text:
+        if (
+            expected_text not in (None, "")
+            and actual_text not in (None, "")
+            and expected_text != actual_text
+        ):
             issues.append(_issue("warning", "node.text", semantic_id, "text differs"))
 
-    if expected.get("_parent_key") and actual.get("_parent_key") and expected["_parent_key"] != actual["_parent_key"]:
+    if (
+        expected.get("_parent_key")
+        and actual.get("_parent_key")
+        and expected["_parent_key"] != actual["_parent_key"]
+    ):
         issues.append(_issue("warning", "node.hierarchy", semantic_id, "parent differs"))
 
-    if abs(float(expected.get("_order", 0)) - float(actual.get("_order", 0))) > float(tolerance.get("order", 0)):
+    if abs(float(expected.get("_order", 0)) - float(actual.get("_order", 0))) > float(
+        tolerance.get("order", 0)
+    ):
         issues.append(_issue("warning", "node.order", semantic_id, "order differs"))
 
-    issues.extend(_compare_bbox(semantic_id, expected.get("bbox", {}), actual.get("bbox", {}), tolerance))
-    issues.extend(_compare_visual(semantic_id, expected.get("visual", {}), actual.get("visual", {}), tolerance))
+    issues.extend(
+        _compare_bbox(semantic_id, expected.get("bbox", {}), actual.get("bbox", {}), tolerance)
+    )
+    issues.extend(
+        _compare_visual(
+            semantic_id, expected.get("visual", {}), actual.get("visual", {}), tolerance
+        )
+    )
     return issues
 
 
@@ -141,7 +171,9 @@ def report_to_markdown(report: dict[str, Any]) -> str:
     ]
     for key, value in report["summary"].items():
         lines.append(f"| {key} | {value} |")
-    lines.extend(["", "## Issues", "", "| Severity | Code | Semantic ID | Message |", "|---|---|---|---|"])
+    lines.extend(
+        ["", "## Issues", "", "| Severity | Code | Semantic ID | Message |", "|---|---|---|---|"]
+    )
     if not report["issues"]:
         lines.append("| info | none | - | no issues |")
     for issue in report["issues"]:
@@ -167,7 +199,7 @@ def _text_masked(node: dict[str, Any]) -> bool:
 
 
 def _compare_bbox(
-    semantic_id: str,
+    semantic_id: str | None,
     expected: dict[str, Any],
     actual: dict[str, Any],
     tolerance: dict[str, Any],
@@ -183,7 +215,7 @@ def _compare_bbox(
 
 
 def _compare_visual(
-    semantic_id: str,
+    semantic_id: str | None,
     expected: dict[str, Any],
     actual: dict[str, Any],
     tolerance: dict[str, Any],
@@ -196,10 +228,11 @@ def _compare_visual(
         if key in expected and key in actual:
             limit = float(tolerance.get(limit_name, DEFAULT_TOLERANCE[limit_name]))
             if abs(float(expected[key]) - float(actual[key])) > limit:
-                issues.append(_issue("warning", f"node.visual.{key}", semantic_id, f"{key} differs"))
+                issues.append(
+                    _issue("warning", f"node.visual.{key}", semantic_id, f"{key} differs")
+                )
     return issues
 
 
 def _issue(severity: str, code: str, semantic_id: str | None, message: str) -> dict[str, Any]:
     return {"severity": severity, "code": code, "semantic_id": semantic_id, "message": message}
-

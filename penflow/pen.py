@@ -7,7 +7,7 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from .context import Context, ContextIssue, validate_context
+from .context import Context, ContextIssue, format_context_string, validate_context
 from .models import BBox, PenNode
 
 VISUAL_KEYS = {
@@ -75,7 +75,12 @@ def inspect_pen(path: str | Path) -> dict[str, Any]:
     errors = [issue for issue in validate_pen_context(roots) if issue.severity == "error"]
     return {
         "screens": [
-            {"id": root.id, "name": root.name, "children": len(root.children), "semantic_id": root.semantic_id}
+            {
+                "id": root.id,
+                "name": root.name,
+                "children": len(root.children),
+                "semantic_id": root.semantic_id,
+            }
             for root in roots
         ],
         "node_count": len(nodes),
@@ -108,17 +113,22 @@ def validate_pen_context(roots: list[PenNode]) -> list[ContextIssue]:
     return issues
 
 
-def update_pen_by_semantic_id(path: str | Path, updates: dict[str, dict[str, Any]], out: str | Path) -> None:
+def update_pen_by_semantic_id(
+    path: str | Path, updates: dict[str, dict[str, Any]], out: str | Path
+) -> None:
     data = load_pen(path)
 
     def visit(node: dict[str, Any]) -> None:
-        context = Context.from_raw(node.get("context"))
+        raw_context = node.get("context")
+        context = Context.from_raw(raw_context)
         if context.semantic_id in updates:
             update = updates[str(context.semantic_id)]
             if "context" in update:
                 current = context.to_dict()
                 current.update(update["context"])
-                node["context"] = current
+                node["context"] = (
+                    format_context_string(current) if isinstance(raw_context, str) else current
+                )
             for key in ("content", "name"):
                 if key in update:
                     node[key] = update[key]

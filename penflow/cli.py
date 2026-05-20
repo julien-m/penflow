@@ -21,6 +21,7 @@ from .contracts import (
     write_pencil_draft,
 )
 from .demo import build_demo
+from .llm import fix_compare_report, review_compare_report
 from .pen import inspect_pen, parse_pen, validate_pen_context
 from .tree import load_tree, validate_actual_tree, write_expected_tree
 
@@ -37,7 +38,9 @@ def main(argv: list[str] | None = None) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="penflow")
-    parser.add_argument("--json", action="store_true", help="print machine-readable JSON when supported")
+    parser.add_argument(
+        "--json", action="store_true", help="print machine-readable JSON when supported"
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     inspect_cmd = sub.add_parser("inspect", help="inspect a .pen file")
@@ -45,7 +48,9 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_cmd.add_argument("pen")
     inspect_cmd.set_defaults(func=cmd_inspect)
 
-    validate_pen = sub.add_parser("validate-pen", aliases=["validate"], help="validate .pen context")
+    validate_pen = sub.add_parser(
+        "validate-pen", aliases=["validate"], help="validate .pen context"
+    )
     validate_pen.add_argument("--json", action="store_true", help="print machine-readable JSON")
     validate_pen.add_argument("pen")
     validate_pen.set_defaults(func=cmd_validate_pen)
@@ -126,6 +131,20 @@ def build_parser() -> argparse.ArgumentParser:
     ci.add_argument("--threshold", type=float, default=0.9)
     ci.set_defaults(func=cmd_ci)
 
+    review = sub.add_parser("review-report", help="explain a compare report in stable Markdown")
+    review.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    review.add_argument("report")
+    review.add_argument("-o", "--out", default=None)
+    review.set_defaults(func=cmd_review_report)
+
+    fix = sub.add_parser(
+        "fix-report", help="suggest fixes from a compare report in stable Markdown"
+    )
+    fix.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    fix.add_argument("report")
+    fix.add_argument("-o", "--out", default=None)
+    fix.set_defaults(func=cmd_fix_report)
+
     demo = sub.add_parser("demo", help="write an end-to-end demo project")
     demo.add_argument("--json", action="store_true", help="print machine-readable JSON")
     demo.add_argument("--out", default="examples/generated-demo")
@@ -147,7 +166,9 @@ def cmd_validate_pen(args: argparse.Namespace) -> int:
 
 def cmd_export_expected(args: argparse.Namespace) -> int:
     tree = write_expected_tree(args.pen, args.out)
-    _print({"out": args.out, "screens": len(tree["screens"]), "issues": len(tree["issues"])}, args.json)
+    _print(
+        {"out": args.out, "screens": len(tree["screens"]), "issues": len(tree["issues"])}, args.json
+    )
     return 1 if _has_errors(tree["issues"]) else 0
 
 
@@ -165,7 +186,15 @@ def cmd_compare_tree(args: argparse.Namespace) -> int:
         markdown_out=args.markdown,
         threshold=args.threshold,
     )
-    _print({"status": report["status"], "score": report["score"], "out": args.out, "markdown": args.markdown}, args.json)
+    _print(
+        {
+            "status": report["status"],
+            "score": report["score"],
+            "out": args.out,
+            "markdown": args.markdown,
+        },
+        args.json,
+    )
     return 0 if report["status"] == "PASS" else 1
 
 
@@ -213,7 +242,9 @@ def cmd_update_pen(args: argparse.Namespace) -> int:
 def cmd_extract_tokens(args: argparse.Namespace) -> int:
     tokens = extract_design_tokens(args.pen)
     if args.out:
-        Path(args.out).write_text(json.dumps(tokens, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        Path(args.out).write_text(
+            json.dumps(tokens, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
     _print(tokens | ({"out": args.out} if args.out else {}), args.json)
     return 0
 
@@ -238,9 +269,31 @@ def cmd_codegen(args: argparse.Namespace) -> int:
 def cmd_ci(args: argparse.Namespace) -> int:
     expected_path = Path("expected-ui-tree.json")
     write_expected_tree(args.pen, expected_path)
-    report = compare_tree_files(expected_path, args.actual, json_out="compare-report.json", markdown_out="compare-report.md", threshold=args.threshold)
+    report = compare_tree_files(
+        expected_path,
+        args.actual,
+        json_out="compare-report.json",
+        markdown_out="compare-report.md",
+        threshold=args.threshold,
+    )
     _print({"status": report["status"], "score": report["score"]}, args.json)
     return 0 if report["status"] == "PASS" else 1
+
+
+def cmd_review_report(args: argparse.Namespace) -> int:
+    markdown = review_compare_report(args.report)
+    if args.out:
+        Path(args.out).write_text(markdown, encoding="utf-8")
+    _print({"status": "PASS", "out": args.out, "markdown": markdown}, args.json)
+    return 0
+
+
+def cmd_fix_report(args: argparse.Namespace) -> int:
+    markdown = fix_compare_report(args.report)
+    if args.out:
+        Path(args.out).write_text(markdown, encoding="utf-8")
+    _print({"status": "PASS", "out": args.out, "markdown": markdown}, args.json)
+    return 0
 
 
 def cmd_demo(args: argparse.Namespace) -> int:

@@ -7,7 +7,7 @@
   },
   "root": {
     "id": "checkout",
-    "pencil_id": "checkout-screen",
+    "pencil_id": "checkoutScreen",
     "semantic_id": "checkout",
     "role": "screen",
     "name": "checkout",
@@ -19,9 +19,10 @@
       "height": 844.0
     },
     "visual": {
-      "layout": "vertical",
+      "gap": 16,
       "padding": 24,
-      "gap": 16
+      "fill": "#FFFFFF",
+      "layout": "vertical"
     },
     "context": {
       "role": "screen",
@@ -30,18 +31,22 @@
     "children": [
       {
         "id": "checkout.title",
-        "pencil_id": "checkout-title-0",
+        "pencil_id": "checkoutTitle0",
         "semantic_id": "checkout.title",
         "role": "text",
         "name": "checkout.title",
         "text": "Checkout",
         "bbox": {
-          "x": 0.0,
-          "y": 0.0,
-          "width": 320.0,
-          "height": 44.0
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
         },
-        "visual": {},
+        "visual": {
+          "fontSize": 24,
+          "fontWeight": "600",
+          "fill": "#111827"
+        },
         "context": {
           "role": "text",
           "semantic_id": "checkout.title"
@@ -50,18 +55,25 @@
       },
       {
         "id": "checkout.pay",
-        "pencil_id": "checkout-pay-1",
+        "pencil_id": "checkoutPay1",
         "semantic_id": "checkout.pay",
         "role": "button",
         "name": "checkout.pay",
         "text": null,
         "bbox": {
-          "x": 0.0,
-          "y": 0.0,
-          "width": 320.0,
-          "height": 44.0
+          "x": 0,
+          "y": 0,
+          "width": 0,
+          "height": 0
         },
         "visual": {
+          "gap": 8,
+          "cornerRadius": 8,
+          "padding": [
+            12,
+            16
+          ],
+          "fill": "#0057FF",
           "layout": "horizontal"
         },
         "context": {
@@ -72,18 +84,22 @@
         "children": [
           {
             "id": "checkout.pay.label",
-            "pencil_id": "checkout-pay-label",
+            "pencil_id": "checkoutPayLabel",
             "semantic_id": "checkout.pay.label",
             "role": "text",
             "name": null,
             "text": "Pay",
             "bbox": {
-              "x": 0.0,
-              "y": 0.0,
-              "width": 0.0,
-              "height": 0.0
+              "x": 0,
+              "y": 0,
+              "width": 0,
+              "height": 0
             },
-            "visual": {},
+            "visual": {
+              "fontSize": 16,
+              "fontWeight": "600",
+              "fill": "#FFFFFF"
+            },
             "context": {
               "role": "text",
               "semantic_id": "checkout.pay.label"
