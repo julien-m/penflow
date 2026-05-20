@@ -298,3 +298,37 @@ def test_export_ir_legacy_path_still_works(tmp_path: Path) -> None:
     assert ir["viewport"] == {"width": 390, "height": 844}
     assert "components" in ir
     assert ir["expected_tree_source"] is False
+
+
+def test_codegen_accepts_contextualized_code_ir_cli_output(tmp_path: Path) -> None:
+    pen_path = write_json(tmp_path / "ui.pen", contextualized_pen())
+    ir_path = tmp_path / "code-ir.json"
+
+    assert (
+        main(
+            [
+                "code-ir",
+                "--from-context",
+                str(pen_path),
+                "--flow-id",
+                "checkout",
+                "--flow-name",
+                "Checkout flow",
+                "--out",
+                str(ir_path),
+            ]
+        )
+        == 0
+    )
+
+    outputs = {
+        "react": tmp_path / "Checkout.jsx",
+        "swiftui": tmp_path / "CheckoutView.swift",
+        "rust": tmp_path / "checkout.rs",
+    }
+    for target, output in outputs.items():
+        assert main(["codegen", target, str(ir_path), "--out", str(output)]) == 0
+
+    assert 'data-penflow-id="checkout"' in outputs["react"].read_text(encoding="utf-8")
+    assert "struct CheckoutView: View" in outputs["swiftui"].read_text(encoding="utf-8")
+    assert "pub fn Checkout() -> Element" in outputs["rust"].read_text(encoding="utf-8")

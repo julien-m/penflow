@@ -219,6 +219,8 @@ penflow validate-semantic-tree reverse-output/semantic-ui-tree.json --json
 penflow validate-pen reverse-output/ui.enriched.pen --json
 ```
 
+`reverse-pen --out <dir>` writes a directory containing `semantic-ui-tree.json` and `flow-ui-contract/`; validate `<dir>/semantic-ui-tree.json`, not the directory path itself.
+
 ## Post-Implementation Compare Sequence
 
 ```bash

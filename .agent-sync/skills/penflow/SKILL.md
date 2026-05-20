@@ -87,6 +87,7 @@ penflow validate-semantic-tree reverse-output/semantic-ui-tree.json --json
 penflow validate-pen reverse-output/ui.enriched.pen --json
 ```
 
+`reverse-pen --out <dir>` writes a directory containing `semantic-ui-tree.json` and `flow-ui-contract/`; validate `<dir>/semantic-ui-tree.json`, not the directory path itself.
 Reverse mode marks missing business rules as `[NEEDS CLARIFICATION]`. Do not invent backend side effects, validations, state transitions, or access rules.
 
 ## Post-Implementation Compare Mode
@@ -123,6 +124,8 @@ penflow compare-tree /tmp/expected-ui-tree.json examples/full/actual-ui-tree.jso
 penflow review-report /tmp/compare.json --out /tmp/review.md
 penflow fix-report /tmp/compare.json --out /tmp/fix.md
 ```
+
+`/tmp/reverse-output` is a reverse output directory; its semantic tree lives at `/tmp/reverse-output/semantic-ui-tree.json` and recovered flow specs live under `/tmp/reverse-output/flow-ui-contract/`.
 
 ## Full Demo Mode
 

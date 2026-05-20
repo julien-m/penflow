@@ -75,6 +75,7 @@ def test_flow_ui_contract_skill_and_readme_document_modes() -> None:
         "NEEDS CLARIFICATION",
         "never write into LiveSpec `.specs/`",
         "external adapters emit `actual-ui-tree.json`",
+        "writes a directory containing `semantic-ui-tree.json` and `flow-ui-contract/`",
     ):
         assert phrase in combined
 
@@ -129,4 +130,5 @@ def test_root_readme_syncs_c15_command_sequences() -> None:
         "Penflow validates and compares that file; it does not launch or inspect the running app"
         in readme
     )
+    assert "writes a directory containing `semantic-ui-tree.json` and `flow-ui-contract/`" in readme
     assert ".agent-sync/skills/flow-ui-contract/references/semantic-ui-tree.md" in readme
