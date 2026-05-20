@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+dist/
+build/
+*.egg-info/
+.venv/
+reports/
+actual-ui-tree.json
+expected-ui-tree.json
+compare-report.json
+compare-report.md
+
