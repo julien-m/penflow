@@ -13,7 +13,6 @@ build/
 # Materialized conventions
 .conventions/
 
-.agent-sync.local/
 .agents/skills/spec-*
 .claude/agents/livespec-*.md
 .claude/rules/*.md
