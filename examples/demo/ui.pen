@@ -1,0 +1,57 @@
+{
+  "version": 1,
+  "children": [
+    {
+      "id": "checkout-screen",
+      "type": "frame",
+      "name": "checkout",
+      "width": 390,
+      "height": 844,
+      "layout": "vertical",
+      "gap": 16,
+      "padding": 24,
+      "context": {
+        "semantic_id": "checkout",
+        "role": "screen"
+      },
+      "children": [
+        {
+          "id": "checkout-title-0",
+          "name": "checkout.title",
+          "width": 320,
+          "height": 44,
+          "context": {
+            "semantic_id": "checkout.title",
+            "role": "text"
+          },
+          "type": "text",
+          "content": "Checkout"
+        },
+        {
+          "id": "checkout-pay-1",
+          "name": "checkout.pay",
+          "width": 320,
+          "height": 44,
+          "context": {
+            "semantic_id": "checkout.pay",
+            "role": "button",
+            "intent": "submit_payment"
+          },
+          "type": "frame",
+          "layout": "horizontal",
+          "children": [
+            {
+              "id": "checkout-pay-label",
+              "type": "text",
+              "content": "Pay",
+              "context": {
+                "semantic_id": "checkout.pay.label",
+                "role": "text"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

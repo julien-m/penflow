@@ -1,0 +1,34 @@
+{
+  "id": "checkout-flow",
+  "surface": "mobile",
+  "screens": [
+    {
+      "id": "checkout",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "actions": [
+        {
+          "id": "pay",
+          "label": "Pay"
+        }
+      ],
+      "components": [
+        {
+          "id": "checkout.title",
+          "semantic_id": "checkout.title",
+          "role": "text",
+          "text": "Checkout"
+        },
+        {
+          "id": "checkout.pay",
+          "semantic_id": "checkout.pay",
+          "role": "button",
+          "text": "Pay",
+          "intent": "submit_payment"
+        }
+      ]
+    }
+  ]
+}

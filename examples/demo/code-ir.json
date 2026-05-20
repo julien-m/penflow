@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "screen": "checkout",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "imports": [],
+  "state": [],
+  "actions": [
+    {
+      "id": "pay",
+      "label": "Pay"
+    }
+  ],
+  "components": [
+    {
+      "id": "checkout.title",
+      "role": "text",
+      "text": "Checkout",
+      "binding": null,
+      "intent": null
+    },
+    {
+      "id": "checkout.pay",
+      "role": "button",
+      "text": "Pay",
+      "binding": null,
+      "intent": "submit_payment"
+    }
+  ],
+  "expected_tree_source": true
+}
