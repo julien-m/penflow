@@ -13,4 +13,7 @@ actual-ui-tree.json
 expected-ui-tree.json
 compare-report.json
 compare-report.md
-
+!examples/demo/actual-ui-tree.json
+!examples/demo/expected-ui-tree.json
+!examples/demo/compare-report.json
+!examples/demo/compare-report.md

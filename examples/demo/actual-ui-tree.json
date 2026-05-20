@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "screen_id": "checkout",
+  "viewport": {
+    "width": 390,
+    "height": 844
+  },
+  "root": {
+    "id": "checkout",
+    "pencil_id": "checkout-screen",
+    "semantic_id": "checkout",
+    "role": "screen",
+    "name": "checkout",
+    "text": null,
+    "bbox": {
+      "x": 0.0,
+      "y": 0.0,
+      "width": 390.0,
+      "height": 844.0
+    },
+    "visual": {
+      "layout": "vertical",
+      "padding": 24,
+      "gap": 16
+    },
+    "context": {
+      "role": "screen",
+      "semantic_id": "checkout"
+    },
+    "children": [
+      {
+        "id": "checkout.title",
+        "pencil_id": "checkout-title-0",
+        "semantic_id": "checkout.title",
+        "role": "text",
+        "name": "checkout.title",
+        "text": "Checkout",
+        "bbox": {
+          "x": 0.0,
+          "y": 0.0,
+          "width": 320.0,
+          "height": 44.0
+        },
+        "visual": {},
+        "context": {
+          "role": "text",
+          "semantic_id": "checkout.title"
+        },
+        "children": []
+      },
+      {
+        "id": "checkout.pay",
+        "pencil_id": "checkout-pay-1",
+        "semantic_id": "checkout.pay",
+        "role": "button",
+        "name": "checkout.pay",
+        "text": null,
+        "bbox": {
+          "x": 0.0,
+          "y": 0.0,
+          "width": 320.0,
+          "height": 44.0
+        },
+        "visual": {
+          "layout": "horizontal"
+        },
+        "context": {
+          "intent": "submit_payment",
+          "role": "button",
+          "semantic_id": "checkout.pay"
+        },
+        "children": [
+          {
+            "id": "checkout.pay.label",
+            "pencil_id": "checkout-pay-label",
+            "semantic_id": "checkout.pay.label",
+            "role": "text",
+            "name": null,
+            "text": "Pay",
+            "bbox": {
+              "x": 0.0,
+              "y": 0.0,
+              "width": 0.0,
+              "height": 0.0
+            },
+            "visual": {},
+            "context": {
+              "role": "text",
+              "semantic_id": "checkout.pay.label"
+            },
+            "children": []
+          }
+        ]
+      }
+    ]
+  }
+}

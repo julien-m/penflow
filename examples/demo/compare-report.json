@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "status": "PASS",
+  "score": 1.0,
+  "threshold": 0.9,
+  "summary": {
+    "checks": 4,
+    "failed": 0,
+    "issues": 0,
+    "errors": 0,
+    "warnings": 0
+  },
+  "issues": []
+}
