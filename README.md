@@ -54,6 +54,10 @@ Adapter conformance docs (**contract C13**, feature 038) live under [`docs/adapt
 
 Run `penflow demo --out examples/full` to regenerate the contract **C14** fixture. Use [`examples/full/`](examples/full/) to inspect the complete chain: flow specs, semantic tree, enriched Pencil file, expected tree, code IR, actual-tree fixture, compare report, review report, and fix report.
 
+### Existing Project Integration
+
+**Read** [`docs/project-integration.md`](docs/project-integration.md) when adding Penflow to an existing app repository. It explains the recommended `penflow/` workspace layout, forward adoption, Pencil enrichment, legacy reverse migration, implementation handoff through `code-ir.json`, runtime `actual-ui-tree.json` verification, and a minimal CI gate.
+
 ### LLM Workflow Sequences
 
 Install the package first so the `penflow` console script is available.

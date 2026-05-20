@@ -75,9 +75,10 @@ def test_semantic_schema_does_not_add_feature_036_or_later_runtime_pipeline() ->
     # only, still no runtime adapter inside `penflow/`. Feature 039 is in
     # scope — it ships the full local demo fixture. Feature 040 is in scope —
     # it ships docs/tests only. Feature 041 is in scope — it ships regression
-    # coverage only. Feature 042 remains guarded.
+    # coverage only. Feature 042 is in scope — it ships integration docs/tests
+    # only. Feature 043 remains guarded.
     future_feature_dirs: list[Path] = []
-    for feature_number in range(42, 43):
+    for feature_number in range(43, 44):
         future_feature_dirs.extend((ROOT / ".specs" / "features").glob(f"{feature_number:03d}-*"))
     assert future_feature_dirs == []
     assert not (ROOT / "penflow" / "semantic_validator.py").exists()

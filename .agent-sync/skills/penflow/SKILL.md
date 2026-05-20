@@ -41,11 +41,18 @@ For the semantic-tree formation rules, **Read** [`../flow-ui-contract/references
 
 | User intent | Mode |
 |---|---|
+| "Integrate Penflow into my existing project" | Project integration mode |
 | "Generate `.pen` / code IR from flow specs" | Forward mode |
 | "Enrich an existing Pencil mockup with business context" | Pencil enrichment mode |
 | "Reconstruct flows from legacy Pencil" | Reverse mode |
 | "Compare implementation with design contract" | Post-implementation compare mode |
 | "Show me the whole chain" | Full demo mode |
+
+## Project Integration Mode
+
+Use when a user already has an application repository and asks how to adopt Penflow, where to store artifacts, how to migrate existing Pencil mockups, or how agents should consume Penflow outputs.
+
+**Read** [`../../../docs/project-integration.md`](../../../docs/project-integration.md). It covers the recommended `penflow/` workspace, forward adoption, existing-Pencil enrichment, legacy reverse migration, code IR handoff, runtime `actual-ui-tree.json` verification, and CI gate.
 
 ## Forward Mode
 

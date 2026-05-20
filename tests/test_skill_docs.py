@@ -11,6 +11,7 @@ SEMANTIC_TREE_REFERENCE = (
     ROOT / ".agent-sync" / "skills" / "flow-ui-contract" / "references" / "semantic-ui-tree.md"
 )
 README = ROOT / "README.md"
+PROJECT_INTEGRATION = ROOT / "docs" / "project-integration.md"
 
 
 REQUIRED_COMMANDS = (
@@ -132,3 +133,62 @@ def test_root_readme_syncs_c15_command_sequences() -> None:
     )
     assert "writes a directory containing `semantic-ui-tree.json` and `flow-ui-contract/`" in readme
     assert ".agent-sync/skills/flow-ui-contract/references/semantic-ui-tree.md" in readme
+
+
+def test_project_integration_guide_documents_existing_project_adoption() -> None:
+    guide = PROJECT_INTEGRATION.read_text(encoding="utf-8")
+
+    for heading in (
+        "# Integrating Penflow Into an Existing Project",
+        "## Recommended Layout",
+        "## Path A: New Project or New Feature Area",
+        "## Path B: Existing Pencil Mockups",
+        "## Path C: Legacy Project With Mockups but No Flows",
+        "## Implementation Handoff",
+        "## Runtime Verification",
+        "## CI Gate",
+        "## Migration Checklist",
+    ):
+        assert heading in guide
+
+    for phrase in (
+        "my-app/",
+        "penflow/flow-ui-contract",
+        "semantic-ui-tree.json",
+        "ui.enriched.pen",
+        "pencil-context-map.json",
+        "expected-ui-tree.json",
+        "code-ir.json",
+        "actual-ui-tree.json",
+        "compare-report.json",
+        "review.md",
+        "fix.md",
+        "validate-flow-specs penflow/flow-ui-contract",
+        "export-semantic-tree penflow/flow-ui-contract",
+        "draft-pen-from-tree penflow/semantic-ui-tree.json",
+        "enrich-pen design/ui.pen",
+        "map-pencil-context penflow/ui.enriched.pen",
+        "reverse-pen design/ui.pen --out penflow/reverse-output",
+        "penflow/reverse-output/semantic-ui-tree.json",
+        "[NEEDS CLARIFICATION]",
+        "validate-actual penflow/actual-ui-tree.json --schema",
+        "compare-tree penflow/expected-ui-tree.json penflow/actual-ui-tree.json",
+        "review-report penflow/compare-report.json",
+        "fix-report penflow/compare-report.json",
+        "semantic_id",
+        "binding",
+        "entity",
+        "test_id",
+        "Penflow validates and compares that file; it does not launch the app",
+    ):
+        assert phrase in guide
+
+
+def test_project_integration_guide_is_discoverable() -> None:
+    readme = README.read_text(encoding="utf-8")
+    skill = PENFLOW_SKILL.read_text(encoding="utf-8")
+
+    assert "docs/project-integration.md" in readme
+    assert "Existing Project Integration" in readme
+    assert "Project Integration Mode" in skill
+    assert "../../../docs/project-integration.md" in skill
