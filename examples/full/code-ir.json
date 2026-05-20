@@ -1,0 +1,280 @@
+{
+  "actions": [
+    {
+      "entity": "payments",
+      "intent": "post-payments-confirmation"
+    }
+  ],
+  "bindings": [
+    "checkout.order_summary",
+    "checkout.selected_payment_method"
+  ],
+  "components": [
+    {
+      "binding": null,
+      "id": "checkout",
+      "intent": null,
+      "role": "screen",
+      "test_id": null,
+      "text": "Order summary",
+      "type": "frame"
+    },
+    {
+      "binding": "checkout.order_summary",
+      "id": "checkout.order-summary",
+      "intent": null,
+      "role": "text",
+      "test_id": null,
+      "text": "Order summary",
+      "type": "text"
+    },
+    {
+      "binding": "checkout.selected_payment_method",
+      "id": "checkout.selected-payment-method",
+      "intent": null,
+      "role": "text",
+      "test_id": null,
+      "text": "Selected payment method",
+      "type": "text"
+    },
+    {
+      "binding": null,
+      "id": "checkout.pay-now",
+      "intent": "post-payments-confirmation",
+      "role": "button",
+      "test_id": null,
+      "text": "Pay now",
+      "type": "frame"
+    },
+    {
+      "binding": null,
+      "id": "payNowLabel",
+      "intent": null,
+      "role": "text",
+      "test_id": null,
+      "text": "Pay now",
+      "type": "text"
+    }
+  ],
+  "flow": {
+    "id": "checkout",
+    "name": "Checkout"
+  },
+  "inputs": {
+    "context_map": "examples/full/pencil-context-map.json",
+    "semantic_tree": "examples/full/semantic-ui-tree.json"
+  },
+  "kind": "penflow-code-ir",
+  "screens": [
+    {
+      "errors": [],
+      "flow_id": "checkout",
+      "id": "checkout",
+      "name": "checkout",
+      "root": {
+        "children": [
+          {
+            "binding": "checkout.order_summary",
+            "entity": "checkout",
+            "id": "checkout.order-summary",
+            "name": "Order summary",
+            "path": "0.0",
+            "pencil_node_id": "orderSummary",
+            "role": "text",
+            "semantic_id": "checkout.order-summary",
+            "source_map": {
+              "context": {
+                "binding": "checkout.order_summary",
+                "entity": "checkout",
+                "role": "text",
+                "semantic_id": "checkout.order-summary"
+              },
+              "notes": [
+                "section: ## Donn\u00e9es affich\u00e9es"
+              ],
+              "pencil_node_id": "orderSummary",
+              "pencil_path": "0.0",
+              "screen_spec": "examples/full/flow-ui-contract/screens/checkout.md",
+              "semantic_id": "checkout.order-summary"
+            },
+            "text": "Order summary",
+            "type": "text"
+          },
+          {
+            "binding": "checkout.selected_payment_method",
+            "entity": "checkout",
+            "id": "checkout.selected-payment-method",
+            "name": "Selected payment method",
+            "path": "0.1",
+            "pencil_node_id": "selectedPaymentMethod",
+            "role": "text",
+            "semantic_id": "checkout.selected-payment-method",
+            "source_map": {
+              "context": {
+                "binding": "checkout.selected_payment_method",
+                "entity": "checkout",
+                "role": "text",
+                "semantic_id": "checkout.selected-payment-method"
+              },
+              "notes": [
+                "section: ## Donn\u00e9es affich\u00e9es"
+              ],
+              "pencil_node_id": "selectedPaymentMethod",
+              "pencil_path": "0.1",
+              "screen_spec": "examples/full/flow-ui-contract/screens/checkout.md",
+              "semantic_id": "checkout.selected-payment-method"
+            },
+            "text": "Selected payment method",
+            "type": "text"
+          },
+          {
+            "actions": [
+              {
+                "entity": "payments",
+                "intent": "post-payments-confirmation"
+              }
+            ],
+            "children": [
+              {
+                "id": "payNowLabel",
+                "path": "0.2.0",
+                "pencil_node_id": "payNowLabel",
+                "role": "text",
+                "source_map": {
+                  "pencil_node_id": "payNowLabel",
+                  "pencil_path": "0.2.0"
+                },
+                "text": "Pay now",
+                "type": "text"
+              }
+            ],
+            "entity": "payments",
+            "id": "checkout.pay-now",
+            "intent": "post-payments-confirmation",
+            "name": "Pay now",
+            "path": "0.2",
+            "pencil_node_id": "payNowButton",
+            "role": "button",
+            "semantic_id": "checkout.pay-now",
+            "side_effects": [
+              {
+                "effect": "post-payments-confirmation",
+                "target": "payments"
+              }
+            ],
+            "source_map": {
+              "context": {
+                "entity": "payments",
+                "intent": "post-payments-confirmation",
+                "role": "button",
+                "semantic_id": "checkout.pay-now"
+              },
+              "notes": [
+                "section: ## Actions"
+              ],
+              "pencil_node_id": "payNowButton",
+              "pencil_path": "0.2",
+              "screen_spec": "examples/full/flow-ui-contract/screens/checkout.md",
+              "semantic_id": "checkout.pay-now"
+            },
+            "text": "Pay now",
+            "type": "frame",
+            "validations": [
+              {
+                "rule": "required-inputs-present",
+                "source": "POST /payments \u2192 confirmation"
+              }
+            ]
+          }
+        ],
+        "id": "checkout",
+        "name": "checkout",
+        "path": "0",
+        "pencil_node_id": "checkoutScreen",
+        "role": "screen",
+        "semantic_id": "checkout",
+        "side_effects": [
+          {
+            "effect": "the-submitting-state-is-shown-while-the-payment-request-is-in-flight",
+            "when": "The submitting state is shown while the payment request is in flight"
+          }
+        ],
+        "source_map": {
+          "context": {
+            "role": "screen",
+            "semantic_id": "checkout"
+          },
+          "mockup": "checkout.png",
+          "notes": [
+            "section: # \u00c9cran"
+          ],
+          "pencil_node_id": "checkoutScreen",
+          "pencil_path": "0",
+          "screen_spec": "examples/full/flow-ui-contract/screens/checkout.md",
+          "semantic_id": "checkout"
+        },
+        "state_kinds": [
+          "error"
+        ],
+        "states": [
+          {
+            "name": "default"
+          },
+          {
+            "name": "submitting"
+          },
+          {
+            "name": "error"
+          },
+          {
+            "name": "success"
+          }
+        ],
+        "text": "Order summary",
+        "type": "frame",
+        "validations": [
+          {
+            "message": "A selected payment method is required before submitting payment",
+            "rule": "a-selected-payment-method-is-required-before-submitting-payment"
+          }
+        ]
+      },
+      "source_map": {
+        "context": {
+          "role": "screen",
+          "semantic_id": "checkout"
+        },
+        "mockup": "checkout.png",
+        "notes": [
+          "section: # \u00c9cran"
+        ],
+        "pencil_node_id": "checkoutScreen",
+        "pencil_path": "0",
+        "screen_spec": "examples/full/flow-ui-contract/screens/checkout.md",
+        "semantic_id": "checkout"
+      },
+      "states": [
+        {
+          "name": "default"
+        },
+        {
+          "name": "submitting"
+        },
+        {
+          "name": "error"
+        },
+        {
+          "name": "success"
+        }
+      ],
+      "test_id": null,
+      "viewport": {
+        "height": 844,
+        "width": 390
+      }
+    }
+  ],
+  "source": "pencil-context",
+  "test_ids": [],
+  "version": 1
+}

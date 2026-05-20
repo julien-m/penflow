@@ -45,7 +45,20 @@ def load_tree(path: str | Path) -> dict[str, Any]:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def validate_actual_tree(tree: dict[str, Any]) -> list[dict[str, Any]]:
+def validate_actual_tree(tree: dict[str, Any], *, schema: bool = False) -> list[dict[str, Any]]:
+    """Validate an actual UI tree.
+
+    Args:
+        tree: Actual UI tree dict (contract C12).
+        schema: When True, also run JSON Schema validation against
+            ``penflow/schemas/actual-ui-tree.schema.json`` (draft 2020-12) and
+            merge schema errors into the returned issues list. Default ``False``
+            preserves byte-identical v0 behavior shipped by features 007/008.
+
+    Returns:
+        List of structured issues ``{severity, path, message}``. Empty list
+        means the tree is valid.
+    """
     issues: list[dict[str, Any]] = []
     if not isinstance(tree, dict):
         return [_issue("error", "$", "actual tree must be an object")]
@@ -69,6 +82,95 @@ def validate_actual_tree(tree: dict[str, Any]) -> list[dict[str, Any]]:
             issues.append(_issue("error", f"{path}.viewport", "viewport must be an object"))
         root = screen.get("root") or {"children": screen.get("nodes", [])}
         issues.extend(_validate_actual_node(root, f"{path}.root"))
+    if schema:
+        # Normalize the legacy flat single-screen form before schema check so
+        # existing v0 fixtures (feature 025) continue to validate against the
+        # canonical {version, screens:[…]} shape declared by C12 (FR-006).
+        canonical = normalize_actual_tree(tree) if isinstance(tree, dict) else tree
+        issues.extend(_validate_actual_tree_schema(canonical))
+    return issues
+
+
+def _validate_actual_tree_schema(tree: Any) -> list[dict[str, Any]]:
+    """Run the JSON Schema (draft 2020-12) validator on an actual UI tree.
+
+    Mirrors the optional-jsonschema-with-minimal-fallback pattern used by
+    ``validate_code_ir`` in ``penflow/contracts.py``. Errors are sorted
+    deterministically by ``(absolute_path, message)`` so the merged list is
+    reproducible across runs.
+    """
+    schema_path = Path(__file__).parent / "schemas" / "actual-ui-tree.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    try:
+        from jsonschema import Draft202012Validator  # type: ignore[import-not-found]
+    except ImportError:
+        return _validate_actual_tree_schema_minimal(tree, schema)
+    if not isinstance(tree, dict):
+        return [_issue("error", "$", "actual tree must be an object")]
+    validator = Draft202012Validator(schema)
+    raw_errors = list(validator.iter_errors(tree))
+    formatted: list[dict[str, Any]] = []
+    for error in raw_errors:
+        formatted.append(
+            _issue(
+                "error",
+                "$"
+                + "".join(
+                    f".{part}" if isinstance(part, str) else f"[{part}]"
+                    for part in error.absolute_path
+                ),
+                error.message,
+            )
+        )
+    formatted.sort(key=lambda item: (item["path"], item["message"]))
+    return formatted
+
+
+def _validate_actual_tree_schema_minimal(tree: Any, schema: dict[str, Any]) -> list[dict[str, Any]]:
+    """Minimal JSON Schema fallback when the ``jsonschema`` lib is unavailable.
+
+    Walks ``required`` at the root and recursively on each node, producing the
+    same ``{severity, path, message}`` shape as the full validator.
+    """
+    issues: list[dict[str, Any]] = []
+    if not isinstance(tree, dict):
+        return [_issue("error", "$", "actual tree must be an object")]
+    for key in schema.get("required", []) or []:
+        if key not in tree:
+            issues.append(_issue("error", f"$.{key}", f"'{key}' is a required property"))
+    for screen_index, screen in enumerate(tree.get("screens", []) or []):
+        screen_path = f"$.screens[{screen_index}]"
+        if not isinstance(screen, dict):
+            issues.append(_issue("error", screen_path, "screen must be an object"))
+            continue
+        for key in ("screen_id", "root"):
+            if key not in screen:
+                issues.append(
+                    _issue("error", f"{screen_path}.{key}", f"'{key}' is a required property")
+                )
+        root = screen.get("root")
+        if isinstance(root, dict):
+            issues.extend(_validate_node_schema_minimal(root, f"{screen_path}.root"))
+    issues.sort(key=lambda item: (item["path"], item["message"]))
+    return issues
+
+
+def _validate_node_schema_minimal(node: Any, path: str) -> list[dict[str, Any]]:
+    issues: list[dict[str, Any]] = []
+    if not isinstance(node, dict):
+        return [_issue("error", path, "node must be an object")]
+    for key in ("id", "role", "bbox"):
+        if key not in node:
+            issues.append(_issue("error", f"{path}.{key}", f"'{key}' is a required property"))
+    bbox = node.get("bbox")
+    if isinstance(bbox, dict):
+        for key in ("x", "y", "width", "height"):
+            if key not in bbox:
+                issues.append(
+                    _issue("error", f"{path}.bbox.{key}", f"'{key}' is a required property")
+                )
+    for index, child in enumerate(node.get("children", []) or []):
+        issues.extend(_validate_node_schema_minimal(child, f"{path}.children[{index}]"))
     return issues
 
 
@@ -81,13 +183,16 @@ def normalize_actual_tree(tree: dict[str, Any]) -> dict[str, Any]:
             {
                 "screen_id": tree.get("screen_id", "screen"),
                 "viewport": tree.get("viewport", {}),
-                "root": tree.get("root") or {"id": "root", "role": "container", "children": tree.get("nodes", [])},
+                "root": tree.get("root")
+                or {"id": "root", "role": "container", "children": tree.get("nodes", [])},
             }
         ],
     }
 
 
-def flatten_nodes(node: dict[str, Any], parent_id: str | None = None, order: int = 0) -> list[dict[str, Any]]:
+def flatten_nodes(
+    node: dict[str, Any], parent_id: str | None = None, order: int = 0
+) -> list[dict[str, Any]]:
     semantic_id = node.get("semantic_id") or node.get("id")
     item = dict(node)
     item["_semantic_key"] = semantic_id

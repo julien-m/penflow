@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 2,
+  "exports": [
+    {
+      "filename": "fresh_screen.png",
+      "sourceGeneratedAt": "2026-05-19T10:00:00Z",
+      "specFlow": "checkout",
+      "specScreen": "fresh_screen",
+      "specStatus": "fresh",
+      "specGeneratedAt": "2026-05-20T10:00:00Z"
+    },
+    {
+      "filename": "stale_screen.png",
+      "sourceGeneratedAt": "2026-05-20T10:00:00Z",
+      "specFlow": "checkout",
+      "specScreen": "stale_screen",
+      "specStatus": "fresh",
+      "specGeneratedAt": "2026-05-19T10:00:00Z"
+    },
+    {
+      "filename": "missing_spec.png",
+      "sourceGeneratedAt": "2026-05-20T10:00:00Z"
+    }
+  ]
+}

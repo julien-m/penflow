@@ -1,0 +1,23 @@
+{
+  "screens": [
+    {
+      "root": {
+        "bbox": {
+          "height": 844,
+          "width": 390,
+          "x": 0,
+          "y": 0
+        },
+        "children": [
+          {
+            "id": "checkout.title",
+            "role": "text"
+          }
+        ],
+        "id": "checkout",
+        "role": "screen"
+      },
+      "screen_id": "checkout"
+    }
+  ]
+}

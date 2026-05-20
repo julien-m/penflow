@@ -1,0 +1,142 @@
+{
+  "children": [
+    {
+      "alignItems": "stretch",
+      "children": [
+        {
+          "content": "Order summary",
+          "context": "binding=checkout.order_summary; entity=checkout; role=text; semantic_id=checkout.order-summary",
+          "fill": "#111827",
+          "fontSize": 24,
+          "fontWeight": "600",
+          "id": "orderSummary",
+          "name": "Order summary",
+          "source_map": {
+            "notes": [
+              "section: ## Donn\u00e9es affich\u00e9es"
+            ],
+            "screen_spec": "examples/full/flow-ui-contract/screens/checkout.md"
+          },
+          "textGrowth": "fixed-width",
+          "type": "text",
+          "width": "fill_container"
+        },
+        {
+          "content": "Selected payment method",
+          "context": "binding=checkout.selected_payment_method; entity=checkout; role=text; semantic_id=checkout.selected-payment-method",
+          "fill": "#374151",
+          "fontSize": 16,
+          "fontWeight": "400",
+          "id": "selectedPaymentMethod",
+          "name": "Selected payment method",
+          "source_map": {
+            "notes": [
+              "section: ## Donn\u00e9es affich\u00e9es"
+            ],
+            "screen_spec": "examples/full/flow-ui-contract/screens/checkout.md"
+          },
+          "textGrowth": "fixed-width",
+          "type": "text",
+          "width": "fill_container"
+        },
+        {
+          "alignItems": "center",
+          "children": [
+            {
+              "content": "Pay now",
+              "fill": "#FFFFFF",
+              "fontSize": 16,
+              "fontWeight": "600",
+              "id": "payNowLabel",
+              "type": "text"
+            }
+          ],
+          "context": "entity=payments; intent=post-payments-confirmation; role=button; semantic_id=checkout.pay-now",
+          "cornerRadius": 8,
+          "fill": "#0057FF",
+          "gap": 8,
+          "height": "fit_content(44)",
+          "id": "payNowButton",
+          "justifyContent": "center",
+          "layout": "horizontal",
+          "name": "Pay now",
+          "padding": [
+            12,
+            16
+          ],
+          "semantic": {
+            "side_effects": [
+              {
+                "effect": "post-payments-confirmation",
+                "target": "payments"
+              }
+            ],
+            "validations": [
+              {
+                "rule": "required-inputs-present",
+                "source": "POST /payments \u2192 confirmation"
+              }
+            ]
+          },
+          "source_map": {
+            "notes": [
+              "section: ## Actions"
+            ],
+            "screen_spec": "examples/full/flow-ui-contract/screens/checkout.md"
+          },
+          "type": "frame",
+          "width": "fill_container"
+        }
+      ],
+      "context": "role=screen; semantic_id=checkout",
+      "fill": "#FFFFFF",
+      "gap": 16,
+      "height": 844,
+      "id": "checkoutScreen",
+      "layout": "vertical",
+      "name": "checkout",
+      "padding": 24,
+      "semantic": {
+        "side_effects": [
+          {
+            "effect": "the-submitting-state-is-shown-while-the-payment-request-is-in-flight",
+            "when": "The submitting state is shown while the payment request is in flight"
+          }
+        ],
+        "states": [
+          {
+            "name": "default"
+          },
+          {
+            "name": "submitting"
+          },
+          {
+            "name": "error"
+          },
+          {
+            "name": "success"
+          }
+        ],
+        "validations": [
+          {
+            "message": "A selected payment method is required before submitting payment",
+            "rule": "a-selected-payment-method-is-required-before-submitting-payment"
+          }
+        ]
+      },
+      "source_map": {
+        "mockup": "checkout.png",
+        "notes": [
+          "section: # \u00c9cran"
+        ],
+        "pencil_node_id": "checkoutScreen",
+        "screen_spec": "examples/full/flow-ui-contract/screens/checkout.md"
+      },
+      "type": "frame",
+      "width": 390,
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "version": "2.11"
+}

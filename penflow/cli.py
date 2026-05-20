@@ -12,17 +12,28 @@ from typing import Any
 from .codegen import react, rust_dioxus, swiftui
 from .compare import compare_tree_files
 from .contracts import (
+    _raise_if_no_context,
     code_ir_from_contract,
+    code_ir_from_pen,
     extract_design_tokens,
     screen_contracts_from_flow,
     update_pencil,
+    validate_code_ir,
     validate_flow_contract,
     validate_screen_contract,
     write_pencil_draft,
 )
 from .demo import build_demo
+from .drift import detect_drift
+from .flow_specs import validate_flow_specs_dir
 from .llm import fix_compare_report, review_compare_report
 from .pen import inspect_pen, parse_pen, validate_pen_context
+from .reverse import reverse_pen
+from .semantic import write_semantic_tree
+from .semantic_draft import write_pen_draft_from_semantic_tree
+from .semantic_enrichment import enrich_pen_from_semantic_tree
+from .semantic_mapping import write_pencil_context_map
+from .semantic_validation import validate_semantic_tree_file
 from .tree import load_tree, validate_actual_tree, write_expected_tree
 
 
@@ -61,8 +72,80 @@ def build_parser() -> argparse.ArgumentParser:
     expected.add_argument("-o", "--out", default="expected-ui-tree.json")
     expected.set_defaults(func=cmd_export_expected)
 
+    semantic = sub.add_parser(
+        "export-semantic-tree", help="export semantic UI tree from flow-ui-contract specs"
+    )
+    semantic.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    semantic.add_argument("specs_dir")
+    semantic.add_argument("-o", "--out", default="semantic-ui-tree.json")
+    semantic.set_defaults(func=cmd_export_semantic_tree)
+
+    validate_flow_specs = sub.add_parser(
+        "validate-flow-specs", help="validate flow-ui-contract Markdown specs"
+    )
+    validate_flow_specs.add_argument(
+        "--json", action="store_true", help="print machine-readable JSON"
+    )
+    validate_flow_specs.add_argument("specs_dir")
+    validate_flow_specs.set_defaults(func=cmd_validate_flow_specs)
+
+    validate_semantic = sub.add_parser(
+        "validate-semantic-tree", help="validate semantic UI tree contract"
+    )
+    validate_semantic.add_argument(
+        "--json", action="store_true", help="print machine-readable JSON"
+    )
+    validate_semantic.add_argument("semantic_tree")
+    validate_semantic.set_defaults(func=cmd_validate_semantic_tree)
+
+    semantic_draft = sub.add_parser(
+        "draft-pen-from-tree", help="generate Pencil draft from semantic UI tree"
+    )
+    semantic_draft.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    semantic_draft.add_argument("semantic_tree")
+    semantic_draft.add_argument("-o", "--out", default="ui.pen")
+    semantic_draft.set_defaults(func=cmd_draft_pen_from_tree)
+
+    enrich = sub.add_parser("enrich-pen", help="enrich existing Pencil file from semantic UI tree")
+    enrich.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    enrich.add_argument("pen")
+    enrich.add_argument("semantic_tree")
+    enrich.add_argument("-o", "--out", required=True)
+    enrich.set_defaults(func=cmd_enrich_pen)
+
+    map_context = sub.add_parser("map-pencil-context", help="map semantic nodes to Pencil nodes")
+    map_context.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    map_context.add_argument("pen")
+    map_context.add_argument("semantic_tree")
+    map_context.add_argument("-o", "--out", required=True)
+    map_context.add_argument("--pen-out", default=None)
+    map_context.set_defaults(func=cmd_map_pencil_context)
+
+    reverse = sub.add_parser("reverse-pen", help="reverse Pencil file into flow specs")
+    reverse.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    reverse.add_argument("pen")
+    reverse.add_argument("--out", required=True)
+    reverse.add_argument("--enrich", action="store_true")
+    reverse.set_defaults(func=cmd_reverse_pen)
+
+    drift = sub.add_parser(
+        "detect-drift", help="detect drift across specs, semantic tree, and Pencil"
+    )
+    drift.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    drift.add_argument("specs_dir")
+    drift.add_argument("semantic_tree")
+    drift.add_argument("pen")
+    drift.add_argument("--out", required=True)
+    drift.add_argument("--markdown", default=None)
+    drift.set_defaults(func=cmd_detect_drift)
+
     actual = sub.add_parser("validate-actual", help="validate actual runtime UI tree")
     actual.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    actual.add_argument(
+        "--schema",
+        action="store_true",
+        help="also run JSON Schema validation (draft 2020-12)",
+    )
     actual.add_argument("actual")
     actual.set_defaults(func=cmd_validate_actual)
 
@@ -116,6 +199,18 @@ def build_parser() -> argparse.ArgumentParser:
     ir.add_argument("--expected", default=None)
     ir.add_argument("-o", "--out", default="code-ir.json")
     ir.set_defaults(func=cmd_export_ir)
+
+    code_ir = sub.add_parser(
+        "code-ir", help="export deterministic code IR from contextualized Pencil context"
+    )
+    code_ir.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    code_ir.add_argument("--from-context", dest="from_context", required=True)
+    code_ir.add_argument("--semantic-tree", dest="semantic_tree", default=None)
+    code_ir.add_argument("--context-map", dest="context_map", default=None)
+    code_ir.add_argument("--flow-id", dest="flow_id", default=None)
+    code_ir.add_argument("--flow-name", dest="flow_name", default=None)
+    code_ir.add_argument("-o", "--out", required=True)
+    code_ir.set_defaults(func=cmd_code_ir)
 
     codegen = sub.add_parser("codegen", help="generate SwiftUI, React, or Rust Dioxus code from IR")
     codegen.add_argument("--json", action="store_true", help="print machine-readable JSON")
@@ -172,8 +267,84 @@ def cmd_export_expected(args: argparse.Namespace) -> int:
     return 1 if _has_errors(tree["issues"]) else 0
 
 
+def cmd_export_semantic_tree(args: argparse.Namespace) -> int:
+    tree = write_semantic_tree(args.specs_dir, args.out)
+    _print(
+        {
+            "status": "PASS",
+            "out": args.out,
+            "flows": len(tree["flows"]),
+            "screens": len(tree["screens"]),
+        },
+        args.json,
+    )
+    return 0
+
+
+def cmd_validate_flow_specs(args: argparse.Namespace) -> int:
+    report = validate_flow_specs_dir(args.specs_dir)
+    _print(report, args.json)
+    return 0 if report["status"] == "PASS" else 1
+
+
+def cmd_validate_semantic_tree(args: argparse.Namespace) -> int:
+    passed, issues = validate_semantic_tree_file(args.semantic_tree)
+    _print({"status": "PASS" if passed else "FAIL", "issues": issues}, args.json)
+    return 0 if passed else 1
+
+
+def cmd_draft_pen_from_tree(args: argparse.Namespace) -> int:
+    passed, issues = validate_semantic_tree_file(args.semantic_tree)
+    if not passed:
+        _print({"status": "FAIL", "issues": issues}, args.json)
+        return 1
+    draft = write_pen_draft_from_semantic_tree(args.semantic_tree, args.out)
+    _print({"status": "PASS", "out": args.out, "screens": len(draft["children"])}, args.json)
+    return 0
+
+
+def cmd_enrich_pen(args: argparse.Namespace) -> int:
+    passed, issues = validate_semantic_tree_file(args.semantic_tree)
+    if not passed:
+        _print({"status": "FAIL", "issues": issues}, args.json)
+        return 1
+    report = enrich_pen_from_semantic_tree(args.pen, args.semantic_tree, args.out)
+    _print(report, args.json)
+    return 0
+
+
+def cmd_map_pencil_context(args: argparse.Namespace) -> int:
+    passed, issues = validate_semantic_tree_file(args.semantic_tree)
+    if not passed:
+        _print({"status": "FAIL", "issues": issues}, args.json)
+        return 1
+    context_map = write_pencil_context_map(
+        args.pen, args.semantic_tree, args.out, pen_out=args.pen_out
+    )
+    _print(context_map | {"out": args.out, "pen_out": args.pen_out}, args.json)
+    return 0
+
+
+def cmd_reverse_pen(args: argparse.Namespace) -> int:
+    report = reverse_pen(args.pen, args.out, enrich=args.enrich)
+    _print(report, args.json)
+    return 0
+
+
+def cmd_detect_drift(args: argparse.Namespace) -> int:
+    report = detect_drift(
+        args.specs_dir,
+        args.semantic_tree,
+        args.pen,
+        args.out,
+        markdown_path=args.markdown,
+    )
+    _print(report | {"out": args.out, "markdown": args.markdown}, args.json)
+    return 0 if report["status"] == "PASS" else 1
+
+
 def cmd_validate_actual(args: argparse.Namespace) -> int:
-    issues = validate_actual_tree(load_tree(args.actual))
+    issues = validate_actual_tree(load_tree(args.actual), schema=args.schema)
     _print({"status": "PASS" if not _has_errors(issues) else "FAIL", "issues": issues}, args.json)
     return 1 if _has_errors(issues) else 0
 
@@ -255,6 +426,29 @@ def cmd_export_ir(args: argparse.Namespace) -> int:
     ir = code_ir_from_contract(screen, expected)
     Path(args.out).write_text(json.dumps(ir, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     _print({"status": "PASS", "out": args.out}, args.json)
+    return 0
+
+
+def cmd_code_ir(args: argparse.Namespace) -> int:
+    ir = code_ir_from_pen(
+        args.from_context,
+        flow_id=args.flow_id,
+        flow_name=args.flow_name,
+        semantic_tree=args.semantic_tree,
+        context_map=args.context_map,
+    )
+    _raise_if_no_context(ir["screens"], args.from_context)
+    issues = validate_code_ir(ir)
+    errors = [issue for issue in issues if issue.get("severity") == "error"]
+    if errors:
+        raise PenflowError(
+            f"code IR failed schema validation: {errors[0]['path']}: {errors[0]['message']}"
+        )
+    Path(args.out).write_text(json.dumps(ir, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    _print(
+        {"status": "PASS", "out": args.out, "screens": len(ir["screens"]), "kind": ir["kind"]},
+        args.json,
+    )
     return 0
 
 

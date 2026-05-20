@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.dev/schemas/actual-ui-tree.schema.json",
+  "title": "Penflow Actual UI Tree",
+  "description": "After-code runtime UI tree (contract C12) emitted by external runtimes (SwiftUI, React, Rust/Dioxus, etc.) and validated by `penflow validate-actual`.",
+  "type": "object",
+  "required": ["version", "screens"],
+  "additionalProperties": true,
+  "properties": {
+    "version": {"type": "integer", "minimum": 1},
+    "screens": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/screen"}
+    }
+  },
+  "$defs": {
+    "screen": {
+      "type": "object",
+      "required": ["screen_id", "root"],
+      "additionalProperties": true,
+      "properties": {
+        "screen_id": {"type": "string"},
+        "viewport": {"$ref": "#/$defs/viewport"},
+        "root": {"$ref": "#/$defs/node"}
+      }
+    },
+    "viewport": {
+      "type": "object",
+      "required": ["width", "height"],
+      "additionalProperties": true,
+      "properties": {
+        "x": {"type": "number"},
+        "y": {"type": "number"},
+        "width": {"type": "number"},
+        "height": {"type": "number"}
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": ["id", "role", "bbox"],
+      "additionalProperties": true,
+      "properties": {
+        "id": {"type": "string"},
+        "role": {"type": "string"},
+        "bbox": {"$ref": "#/$defs/bbox"},
+        "pencil_id": {"type": "string"},
+        "semantic_id": {"type": "string"},
+        "name": {"type": ["string", "null"]},
+        "text": {"type": ["string", "null"]},
+        "visual": {"type": "object", "additionalProperties": true},
+        "context": {"type": "object", "additionalProperties": true},
+        "children": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/node"}
+        }
+      }
+    },
+    "bbox": {
+      "type": "object",
+      "required": ["x", "y", "width", "height"],
+      "additionalProperties": true,
+      "properties": {
+        "x": {"type": "number"},
+        "y": {"type": "number"},
+        "width": {"type": "number"},
+        "height": {"type": "number"}
+      }
+    }
+  }
+}

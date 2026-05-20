@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.dev/schemas/code-ir.schema.json",
+  "title": "Penflow Code IR",
+  "type": "object",
+  "required": ["version", "kind", "source", "flow", "screens"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "integer", "minimum": 1},
+    "kind": {"const": "penflow-code-ir"},
+    "source": {"const": "pencil-context"},
+    "flow": {
+      "type": "object",
+      "required": ["id", "name"],
+      "additionalProperties": true,
+      "properties": {
+        "id": {"type": "string"},
+        "name": {"type": "string"}
+      }
+    },
+    "screens": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/screen"}
+    },
+    "bindings": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "test_ids": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "actions": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "components": {
+      "type": "array",
+      "items": {"type": "object"}
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": {"type": "string"}
+    }
+  },
+  "$defs": {
+    "screen": {
+      "type": "object",
+      "required": ["id", "root", "source_map"],
+      "additionalProperties": true,
+      "properties": {
+        "id": {"type": "string"},
+        "name": {"type": "string"},
+        "flow_id": {"type": "string"},
+        "viewport": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "states": {"type": "array"},
+        "errors": {"type": "array"},
+        "test_id": {"type": "string"},
+        "source_map": {"$ref": "#/$defs/source_map"},
+        "root": {"$ref": "#/$defs/node"}
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": ["id", "pencil_node_id", "path", "type", "source_map"],
+      "additionalProperties": true,
+      "properties": {
+        "id": {"type": "string"},
+        "pencil_node_id": {"type": "string"},
+        "path": {"type": "string"},
+        "type": {"type": "string"},
+        "semantic_id": {"type": "string"},
+        "name": {"type": "string"},
+        "text": {"type": "string"},
+        "role": {"type": "string"},
+        "intent": {"type": "string"},
+        "binding": {"type": "string"},
+        "entity": {"type": "string"},
+        "test_id": {"type": "string"},
+        "actions": {
+          "type": "array",
+          "items": {"type": "object"}
+        },
+        "states": {"type": "array"},
+        "validations": {"type": "array"},
+        "side_effects": {"type": "array"},
+        "errors": {"type": "array"},
+        "state_kinds": {
+          "type": "array",
+          "items": {"enum": ["empty", "error", "loading"]}
+        },
+        "source_map": {"$ref": "#/$defs/source_map"},
+        "children": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/node"}
+        }
+      }
+    },
+    "source_map": {
+      "type": "object",
+      "required": ["pencil_node_id", "pencil_path"],
+      "additionalProperties": true,
+      "properties": {
+        "pencil_node_id": {"type": "string"},
+        "pencil_path": {"type": "string"},
+        "semantic_id": {"type": "string"},
+        "context": {"type": "object"},
+        "flow_spec": {"type": "string"},
+        "screen_spec": {"type": "string"}
+      }
+    }
+  }
+}
