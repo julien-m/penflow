@@ -209,7 +209,7 @@ Status mode reads `<target>/mockups/manifest.json` and reports each export as:
 Status command:
 
 ```bash
-python .agent-sync/skills/flow-ui-contract/validator.py --status --target <target>
+python3 .agent-sync/skills/flow-ui-contract/validator.py --status --target <target>
 ```
 
 Status output:

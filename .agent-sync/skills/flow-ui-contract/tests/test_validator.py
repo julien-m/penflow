@@ -5,7 +5,7 @@
 Each test class covers one category of BLOCKING checks.
 At least one pass + one fail case per category.
 
-Run: python -m pytest .agent-sync/skills/flow-ui-contract/tests/ -v
+Run: python3 -m pytest .agent-sync/skills/flow-ui-contract/tests/ -v
 """
 
 from __future__ import annotations

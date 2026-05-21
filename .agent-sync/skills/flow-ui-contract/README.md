@@ -31,10 +31,10 @@ The skill does not ask the LLM to hand-write `semantic-ui-tree.json`; Penflow ge
 ## Validator
 
 ```bash
-python .agent-sync/skills/flow-ui-contract/validator.py <target>/flow-ui-contract/flows/booking.md
-python .agent-sync/skills/flow-ui-contract/validator.py --dir <target>/flow-ui-contract
-python .agent-sync/skills/flow-ui-contract/validator.py booking.md --manifest <target>/mockups/manifest.json
-python .agent-sync/skills/flow-ui-contract/validator.py --status --target <target>
+python3 .agent-sync/skills/flow-ui-contract/validator.py <target>/flow-ui-contract/flows/booking.md
+python3 .agent-sync/skills/flow-ui-contract/validator.py --dir <target>/flow-ui-contract
+python3 .agent-sync/skills/flow-ui-contract/validator.py booking.md --manifest <target>/mockups/manifest.json
+python3 .agent-sync/skills/flow-ui-contract/validator.py --status --target <target>
 ```
 
 Exit codes: `0` = PASS, `1` = FAIL with at least one blocking error or missing status manifest.
@@ -87,10 +87,10 @@ penflow demo --out examples/full --json
 ## Tests
 
 ```bash
-python -m pytest .agent-sync/skills/flow-ui-contract/tests -v
+python3 -m pytest .agent-sync/skills/flow-ui-contract/tests -v
 ```
 
-The project-level suite also smoke-tests the migrated validator with `python -m pytest`.
+The project-level suite also smoke-tests the migrated validator with `python3 -m pytest`.
 
 ## Boundaries
 

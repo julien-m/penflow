@@ -166,9 +166,9 @@ Use the templates as skeletons and keep prose language consistent per file.
 ### Step 7 — Flow Spec Validation
 
 ```bash
-python .agent-sync/skills/flow-ui-contract/validator.py <path>
-python .agent-sync/skills/flow-ui-contract/validator.py --dir <target>/flow-ui-contract
-python .agent-sync/skills/flow-ui-contract/validator.py --status --target <target>
+python3 .agent-sync/skills/flow-ui-contract/validator.py <path>
+python3 .agent-sync/skills/flow-ui-contract/validator.py --dir <target>/flow-ui-contract
+python3 .agent-sync/skills/flow-ui-contract/validator.py --status --target <target>
 ```
 
 If validation fails, show the report, correct the draft, and re-run validation before treating the files as accepted.

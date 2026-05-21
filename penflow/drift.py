@@ -9,12 +9,15 @@ from typing import Any
 import yaml
 
 from .context import Context
-from .semantic_enrichment import _pen_records
+from .semantic_enrichment import PenRecord, _pen_records
 from .semantic_mapping import pencil_context_map
 from .semantic_validation import validate_semantic_tree
 
 CLARIFICATION = "[NEEDS CLARIFICATION]"
 REPORT_VERSION = 1
+PRESENTATIONAL_LEAF_TYPES = frozenset(
+    {"text", "icon_font", "line", "path", "rectangle", "ellipse", "polygon"}
+)
 
 
 def detect_drift(
@@ -206,11 +209,19 @@ def _uncovered_mockup_issues(
     pen: dict[str, Any], context_map: dict[str, Any]
 ) -> list[dict[str, Any]]:
     matched_ids = {str(item["pencil_node_id"]) for item in context_map["matched"]}
+    # Treat leaf-only visual descendants of mapped controls as covered while
+    # still reporting nested containers as drift.
+    covered_subtree_paths = {
+        tuple(int(part) for part in str(item["pencil_path"]).split("."))
+        for item in context_map["matched"]
+        if item.get("role") != "screen"
+    }
     issues = []
     for record in _pen_records(pen):
         node_id = str(record.node.get("id"))
         has_semantic_context = Context.from_raw(record.node.get("context")).semantic_id is not None
-        if node_id not in matched_ids and not has_semantic_context:
+        is_covered_child = _is_covered_visual_child(record, covered_subtree_paths)
+        if node_id not in matched_ids and not has_semantic_context and not is_covered_child:
             issues.append(
                 _issue(
                     "warning",
@@ -221,6 +232,19 @@ def _uncovered_mockup_issues(
                 )
             )
     return issues
+
+
+def _is_covered_visual_child(
+    record: PenRecord, covered_subtree_paths: set[tuple[int, ...]]
+) -> bool:
+    """Return true for simple presentational descendants of a mapped control."""
+    if not any(
+        record.path[: len(path)] == path and record.path != path for path in covered_subtree_paths
+    ):
+        return False
+    node_type = str(record.node.get("type", "frame"))
+    has_children = bool(record.node.get("children"))
+    return not has_children and node_type in PRESENTATIONAL_LEAF_TYPES
 
 
 def _clarification_issues(specs_dir: Path, tree: dict[str, Any]) -> list[dict[str, Any]]:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ast
+import json
 from pathlib import Path
 
 
@@ -7,6 +9,16 @@ ROOT = Path(__file__).resolve().parent.parent
 PENFLOW_SKILL = ROOT / ".agent-sync" / "skills" / "penflow" / "SKILL.md"
 FLOW_SKILL = ROOT / ".agent-sync" / "skills" / "flow-ui-contract" / "SKILL.md"
 FLOW_README = ROOT / ".agent-sync" / "skills" / "flow-ui-contract" / "README.md"
+MOCKUP_SKILL = ROOT / ".agent-sync" / "skills" / "mockup-factory" / "SKILL.md"
+MOCKUP_README = ROOT / ".agent-sync" / "skills" / "mockup-factory" / "README.md"
+MOCKUP_WORKFLOW = ROOT / ".agent-sync" / "skills" / "mockup-factory" / "references" / "workflow.md"
+MOCKUP_RUBRIC = (
+    ROOT / ".agent-sync" / "skills" / "mockup-factory" / "references" / "audit-rubric.md"
+)
+MOCKUP_VISUAL = (
+    ROOT / ".agent-sync" / "skills" / "mockup-factory" / "references" / "visual-validation.md"
+)
+EXAMPLE_VISUAL_DIR = ROOT / "examples" / "full" / ".mockup-validation" / "visual-evidence"
 SEMANTIC_TREE_REFERENCE = (
     ROOT / ".agent-sync" / "skills" / "flow-ui-contract" / "references" / "semantic-ui-tree.md"
 )
@@ -192,3 +204,165 @@ def test_project_integration_guide_is_discoverable() -> None:
     assert "Existing Project Integration" in readme
     assert "Project Integration Mode" in skill
     assert "../../../docs/project-integration.md" in skill
+
+
+def test_mockup_factory_skill_is_penflow_local_and_tree_aware() -> None:
+    skill = MOCKUP_SKILL.read_text(encoding="utf-8")
+    readme = MOCKUP_README.read_text(encoding="utf-8")
+    penflow_skill = PENFLOW_SKILL.read_text(encoding="utf-8")
+    root_readme = README.read_text(encoding="utf-8")
+    combined = "\n".join([skill, readme, penflow_skill, root_readme])
+
+    for phrase in (
+        "name: mockup-factory",
+        "Penflow-local guided UX/UI optimizer",
+        "flow-ui-contract/flows/*.md",
+        "semantic-ui-tree.json",
+        "ui.pen",
+        "pencil-context-map.json",
+        "expected-ui-tree.json",
+        "drift-report.json",
+        "penflow detect-drift",
+        "screen_id",
+        "semantic_id",
+        "pencil_node_id",
+        "Contract gate",
+        "UX/UI gate",
+    ):
+        assert phrase in combined
+
+    assert "Forbidden in Penflow Python core" in skill
+    assert "../mockup-factory/SKILL.md" in penflow_skill
+    assert ".agent-sync/skills/mockup-factory/SKILL.md" in root_readme
+    assert "ai-ressources remains a conventions/reference source" in readme
+
+
+def test_mockup_factory_visual_evidence_gate_is_documented() -> None:
+    skill = MOCKUP_SKILL.read_text(encoding="utf-8")
+    readme = MOCKUP_README.read_text(encoding="utf-8")
+    workflow = MOCKUP_WORKFLOW.read_text(encoding="utf-8")
+    rubric = MOCKUP_RUBRIC.read_text(encoding="utf-8")
+    visual = MOCKUP_VISUAL.read_text(encoding="utf-8")
+    penflow_skill = PENFLOW_SKILL.read_text(encoding="utf-8")
+    root_readme = README.read_text(encoding="utf-8")
+    project_guide = PROJECT_INTEGRATION.read_text(encoding="utf-8")
+    combined = "\n".join(
+        [skill, readme, workflow, rubric, visual, penflow_skill, root_readme, project_guide]
+    )
+
+    for phrase in (
+        "Visual Evidence Gate",
+        "snapshot_layout",
+        "get_screenshot",
+        "export PNG",
+        ".mockup-validation/visual-evidence/manifest.json",
+        "visual-report.md",
+        "BLOCKED_VISUAL_NOT_RUN",
+        "PASSED_WITH_WARNINGS",
+        "ESCALATED",
+        "layout snapshot",
+        "screenshot inspection",
+        "Pencil renderer",
+        "screen_id",
+        "semantic_id",
+        "pencil_node_id",
+    ):
+        assert phrase in combined
+
+
+def test_examples_full_visual_evidence_packet_is_real_and_anchored() -> None:
+    manifest_path = EXAMPLE_VISUAL_DIR / "manifest.json"
+    report_path = EXAMPLE_VISUAL_DIR / "visual-report.md"
+    png_path = EXAMPLE_VISUAL_DIR / "checkoutScreen.png"
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    report = report_path.read_text(encoding="utf-8")
+
+    assert manifest["renderer"] == "pencil-mcp"
+    assert manifest["sourceFile"] == "examples/full/ui.pen"
+    assert manifest["status"] == "PASSED_WITH_WARNINGS"
+    screen = manifest["screens"][0]
+    assert screen["screen_id"] == "checkout"
+    assert screen["semantic_id"] == "checkout"
+    assert screen["pencil_node_id"] == "checkoutScreen"
+    assert screen["png"] == "checkoutScreen.png"
+    assert screen["layout_checked"] is True
+    assert screen["screenshot_checked"] is True
+
+    assert png_path.exists()
+    assert png_path.stat().st_size > 0
+    for phrase in (
+        "Status: `PASSED_WITH_WARNINGS`",
+        "Renderer: `pencil-mcp`",
+        "`checkoutScreen`",
+        "snapshot_layout",
+        "get_screenshot",
+        "export_nodes",
+        "Density",
+        "Responsive behavior",
+    ):
+        assert phrase in report
+
+
+def test_mockup_factory_rubric_covers_guided_optimizer_gate() -> None:
+    workflow = MOCKUP_WORKFLOW.read_text(encoding="utf-8")
+    rubric = MOCKUP_RUBRIC.read_text(encoding="utf-8")
+    project_guide = PROJECT_INTEGRATION.read_text(encoding="utf-8")
+    combined = workflow + "\n" + rubric + "\n" + project_guide
+
+    for phrase in (
+        "Freeze a checklist",
+        "Fix only checklist items",
+        "PASS",
+        "PASSED_WITH_WARNINGS",
+        "ESCALATED",
+        "Semantic contract",
+        "Visual alignment",
+        "Hierarchy",
+        "CTA placement",
+        "Density",
+        "Accessibility",
+        "Responsive behavior",
+        "Modernity",
+        "Polish",
+        "critical UX/UI issues",
+    ):
+        assert phrase in combined
+
+
+def test_penflow_python_core_has_no_mockup_factory_runtime_dependencies() -> None:
+    forbidden_imports = (
+        "appium",
+        "browser_use",
+        "cc_hub",
+        "mcp__pencil",
+        "playwright",
+        "selenium",
+    )
+
+    for path in (ROOT / "penflow").rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        imports: list[str] = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imports.extend(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imports.append(node.module)
+
+        for token in forbidden_imports:
+            assert all(not module.startswith(token) for module in imports), (
+                f"{path} must not import {token}"
+            )
+
+    pyproject = (ROOT / "pyproject.toml").read_text(encoding="utf-8").lower()
+    for token in (
+        "appium",
+        "browser-use",
+        "cc-hub",
+        "mcp-pencil",
+        "playwright",
+        "react-native",
+        "selenium",
+        "xcode",
+    ):
+        assert token not in pyproject

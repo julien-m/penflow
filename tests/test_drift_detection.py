@@ -84,6 +84,13 @@ def aligned_pen() -> dict:
                         "type": "frame",
                         "name": "Pay",
                         "context": "semantic_id=checkout.pay; role=button; intent=submit_payment",
+                        "children": [
+                            {
+                                "id": "payButtonLabel",
+                                "type": "text",
+                                "content": "Pay",
+                            }
+                        ],
                     },
                 ],
             }
@@ -250,3 +257,24 @@ def test_detect_drift_cli_writes_json_and_markdown(tmp_path: Path) -> None:
     assert report["kind"] == "penflow-drift-report"
     assert report["status"] == "PASS"
     assert markdown_path.exists()
+
+
+def test_detect_drift_reports_nested_unmapped_containers(tmp_path: Path) -> None:
+    specs_dir = write_specs(tmp_path)
+    tree_path = write_json(tmp_path / "semantic-ui-tree.json", aligned_tree())
+    pen = aligned_pen()
+    pay_button = pen["children"][0]["children"][1]
+    pay_button["children"].append(
+        {
+            "id": "nestedPromo",
+            "type": "frame",
+            "name": "Promo",
+            "children": [{"id": "nestedPromoLabel", "type": "text", "content": "Promo"}],
+        }
+    )
+    pen_path = write_json(tmp_path / "ui.pen", pen)
+
+    report = detect_drift(specs_dir, tree_path, pen_path, tmp_path / "drift-report.json")
+
+    assert report["status"] == "DRIFT"
+    assert any(issue.get("pencil_node_id") == "nestedPromo" for issue in report["issues"])

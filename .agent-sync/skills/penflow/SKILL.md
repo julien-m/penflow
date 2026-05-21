@@ -47,12 +47,19 @@ For the semantic-tree formation rules, **Read** [`../flow-ui-contract/references
 | "Reconstruct flows from legacy Pencil" | Reverse mode |
 | "Compare implementation with design contract" | Post-implementation compare mode |
 | "Show me the whole chain" | Full demo mode |
+| "Generate, audit, or optimize Pencil mockups" | Mockup Factory mode |
 
 ## Project Integration Mode
 
 Use when a user already has an application repository and asks how to adopt Penflow, where to store artifacts, how to migrate existing Pencil mockups, or how agents should consume Penflow outputs.
 
 **Read** [`../../../docs/project-integration.md`](../../../docs/project-integration.md). It covers the recommended `penflow/` workspace, forward adoption, existing-Pencil enrichment, legacy reverse migration, code IR handoff, runtime `actual-ui-tree.json` verification, and CI gate.
+
+## Mockup Factory Mode
+
+Use when a user asks for mockup generation, audit, optimization, or `/mockup-factory` on Pencil `.pen` files.
+
+**Read** [`../mockup-factory/SKILL.md`](../mockup-factory/SKILL.md). It is the Penflow-local canonical workflow for guided UX/UI optimization. It requires `flow-ui-contract`, `semantic-ui-tree.json`, `.pen`, `pencil-context-map.json`, `expected-ui-tree.json`, and `detect-drift` as deterministic anchors before any Pencil/Codex audit loop. **Read** [`../mockup-factory/references/visual-validation.md`](../mockup-factory/references/visual-validation.md) before applying the Visual Evidence Gate: layout snapshot, screenshot inspection, PNG export, manifest, and visual report when a renderer is available. UX/UI improvements must be tied to audited checklist items and `screen_id` / `semantic_id` / `pencil_node_id` when available.
 
 ## Forward Mode
 

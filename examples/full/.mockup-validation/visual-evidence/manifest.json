@@ -1,0 +1,17 @@
+{
+  "renderer": "pencil-mcp",
+  "sourceFile": "examples/full/ui.pen",
+  "status": "PASSED_WITH_WARNINGS",
+  "validatedAt": "2026-05-21",
+  "screens": [
+    {
+      "screen_id": "checkout",
+      "semantic_id": "checkout",
+      "pencil_node_id": "checkoutScreen",
+      "png": "checkoutScreen.png",
+      "layout_checked": true,
+      "screenshot_checked": true,
+      "notes": "Real Pencil MCP screenshot/export completed; minimal fixture is structurally clean but visually sparse."
+    }
+  ]
+}

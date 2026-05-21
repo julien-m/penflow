@@ -5,9 +5,9 @@
 """flow-ui-contract validator — enforces the grammar contract defined in references/grammar.md.
 
 Usage:
-    python validator.py <path-to-spec.md>
-    python validator.py --dir <specs-directory>
-    python validator.py <path> --manifest <path-to-manifest.json>
+    python3 validator.py <path-to-spec.md>
+    python3 validator.py --dir <specs-directory>
+    python3 validator.py <path> --manifest <path-to-manifest.json>
 
 Exit codes:
     0 = PASS (no BLOCKING errors)

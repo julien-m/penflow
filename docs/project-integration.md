@@ -166,6 +166,33 @@ Adapter guides:
 - **Read** [`adapters/swiftui-xctest.md`](adapters/swiftui-xctest.md) for SwiftUI + XCTest.
 - **Read** [`adapters/react-native.md`](adapters/react-native.md) for React Native.
 
+## Guided Mockup Optimization
+
+**Read** [`../.agent-sync/skills/mockup-factory/SKILL.md`](../.agent-sync/skills/mockup-factory/SKILL.md) after the project has valid Penflow anchors and needs Pencil mockup generation, audit, or optimization.
+
+Mockup Factory requires these project-local artifacts before UX/UI work starts:
+
+- `penflow/flow-ui-contract/`
+- `penflow/semantic-ui-tree.json`
+- `penflow/ui.pen` or `penflow/ui.enriched.pen`
+- `penflow/pencil-context-map.json`
+- `penflow/expected-ui-tree.json`
+- `penflow/drift-report.json`
+
+The skill is a guided optimizer, not a freeform redesign tool. Every UX/UI fix must reference an audited checklist item and the best available anchor: `screen_id`, `semantic_id`, or `pencil_node_id`. PASS requires semantic contract coherence, no critical UX/UI issues in visual alignment, hierarchy, CTA placement, density, accessibility, responsive behavior, modernity, or polish, and the Visual Evidence Gate from **Read** [`../.agent-sync/skills/mockup-factory/references/visual-validation.md`](../.agent-sync/skills/mockup-factory/references/visual-validation.md).
+
+When Pencil rendering is available, store proof next to the workspace:
+
+```text
+penflow/.mockup-validation/
+  visual-evidence/
+    manifest.json
+    visual-report.md
+    checkout.png
+```
+
+If the renderer is unavailable, record `BLOCKED_VISUAL_NOT_RUN` or escalate; do not call the mockup visually validated from tree checks alone.
+
 ## CI Gate
 
 A minimal CI gate for a project-local Penflow workspace:

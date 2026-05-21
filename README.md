@@ -5,7 +5,7 @@ Penflow is a deterministic Python CLI for Pencil `.pen` design contracts. It par
 ## Install
 
 ```bash
-python -m pip install -e ".[dev]"
+python3 -m pip install -e ".[dev]"
 ```
 
 ## Core Commands
@@ -57,6 +57,12 @@ Run `penflow demo --out examples/full` to regenerate the contract **C14** fixtur
 ### Existing Project Integration
 
 **Read** [`docs/project-integration.md`](docs/project-integration.md) when adding Penflow to an existing app repository. It explains the recommended `penflow/` workspace layout, forward adoption, Pencil enrichment, legacy reverse migration, implementation handoff through `code-ir.json`, runtime `actual-ui-tree.json` verification, and a minimal CI gate.
+
+### Guided Mockup Optimization
+
+**Read** [`.agent-sync/skills/mockup-factory/SKILL.md`](.agent-sync/skills/mockup-factory/SKILL.md) when generating, auditing, or optimizing Pencil mockups. The Penflow-local Mockup Factory uses `flow-ui-contract`, `semantic-ui-tree.json`, `.pen`, `pencil-context-map.json`, `expected-ui-tree.json`, and `detect-drift` reports as deterministic anchors, then gates PASS on both contract coherence and critical UX/UI quality.
+
+Before final PASS, Mockup Factory also runs the Visual Evidence Gate. **Read** [`.agent-sync/skills/mockup-factory/references/visual-validation.md`](.agent-sync/skills/mockup-factory/references/visual-validation.md) before applying it. When Pencil rendering is available, the gate must inspect a screenshot, export PNGs, and write `.mockup-validation/visual-evidence/manifest.json` plus `visual-report.md`; otherwise the status is `BLOCKED_VISUAL_NOT_RUN` or escalated rather than silently passing structural-only validation.
 
 ### LLM Workflow Sequences
 
@@ -160,7 +166,9 @@ penflow compare-tree examples/full/expected-ui-tree.json examples/full/actual-ui
 
 **Read** [`.agent-sync/skills/penflow/SKILL.md`](.agent-sync/skills/penflow/SKILL.md) to use the project-local skill interface. It is stored under `.agent-sync/skills/` so cc-hub/agent-sync can symlink it when requested.
 
-**Read** [`.agent-sync/skills/flow-ui-contract/SKILL.md`](.agent-sync/skills/flow-ui-contract/SKILL.md) to capture flow/screen behavior around Pencil artifacts. Invoke the installed skill as `flow-ui-contract`; legacy wording such as `specify flows` should route there, but no separate `specify-flows` slash command is installed. It writes validated `flow-ui-contract/flows/*.md` and `flow-ui-contract/screens/*.md` files, and reports `fresh` / `stale` / `unspecified` coverage with `python .agent-sync/skills/flow-ui-contract/validator.py --status --target <target>`.
+**Read** [`.agent-sync/skills/flow-ui-contract/SKILL.md`](.agent-sync/skills/flow-ui-contract/SKILL.md) to capture flow/screen behavior around Pencil artifacts. Invoke the installed skill as `flow-ui-contract`; legacy wording such as `specify flows` should route there, but no separate `specify-flows` slash command is installed. It writes validated `flow-ui-contract/flows/*.md` and `flow-ui-contract/screens/*.md` files, and reports `fresh` / `stale` / `unspecified` coverage with `python3 .agent-sync/skills/flow-ui-contract/validator.py --status --target <target>`.
+
+**Read** [`.agent-sync/skills/mockup-factory/SKILL.md`](.agent-sync/skills/mockup-factory/SKILL.md) to run the tree-aware guided UX/UI optimizer for Pencil mockups. The skill can orchestrate external Pencil/audit tooling, but Penflow Python core stays runtime-agnostic.
 
 The pre-Pencil semantic contract is defined in [`penflow/schemas/semantic-ui-tree.schema.json`](penflow/schemas/semantic-ui-tree.schema.json), with a deterministic example at [`examples/demo/semantic-ui-tree.json`](examples/demo/semantic-ui-tree.json). Export it from flow/screen Markdown with `penflow export-semantic-tree path/to/flow-ui-contract --out semantic-ui-tree.json`, validate it with `penflow validate-semantic-tree semantic-ui-tree.json --json`, then create a structural Pencil draft with `penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --json`, enrich an existing Pencil file with `penflow enrich-pen existing-ui.pen semantic-ui-tree.json --out ui.enriched.pen --json`, emit an explicit mapping artifact with `penflow map-pencil-context ui.pen semantic-ui-tree.json --out pencil-context-map.json --json`, reverse an existing Pencil file with `penflow reverse-pen ui.pen --out reverse-output --json`, or report drift with `penflow detect-drift path/to/flow-ui-contract semantic-ui-tree.json ui.pen --out drift-report.json --markdown drift-report.md --json`. This schema is distinct from post-implementation actual UI trees.
 
