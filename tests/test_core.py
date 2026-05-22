@@ -155,6 +155,42 @@ def test_compare_honors_bbox_tolerance(tmp_path: Path) -> None:
     assert any(issue["code"] == "node.bbox.x" for issue in report["issues"])
 
 
+def test_compare_ignores_unmeasurable_expected_bbox(tmp_path: Path) -> None:
+    pen_path = write_json(tmp_path / "ui.pen", sample_pen())
+    expected = expected_tree_from_pen(pen_path)
+    root = expected["screens"][0]["root"]
+    expected["screens"][0]["root"] = {
+        **root,
+        "children": [
+            {
+                **root["children"][0],
+                "bbox": {"x": 0, "y": 0, "width": 0, "height": 0},
+            },
+            root["children"][1],
+        ],
+    }
+    actual = {
+        "version": 1,
+        "screen_id": "checkout",
+        "viewport": {"width": 390, "height": 844},
+        "root": {
+            **expected["screens"][0]["root"],
+            "children": [
+                {
+                    **expected["screens"][0]["root"]["children"][0],
+                    "bbox": {"x": 40, "y": 72, "width": 260, "height": 32},
+                },
+                expected["screens"][0]["root"]["children"][1],
+            ],
+        },
+    }
+
+    report = compare_trees(expected, {"version": 1, "screens": [actual]})
+
+    assert report["status"] == "PASS"
+    assert not any(issue["code"].startswith("node.bbox") for issue in report["issues"])
+
+
 def test_compare_masks_volatile_nodes_and_dynamic_text(tmp_path: Path) -> None:
     data = sample_pen()
     data["children"][0]["children"].extend(

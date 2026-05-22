@@ -98,6 +98,8 @@ def _flow_from_markdown(path: Path, screens: list[dict[str, Any]]) -> dict[str, 
 def _screen_from_markdown(path: Path) -> dict[str, Any]:
     frontmatter, content = _parse_markdown(path)
     screen_id = str(frontmatter["screen"])
+    surface = _surface_from_frontmatter(frontmatter, screen_id)
+    viewport = _viewport_from_frontmatter(frontmatter, surface)
     sections = _sections(content)
     data_nodes = _data_nodes(screen_id, sections.get("## Données affichées", ""), path)
     action_nodes = _action_nodes(screen_id, sections.get("## Actions", ""), path)
@@ -108,8 +110,8 @@ def _screen_from_markdown(path: Path) -> dict[str, Any]:
     return {
         "id": screen_id,
         "flow_id": str(frontmatter["flow"]),
-        "surface": _surface_from_screen(screen_id),
-        "viewport": {"width": 390, "height": 844},
+        "surface": surface,
+        "viewport": viewport,
         "states": states,
         "validations": validations,
         "side_effects": side_effects,
@@ -184,6 +186,8 @@ def _data_nodes(screen_id: str, section: str, path: Path) -> list[dict[str, Any]
 def _action_nodes(screen_id: str, section: str, path: Path) -> list[dict[str, Any]]:
     nodes = []
     for element, role, effect in _action_rows(section):
+        if _is_non_visual_transition_action(element, role):
+            continue
         slug = _slug(element)
         nodes.append(
             {
@@ -210,6 +214,30 @@ def _group_screens_by_flow(screens: list[dict[str, Any]]) -> dict[str, list[dict
     for flow_screens in grouped.values():
         flow_screens.sort(key=lambda item: item["id"])
     return grouped
+
+
+def _surface_from_frontmatter(frontmatter: dict[str, Any], screen_id: str) -> str:
+    for key in ("platform", "surface"):
+        value = frontmatter.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return _surface_from_screen(screen_id)
+
+
+def _viewport_from_frontmatter(frontmatter: dict[str, Any], surface: str) -> dict[str, int]:
+    value = frontmatter.get("viewport")
+    if isinstance(value, dict):
+        width = value.get("width")
+        height = value.get("height")
+        if isinstance(width, int | float) and isinstance(height, int | float):
+            return {"width": int(width), "height": int(height)}
+    if isinstance(value, str):
+        match = re.match(r"^\s*(\d+)\s*x\s*(\d+)\s*$", value)
+        if match:
+            return {"width": int(match.group(1)), "height": int(match.group(2))}
+    if surface == "web-desktop":
+        return {"width": 1440, "height": 900}
+    return {"width": 390, "height": 844}
 
 
 def _transitions_from_flow(content: str, entry_screen: str) -> list[dict[str, str]]:
@@ -276,6 +304,20 @@ def _role_from_action_type(action_type: str) -> str:
     return {"tap": "component", "button": "button", "link": "link", "input": "input"}.get(
         normalized, "button"
     )
+
+
+def _is_non_visual_transition_action(element: str, action_type: str) -> bool:
+    element_slug = _slug(element)
+    action_slug = _slug(action_type)
+    non_visual_elements = {
+        "escape-key",
+        "esc-key",
+        "backdrop",
+        "backdrop-click",
+        "click-backdrop",
+    }
+    non_visual_types = {"keyboard-event", "flow-transition"}
+    return element_slug in non_visual_elements or action_slug in non_visual_types
 
 
 def _entity_from_effect(effect: str) -> str:

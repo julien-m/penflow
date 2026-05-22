@@ -205,6 +205,8 @@ def _compare_bbox(
     tolerance: dict[str, Any],
 ) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
+    if not _bbox_is_measurable(expected):
+        return issues
     limit = float(tolerance.get("bbox_px", DEFAULT_TOLERANCE["bbox_px"]))
     for key in ("x", "y", "width", "height"):
         if key not in expected or key not in actual:
@@ -212,6 +214,13 @@ def _compare_bbox(
         if abs(float(expected[key]) - float(actual[key])) > limit:
             issues.append(_issue("warning", f"node.bbox.{key}", semantic_id, f"bbox {key} differs"))
     return issues
+
+
+def _bbox_is_measurable(bbox: dict[str, Any]) -> bool:
+    try:
+        return float(bbox.get("width", 0)) > 0 and float(bbox.get("height", 0)) > 0
+    except (TypeError, ValueError):
+        return False
 
 
 def _compare_visual(
