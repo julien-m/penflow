@@ -70,3 +70,67 @@ def test_draft_pen_from_tree_cli_writes_json_and_validate_pen_compatible(tmp_pat
 
     assert main(["draft-pen-from-tree", str(tree_path), "--out", str(out_path), "--json"]) == 0
     assert main(["validate-pen", str(out_path), "--json"]) == 0
+
+
+def test_write_pen_draft_from_semantic_tree_applies_theme_tokens(tmp_path: Path) -> None:
+    tree_path = tmp_path / "semantic-ui-tree.json"
+    tree_path.write_text(json.dumps(load_example_without_mockup()), encoding="utf-8")
+    theme_path = tmp_path / "theme.css"
+    theme_path.write_text(
+        """:root {
+  --background: #f6f4ef;
+  --foreground: #25302a;
+  --card: #ffffff;
+  --primary: #0f5132;
+  --primary-foreground: #fffaf0;
+  --border: #d7d2c8;
+  --muted: #ebe6da;
+  --muted-foreground: #6a655c;
+  --radius: 0.5rem;
+  --font-sans: Inter, system-ui, sans-serif;
+}
+""",
+        encoding="utf-8",
+    )
+    out_path = tmp_path / "ui.pen"
+
+    draft = write_pen_draft_from_semantic_tree(tree_path, out_path, theme_css_path=theme_path)
+
+    assert draft["variables"]["pf-primary"] == {"type": "color", "value": "#0f5132"}
+    root = draft["children"][0]
+    button = root["children"][1]
+    assert root["fill"] == "$pf-background"
+    assert button["fill"] == "$pf-primary"
+    assert "#0057FF" not in out_path.read_text(encoding="utf-8")
+    assert "semantic_id=checkout.pay" in button["context"]
+
+
+def test_draft_pen_from_tree_cli_accepts_theme_css(tmp_path: Path) -> None:
+    tree_path = tmp_path / "semantic-ui-tree.json"
+    tree_path.write_text(json.dumps(load_example_without_mockup()), encoding="utf-8")
+    theme_path = tmp_path / "theme.css"
+    theme_path.write_text(
+        ":root { --background: #f6f4ef; --foreground: #25302a; --primary: #0f5132; --primary-foreground: #fffaf0; --card: #ffffff; --border: #d7d2c8; }",
+        encoding="utf-8",
+    )
+    out_path = tmp_path / "ui.pen"
+
+    assert (
+        main(
+            [
+                "draft-pen-from-tree",
+                str(tree_path),
+                "--out",
+                str(out_path),
+                "--theme-css",
+                str(theme_path),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    data = json.loads(out_path.read_text(encoding="utf-8"))
+
+    assert data["variables"]["pf-primary"]["value"] == "#0f5132"
+    assert data["children"][0]["fill"] == "$pf-background"
+    assert main(["validate-pen", str(out_path), "--json"]) == 0

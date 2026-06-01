@@ -2,8 +2,8 @@
 name: mockup-factory
 description: >
   Penflow-local guided UX/UI optimizer for Pencil mockups. Uses flow-ui-contract,
-  semantic-ui-tree, .pen, pencil-context-map, expected-ui-tree, and detect-drift
-  reports as deterministic anchors before any Pencil/Codex audit loop.
+  semantic-ui-tree, theme.css, .pen, pencil-context-map, expected-ui-tree, and
+  detect-drift reports as deterministic anchors before any Pencil/Codex audit loop.
 ---
 
 # Mockup Factory — Penflow Guided Optimizer
@@ -20,6 +20,7 @@ Treat these artifacts as first-class inputs, not optional notes:
 
 - `flow-ui-contract/flows/*.md` and `flow-ui-contract/screens/*.md` — product behavior source.
 - `semantic-ui-tree.json` — before-code semantic anchor exported from flow specs.
+- `theme.css` — product theme input for canonical forward Pencil composition.
 - `ui.pen` or `ui.enriched.pen` — Pencil visual contract to optimize.
 - `pencil-context-map.json` — `screen_id` / `semantic_id` / `pencil_node_id` linkage and ambiguity buckets.
 - `expected-ui-tree.json` — design-derived structural baseline.
@@ -34,6 +35,7 @@ Run from the target project root and produce missing anchors before auditing UX:
 penflow validate-flow-specs <target>/flow-ui-contract --json
 penflow export-semantic-tree <target>/flow-ui-contract --out <target>/semantic-ui-tree.json --json
 penflow validate-semantic-tree <target>/semantic-ui-tree.json --json
+penflow draft-pen-from-tree <target>/semantic-ui-tree.json --out <target>/ui.pen --theme-css <target>/theme.css --json
 penflow validate-pen <target>/ui.pen --json
 penflow map-pencil-context <target>/ui.pen <target>/semantic-ui-tree.json --out <target>/pencil-context-map.json --json
 penflow export-expected <target>/ui.pen --out <target>/expected-ui-tree.json --json
@@ -42,9 +44,20 @@ penflow detect-drift <target>/flow-ui-contract <target>/semantic-ui-tree.json <t
 
 If any command fails, stop and report the failing artifact. Do not optimize a mockup whose semantic anchors are invalid.
 
+## Design Convention Gate
+
+Before auditing, generating, or fixing any `.pen`, **Read** [`../../../.conventions/index.md`](../../../.conventions/index.md), then load every matching design domain. Treat the loaded convention files as acceptance criteria for visual validity.
+
+- Always load `design-tokens`, `design-components`, `design-views`, and `design-quality`.
+- Load `design-dataviz` for dashboard, metrics, KPI, chart, analytics, and usage screens.
+- Load `design-payments` for payment, checkout, billing, subscription, pricing, tip, donation, card form, and order summary screens.
+- Load `design-realtime` for live status, websocket, SSE, progress, or streaming screens.
+
+A themed but structurally generic output is a failure. Reject screens that ignore required app shell, payment, dashboard, form, table/list, empty/loading/error, responsive, or accessibility patterns from the conventions.
+
 ## Workflow
 
-1. **Load anchors:** **Read** [`references/workflow.md`](references/workflow.md) for the end-to-end loop, **Read** [`references/audit-rubric.md`](references/audit-rubric.md) for the UX + contract quality gate, and **Read** [`references/visual-validation.md`](references/visual-validation.md) for the Visual Evidence Gate.
+1. **Load anchors and conventions:** **Read** [`references/workflow.md`](references/workflow.md), **Read** [`references/audit-rubric.md`](references/audit-rubric.md), **Read** [`references/visual-validation.md`](references/visual-validation.md), then apply the Design Convention Gate above.
 2. **Build an anchor table:** for every screen, list `screen_id`, `semantic_id`, `pencil_node_id` when available, source flow/screen file, and drift severity.
 3. **Freeze checklist:** write or update only the orchestrator-owned checklist under `.mockup-validation/<group>/checklist.md`; each item must reference `screen_id` plus `semantic_id` or `pencil_node_id` when available.
 4. **Audit UX + contract:** use the rubric to identify semantic contract gaps and critical UX/UI issues. A critical issue in either category blocks PASS.

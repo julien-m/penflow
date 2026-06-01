@@ -36,6 +36,7 @@ For the semantic-tree formation rules, **Read** [`../flow-ui-contract/references
   python3 -m pip install -e ".[dev]"
   ```
 - **Read** [`README.md`](../../../README.md) for project-level command examples when a user asks for the full workflow.
+- Before any UI flow, Pencil draft, mockup, or visual validation work, **Read** [`../../../.conventions/index.md`](../../../.conventions/index.md) and load all matching design domains. UI work must use the convention-defined view/component patterns, not only theme colors.
 
 ## Mode Selection
 
@@ -59,7 +60,7 @@ Use when a user already has an application repository and asks how to adopt Penf
 
 Use when a user asks for mockup generation, audit, optimization, or `/mockup-factory` on Pencil `.pen` files.
 
-**Read** [`../mockup-factory/SKILL.md`](../mockup-factory/SKILL.md). It is the Penflow-local canonical workflow for guided UX/UI optimization. It requires `flow-ui-contract`, `semantic-ui-tree.json`, `.pen`, `pencil-context-map.json`, `expected-ui-tree.json`, and `detect-drift` as deterministic anchors before any Pencil/Codex audit loop. **Read** [`../mockup-factory/references/visual-validation.md`](../mockup-factory/references/visual-validation.md) before applying the Visual Evidence Gate: layout snapshot, screenshot inspection, PNG export, manifest, and visual report when a renderer is available. UX/UI improvements must be tied to audited checklist items and `screen_id` / `semantic_id` / `pencil_node_id` when available.
+**Read** [`../mockup-factory/SKILL.md`](../mockup-factory/SKILL.md). It is the Penflow-local canonical workflow for guided UX/UI optimization. It requires `flow-ui-contract`, `semantic-ui-tree.json`, `theme.css`, `.pen`, `pencil-context-map.json`, `expected-ui-tree.json`, and `detect-drift` as deterministic anchors before any Pencil/Codex audit loop. **Read** [`../mockup-factory/references/visual-validation.md`](../mockup-factory/references/visual-validation.md) before applying the Visual Evidence Gate: layout snapshot, screenshot inspection, PNG export, manifest, and visual report when a renderer is available. UX/UI improvements must be tied to audited checklist items and `screen_id` / `semantic_id` / `pencil_node_id` when available.
 
 ## Forward Mode
 
@@ -69,7 +70,7 @@ Use when flow/screen Markdown is the source of truth.
 penflow validate-flow-specs examples/full/flow-ui-contract --json
 penflow export-semantic-tree examples/full/flow-ui-contract --out semantic-ui-tree.json --json
 penflow validate-semantic-tree semantic-ui-tree.json --json
-penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --json
+penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --theme-css theme.css --json
 penflow validate-pen ui.pen --json
 penflow export-expected ui.pen --out expected-ui-tree.json --json
 penflow code-ir --from-context ui.pen --semantic-tree semantic-ui-tree.json --flow-id checkout --flow-name "Checkout flow" --out code-ir.json --json
@@ -126,7 +127,7 @@ python3 -m pytest -q
 penflow validate-flow-specs examples/full/flow-ui-contract --json
 penflow export-semantic-tree examples/full/flow-ui-contract --out /tmp/semantic-ui-tree.json --json
 penflow validate-semantic-tree /tmp/semantic-ui-tree.json --json
-penflow draft-pen-from-tree /tmp/semantic-ui-tree.json --out /tmp/ui.pen --json
+penflow draft-pen-from-tree /tmp/semantic-ui-tree.json --out /tmp/ui.pen --theme-css examples/demo/theme.css --json
 penflow validate-pen /tmp/ui.pen --json
 penflow export-expected /tmp/ui.pen -o /tmp/expected-ui-tree.json --json
 penflow enrich-pen examples/legacy/ui.pen /tmp/semantic-ui-tree.json --out /tmp/ui.enriched.pen --json

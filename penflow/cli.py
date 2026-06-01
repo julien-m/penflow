@@ -104,6 +104,7 @@ def build_parser() -> argparse.ArgumentParser:
     semantic_draft.add_argument("--json", action="store_true", help="print machine-readable JSON")
     semantic_draft.add_argument("semantic_tree")
     semantic_draft.add_argument("-o", "--out", default="ui.pen")
+    semantic_draft.add_argument("--theme-css", default=None, help="project theme.css to apply")
     semantic_draft.set_defaults(func=cmd_draft_pen_from_tree)
 
     enrich = sub.add_parser("enrich-pen", help="enrich existing Pencil file from semantic UI tree")
@@ -298,8 +299,24 @@ def cmd_draft_pen_from_tree(args: argparse.Namespace) -> int:
     if not passed:
         _print({"status": "FAIL", "issues": issues}, args.json)
         return 1
-    draft = write_pen_draft_from_semantic_tree(args.semantic_tree, args.out)
-    _print({"status": "PASS", "out": args.out, "screens": len(draft["children"])}, args.json)
+    try:
+        draft = write_pen_draft_from_semantic_tree(
+            args.semantic_tree, args.out, theme_css_path=args.theme_css
+        )
+    except FileNotFoundError as error:
+        _print(
+            {"status": "FAIL", "issues": [{"severity": "error", "message": str(error)}]}, args.json
+        )
+        return 1
+    _print(
+        {
+            "status": "PASS",
+            "out": args.out,
+            "screens": len(draft["children"]),
+            "theme_css": args.theme_css,
+        },
+        args.json,
+    )
     return 0
 
 

@@ -11,7 +11,10 @@ build/
 .venv/
 
 # Materialized conventions
-.conventions/
+.conventions/*
+!.conventions/
+!.conventions/index.md
+!.conventions/manifest.yaml
 
 .agents/skills/spec-*
 .claude/agents/livespec-*.md

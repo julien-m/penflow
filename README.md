@@ -18,7 +18,7 @@ penflow validate-actual examples/demo/actual-ui-tree.json [--schema]
 penflow validate-flow-specs examples/full/flow-ui-contract --json
 penflow export-semantic-tree path/to/flow-ui-contract --out semantic-ui-tree.json
 penflow validate-semantic-tree semantic-ui-tree.json --json
-penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --json
+penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --theme-css theme.css --json
 penflow enrich-pen existing-ui.pen semantic-ui-tree.json --out ui.enriched.pen --json
 penflow map-pencil-context ui.pen semantic-ui-tree.json --out pencil-context-map.json --json
 penflow reverse-pen ui.pen --out reverse-output --json
@@ -70,13 +70,13 @@ Install the package first so the `penflow` console script is available.
 
 #### Forward
 
-Start from flow/screen specs, create a semantic tree, draft a Pencil file, validate it, then produce design/code handoff artifacts.
+Start from flow/screen specs, create a semantic tree, draft a theme-aware Pencil file, validate it, then produce design/code handoff artifacts.
 
 ```bash
 penflow validate-flow-specs examples/full/flow-ui-contract --json
 penflow export-semantic-tree examples/full/flow-ui-contract --out semantic-ui-tree.json --json
 penflow validate-semantic-tree semantic-ui-tree.json --json
-penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --json
+penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --theme-css theme.css --json
 penflow validate-pen ui.pen --json
 penflow export-expected ui.pen --out expected-ui-tree.json --json
 penflow code-ir --from-context ui.pen --semantic-tree semantic-ui-tree.json --flow-id checkout --flow-name "Checkout flow" --out code-ir.json --json
@@ -129,7 +129,7 @@ python3 -m pytest -q
 penflow validate-flow-specs examples/full/flow-ui-contract --json
 penflow export-semantic-tree examples/full/flow-ui-contract --out /tmp/semantic-ui-tree.json --json
 penflow validate-semantic-tree /tmp/semantic-ui-tree.json --json
-penflow draft-pen-from-tree /tmp/semantic-ui-tree.json --out /tmp/ui.pen --json
+penflow draft-pen-from-tree /tmp/semantic-ui-tree.json --out /tmp/ui.pen --theme-css examples/demo/theme.css --json
 penflow validate-pen /tmp/ui.pen --json
 penflow export-expected /tmp/ui.pen -o /tmp/expected-ui-tree.json --json
 penflow enrich-pen examples/legacy/ui.pen /tmp/semantic-ui-tree.json --out /tmp/ui.enriched.pen --json
@@ -170,7 +170,7 @@ penflow compare-tree examples/full/expected-ui-tree.json examples/full/actual-ui
 
 **Read** [`.agent-sync/skills/mockup-factory/SKILL.md`](.agent-sync/skills/mockup-factory/SKILL.md) to run the tree-aware guided UX/UI optimizer for Pencil mockups. The skill can orchestrate external Pencil/audit tooling, but Penflow Python core stays runtime-agnostic.
 
-The pre-Pencil semantic contract is defined in [`penflow/schemas/semantic-ui-tree.schema.json`](penflow/schemas/semantic-ui-tree.schema.json), with a deterministic example at [`examples/demo/semantic-ui-tree.json`](examples/demo/semantic-ui-tree.json). Export it from flow/screen Markdown with `penflow export-semantic-tree path/to/flow-ui-contract --out semantic-ui-tree.json`, validate it with `penflow validate-semantic-tree semantic-ui-tree.json --json`, then create a structural Pencil draft with `penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --json`, enrich an existing Pencil file with `penflow enrich-pen existing-ui.pen semantic-ui-tree.json --out ui.enriched.pen --json`, emit an explicit mapping artifact with `penflow map-pencil-context ui.pen semantic-ui-tree.json --out pencil-context-map.json --json`, reverse an existing Pencil file with `penflow reverse-pen ui.pen --out reverse-output --json`, or report drift with `penflow detect-drift path/to/flow-ui-contract semantic-ui-tree.json ui.pen --out drift-report.json --markdown drift-report.md --json`. This schema is distinct from post-implementation actual UI trees.
+The pre-Pencil semantic contract is defined in [`penflow/schemas/semantic-ui-tree.schema.json`](penflow/schemas/semantic-ui-tree.schema.json), with a deterministic example at [`examples/demo/semantic-ui-tree.json`](examples/demo/semantic-ui-tree.json). Export it from flow/screen Markdown with `penflow export-semantic-tree path/to/flow-ui-contract --out semantic-ui-tree.json`, validate it with `penflow validate-semantic-tree semantic-ui-tree.json --json`, then create a theme-aware Pencil draft with `penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --theme-css theme.css --json`, enrich an existing Pencil file with `penflow enrich-pen existing-ui.pen semantic-ui-tree.json --out ui.enriched.pen --json`, emit an explicit mapping artifact with `penflow map-pencil-context ui.pen semantic-ui-tree.json --out pencil-context-map.json --json`, reverse an existing Pencil file with `penflow reverse-pen ui.pen --out reverse-output --json`, or report drift with `penflow detect-drift path/to/flow-ui-contract semantic-ui-tree.json ui.pen --out drift-report.json --markdown drift-report.md --json`. This schema is distinct from post-implementation actual UI trees.
 
 ## Conventions
 

@@ -76,13 +76,13 @@ penflow validate-flow-specs penflow/flow-ui-contract --json
 
 ## Path A: New Project or New Feature Area
 
-Start with flow specs, then let Penflow generate the tree and Pencil draft.
+Start with flow specs and `theme.css`, then let Penflow generate the tree and themed Pencil draft.
 
 ```bash
 penflow validate-flow-specs penflow/flow-ui-contract --json
 penflow export-semantic-tree penflow/flow-ui-contract --out penflow/semantic-ui-tree.json --json
 penflow validate-semantic-tree penflow/semantic-ui-tree.json --json
-penflow draft-pen-from-tree penflow/semantic-ui-tree.json --out penflow/ui.pen --json
+penflow draft-pen-from-tree penflow/semantic-ui-tree.json --out penflow/ui.pen --theme-css theme.css --json
 penflow validate-pen penflow/ui.pen --json
 penflow export-expected penflow/ui.pen --out penflow/expected-ui-tree.json --json
 penflow code-ir --from-context penflow/ui.pen --semantic-tree penflow/semantic-ui-tree.json --out penflow/code-ir.json --json
@@ -92,7 +92,7 @@ After this path:
 
 - `flow-ui-contract/` explains the product behavior;
 - `semantic-ui-tree.json` is the before-code semantic contract;
-- `ui.pen` is the contextualized Pencil file;
+- `ui.pen` is the contextualized, theme-aware Pencil file;
 - `expected-ui-tree.json` is the design baseline;
 - `code-ir.json` is the handoff artifact an implementation agent can read.
 

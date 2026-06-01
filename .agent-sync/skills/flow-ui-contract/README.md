@@ -10,6 +10,10 @@ Use this skill to author or recover the behavior layer before code. It produces 
 
 Runtime boundary: Penflow consumes actual trees from external adapters. It does not run browsers, Xcode, simulators, Playwright, React Native, Metro, or app builds.
 
+## Design Conventions
+
+Before authoring UI flows or screens, **Read** [`../../../.conventions/index.md`](../../../.conventions/index.md) and load the matching design domains. UI specs must use the convention-defined patterns for app shells, dashboards, payments, forms, lists/tables, states, responsiveness, and accessibility; a screen that only lists labels and buttons is incomplete when a richer pattern applies.
+
 ## Semantic Tree Formation
 
 The skill does not ask the LLM to hand-write `semantic-ui-tree.json`; Penflow generates it with `export-semantic-tree`. The LLM still needs the formation contract so it writes useful specs: flow specs become `flows[]`, screen specs become `screens[]`, visible hierarchy becomes recursive semantic nodes, and business context becomes `intent`, `binding`, `entity`, `states`, `validations`, `side_effects`, `test_id`, and `source_map`. **Read** [`references/semantic-ui-tree.md`](references/semantic-ui-tree.md) before explaining or debugging tree output.
@@ -44,7 +48,7 @@ Exit codes: `0` = PASS, `1` = FAIL with at least one blocking error or missing s
 ```bash
 penflow export-semantic-tree <target>/flow-ui-contract --out semantic-ui-tree.json --json
 penflow validate-semantic-tree semantic-ui-tree.json --json
-penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --json
+penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --theme-css <target>/theme.css --json
 penflow validate-pen ui.pen --json
 penflow export-expected ui.pen --out expected-ui-tree.json --json
 penflow code-ir --from-context ui.pen --semantic-tree semantic-ui-tree.json --flow-id <flow-id> --flow-name "<Flow name>" --out code-ir.json --json

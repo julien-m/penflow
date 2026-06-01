@@ -1,0 +1,17 @@
+:root {
+  --background: #f6f4ef;
+  --foreground: #25302a;
+  --card: #ffffff;
+  --card-foreground: #25302a;
+  --primary: #0f5132;
+  --primary-foreground: #fffaf0;
+  --border: #d7d2c8;
+  --input: #d7d2c8;
+  --muted: #ebe6da;
+  --muted-foreground: #6a655c;
+  --accent: #c7a76c;
+  --destructive: #b42318;
+  --ring: #0f5132;
+  --radius: 0.5rem;
+  --font-sans: Inter, system-ui, sans-serif;
+}

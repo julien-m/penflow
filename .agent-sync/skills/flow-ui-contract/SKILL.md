@@ -39,6 +39,17 @@ This skill prepares inputs. It does **not** run browser, Xcode, simulator, Playw
 
 Before generating or validating files, **Read** [`references/grammar.md`](references/grammar.md), **Read** [`references/templates/flow.md`](references/templates/flow.md), **Read** [`references/templates/screen.md`](references/templates/screen.md), and **Read** [`references/semantic-ui-tree.md`](references/semantic-ui-tree.md).
 
+## Design Convention Gate
+
+Before writing or editing `flow-ui-contract/` for any UI surface, **Read** [`../../../.conventions/index.md`](../../../.conventions/index.md), then load the matching design domains from that index. This is mandatory input, not optional polish.
+
+- Always load `design-tokens`, `design-components`, `design-views`, and `design-quality` for UI flows.
+- Also load `design-dataviz` for dashboard, metrics, KPI, chart, analytics, or usage screens.
+- Also load `design-payments` for payment, checkout, billing, subscription, pricing, tip, donation, order summary, or card form screens.
+- Also load `design-realtime` for live status, websocket, SSE, progress, or streaming screens.
+
+Screen specs must describe visible hierarchy using those conventions: app shell/sidebar/header/content zones, forms, lists/tables, cards, empty/loading/error states, payment anatomy, metric cards, and responsive variants where relevant. Do not produce a flow/screen spec that only lists labels and buttons when the convention defines a richer view pattern.
+
 ## Tree Formation Contract
 
 This skill does not ask the LLM to hand-write `semantic-ui-tree.json`. It asks the LLM to author flow/screen specs precise enough for `penflow export-semantic-tree` to generate the tree deterministically.
@@ -195,7 +206,7 @@ Open questions: <N> [NEEDS CLARIFICATION]
 ```bash
 penflow export-semantic-tree <target>/flow-ui-contract --out semantic-ui-tree.json --json
 penflow validate-semantic-tree semantic-ui-tree.json --json
-penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --json
+penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --theme-css <target>/theme.css --json
 penflow validate-pen ui.pen --json
 penflow export-expected ui.pen --out expected-ui-tree.json --json
 penflow code-ir --from-context ui.pen --semantic-tree semantic-ui-tree.json --flow-id <flow-id> --flow-name "<Flow name>" --out code-ir.json --json
