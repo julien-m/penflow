@@ -47,6 +47,7 @@ def test_validate_semantic_tree_reports_broken_flow_screen_links() -> None:
     tree = load_example()
     tree["flows"][0]["entry_screen"] = "missing"
     tree["flows"][0]["steps"][0]["screen_id"] = "missing"
+    tree["flows"][0]["transitions"].append({"from": "checkout", "to": "checkout", "trigger": "x"})
     tree["flows"][0]["transitions"][0]["to"] = "missing"
     tree["screens"][0]["flow_id"] = "missing-flow"
 
@@ -60,16 +61,27 @@ def test_validate_semantic_tree_reports_broken_flow_screen_links() -> None:
 
 def test_validate_semantic_tree_reports_role_and_context_field_errors() -> None:
     tree = load_example()
-    button = tree["screens"][0]["root"]["children"][1]
-    button["role"] = "unknown"
+    button = tree["screens"][0]["root"]["children"][2]
     button.pop("intent")
     button["binding"] = "bad"
+    invalid_role_node = {
+        "semantic_id": "checkout.invalid-role",
+        "role": "unknown",
+        "source_map": {
+            "contract": "examples/demo/flow-ui-contract/contract.json",
+            "contract_path": "$.nodes[99]",
+        },
+    }
     list_node = {
         "semantic_id": "checkout.items",
         "role": "list",
         "binding": "checkout.items",
-        "source_map": {"screen_spec": "examples/demo/flow-ui-contract/screens/checkout.md"},
+        "source_map": {
+            "contract": "examples/demo/flow-ui-contract/contract.json",
+            "contract_path": "$.nodes[100]",
+        },
     }
+    tree["screens"][0]["root"]["children"].append(invalid_role_node)
     tree["screens"][0]["root"]["children"].append(list_node)
 
     codes = issue_codes(tree)
@@ -83,9 +95,9 @@ def test_validate_semantic_tree_reports_role_and_context_field_errors() -> None:
 def test_validate_semantic_tree_reports_incoherent_source_maps() -> None:
     tree = load_example()
     tree["flows"][0]["source_map"]["notes"] = ["keeps source_map non-empty"]
-    tree["flows"][0]["source_map"].pop("flow_spec")
-    tree["screens"][0]["source_map"].pop("screen_spec")
-    tree["screens"][0]["root"]["source_map"].pop("screen_spec")
+    tree["flows"][0]["source_map"].pop("contract")
+    tree["screens"][0]["source_map"].pop("contract")
+    tree["screens"][0]["root"]["source_map"].pop("contract")
 
     codes = issue_codes(tree)
 

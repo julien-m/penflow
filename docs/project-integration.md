@@ -17,6 +17,7 @@ Create one project-local Penflow workspace. Keep it versioned with the app unles
 my-app/
   penflow/
     flow-ui-contract/
+      contract.json
       flows/
       screens/
     semantic-ui-tree.json
@@ -27,23 +28,23 @@ my-app/
     code-ir.json
     actual-ui-tree.json
     compare-report.json
-    compare-report.md
-    review.md
-    fix.md
+    review-report.json
+    fix-report.json
 ```
 
 Recommended ownership:
 
 | Path | Commit? | Owner | Purpose |
 |---|---:|---|---|
-| `penflow/flow-ui-contract/` | yes | product / design / agent | Source flow and screen intent. |
-| `penflow/semantic-ui-tree.json` | yes | Penflow | Generated semantic contract from flow specs. |
+| `penflow/flow-ui-contract/contract.json` | yes | product / design / agent | Canonical strict v2 business contract. |
+| `penflow/flow-ui-contract/flows/*.md`, `screens/*.md` | optional | product / design / agent | Human docs or explicit migration source only. |
+| `penflow/semantic-ui-tree.json` | yes | Penflow | Generated semantic contract from `flow-ui-contract/contract.json`. |
 | `penflow/ui.pen` or `penflow/ui.enriched.pen` | yes | design / agent | Pencil contract with business context. |
 | `penflow/pencil-context-map.json` | yes | Penflow | Review map for matched, ambiguous, and unmapped Pencil nodes. |
 | `penflow/expected-ui-tree.json` | yes | Penflow | Design-derived baseline for runtime comparison. |
 | `penflow/code-ir.json` | yes | Penflow / codegen | Handoff artifact for implementation agents. |
 | `penflow/actual-ui-tree.json` | optional | app runtime adapter | Runtime observation from the implemented app. |
-| `penflow/compare-report.*`, `review.md`, `fix.md` | optional | Penflow | Review artifacts; commit when useful for PR evidence. |
+| `penflow/compare-report.json`, `review-report.json`, `fix-report.json` | optional | Penflow | JSON review artifacts; commit when useful for PR evidence. |
 
 Use one workspace per product area if the app is large:
 
@@ -71,26 +72,27 @@ python3 -m pip install -e /path/to/penflow
 Run commands from the application repository root and use paths inside the app:
 
 ```bash
-penflow validate-flow-specs penflow/flow-ui-contract --json
+penflow validate-flow-contract penflow/flow-ui-contract/contract.json --json
 ```
 
 ## Path A: New Project or New Feature Area
 
-Start with flow specs and `theme.css`, then let Penflow generate the tree and themed Pencil draft.
+Start with `flow-ui-contract/contract.json` and `theme.css`, then let Penflow generate the tree and themed Pencil draft.
 
 ```bash
-penflow validate-flow-specs penflow/flow-ui-contract --json
-penflow export-semantic-tree penflow/flow-ui-contract --out penflow/semantic-ui-tree.json --json
+penflow validate-flow-contract penflow/flow-ui-contract/contract.json --json
+penflow export-semantic-tree penflow/flow-ui-contract/contract.json --out penflow/semantic-ui-tree.json --json
 penflow validate-semantic-tree penflow/semantic-ui-tree.json --json
 penflow draft-pen-from-tree penflow/semantic-ui-tree.json --out penflow/ui.pen --theme-css theme.css --json
 penflow validate-pen penflow/ui.pen --json
 penflow export-expected penflow/ui.pen --out penflow/expected-ui-tree.json --json
-penflow code-ir --from-context penflow/ui.pen --semantic-tree penflow/semantic-ui-tree.json --out penflow/code-ir.json --json
+penflow code-ir --from-context penflow/ui.pen --semantic-tree penflow/semantic-ui-tree.json --contract penflow/flow-ui-contract/contract.json --out penflow/code-ir.json --json
+penflow validate-code-ir penflow/code-ir.json --json
 ```
 
 After this path:
 
-- `flow-ui-contract/` explains the product behavior;
+- `flow-ui-contract/contract.json` is the canonical machine contract; Markdown/YAML are docs-only after migration;
 - `semantic-ui-tree.json` is the before-code semantic contract;
 - `ui.pen` is the contextualized, theme-aware Pencil file;
 - `expected-ui-tree.json` is the design baseline;
@@ -101,30 +103,31 @@ After this path:
 Use this when designers already have a `.pen` file and you want to preserve the layout.
 
 ```bash
-penflow validate-flow-specs penflow/flow-ui-contract --json
-penflow export-semantic-tree penflow/flow-ui-contract --out penflow/semantic-ui-tree.json --json
+penflow validate-flow-contract penflow/flow-ui-contract/contract.json --json
+penflow export-semantic-tree penflow/flow-ui-contract/contract.json --out penflow/semantic-ui-tree.json --json
 penflow enrich-pen design/ui.pen penflow/semantic-ui-tree.json --out penflow/ui.enriched.pen --json
 penflow map-pencil-context penflow/ui.enriched.pen penflow/semantic-ui-tree.json --out penflow/pencil-context-map.json --json
 penflow validate-pen penflow/ui.enriched.pen --json
 penflow export-expected penflow/ui.enriched.pen --out penflow/expected-ui-tree.json --json
-penflow code-ir --from-context penflow/ui.enriched.pen --semantic-tree penflow/semantic-ui-tree.json --context-map penflow/pencil-context-map.json --out penflow/code-ir.json --json
+penflow code-ir --from-context penflow/ui.enriched.pen --semantic-tree penflow/semantic-ui-tree.json --context-map penflow/pencil-context-map.json --contract penflow/flow-ui-contract/contract.json --out penflow/code-ir.json --json
 ```
 
 Review `pencil-context-map.json` before implementation. Ambiguous or unmapped nodes mean the mockup and product intent need a human or agent decision.
 
 ## Path C: Legacy Project With Mockups but No Flows
 
-Use reverse mode to bootstrap missing flow specs from an old Pencil file.
+Use reverse mode to bootstrap missing docs from an old Pencil file, then explicitly migrate/review into `contract.json`.
 
 ```bash
 penflow reverse-pen design/ui.pen --out penflow/reverse-output --enrich --json
+penflow migrate-flow-md-to-contract-json penflow/reverse-output/flow-ui-contract --out penflow/reverse-output/flow-ui-contract/contract.json --json
 penflow validate-semantic-tree penflow/reverse-output/semantic-ui-tree.json --json
 penflow validate-pen penflow/reverse-output/ui.enriched.pen --json
 ```
 
 `reverse-pen --out <dir>` creates a directory. The semantic tree is `<dir>/semantic-ui-tree.json`; recovered specs are under `<dir>/flow-ui-contract/`.
 
-Reverse mode marks unknown business logic as `[NEEDS CLARIFICATION]`. Treat those markers as migration work. Do not let an agent invent validations, side effects, permissions, or state transitions that were not present in the source material.
+Reverse/migration mode marks unknown business logic as `[NEEDS CLARIFICATION]`. Treat those markers as migration work. Do not let an agent invent validations, side effects, permissions, or state transitions that were not present in the source material.
 
 Once reviewed, promote the recovered files into the project workspace:
 
@@ -155,10 +158,13 @@ After implementation, the app must export an `actual-ui-tree.json` through a run
 
 ```bash
 penflow validate-actual penflow/actual-ui-tree.json --schema --json
-penflow compare-tree penflow/expected-ui-tree.json penflow/actual-ui-tree.json --out penflow/compare-report.json --markdown penflow/compare-report.md --json
-penflow review-report penflow/compare-report.json --out penflow/review.md
-penflow fix-report penflow/compare-report.json --out penflow/fix.md
+penflow compare-tree penflow/expected-ui-tree.json penflow/actual-ui-tree.json --out penflow/compare-report.json --json
+penflow review-report penflow/compare-report.json --out penflow/review-report.json --json
+penflow fix-report penflow/compare-report.json --out penflow/fix-report.json --json
+penflow validate-report penflow/compare-report.json --schema --json
 ```
+
+Legacy pre-v2 guides may mention `review.md`, `fix.md`, or Markdown compare reports. In strict v2, keep those names as historical references only; write `review-report.json`, `fix-report.json`, and `compare-report.json`.
 
 Adapter guides:
 
@@ -187,7 +193,7 @@ When Pencil rendering is available, store proof next to the workspace:
 penflow/.mockup-validation/
   visual-evidence/
     manifest.json
-    visual-report.md
+    visual-report.json
     checkout.png
 ```
 
@@ -198,27 +204,28 @@ If the renderer is unavailable, record `BLOCKED_VISUAL_NOT_RUN` or escalate; do 
 A minimal CI gate for a project-local Penflow workspace:
 
 ```bash
-penflow validate-flow-specs penflow/flow-ui-contract --json
+penflow validate-flow-contract penflow/flow-ui-contract/contract.json --json
 penflow validate-semantic-tree penflow/semantic-ui-tree.json --json
 penflow validate-pen penflow/ui.enriched.pen --json
 penflow export-expected penflow/ui.enriched.pen --out /tmp/expected-ui-tree.json --json
 penflow validate-actual penflow/actual-ui-tree.json --schema --json
-penflow compare-tree /tmp/expected-ui-tree.json penflow/actual-ui-tree.json --out /tmp/compare-report.json --markdown /tmp/compare-report.md --json
+penflow compare-tree /tmp/expected-ui-tree.json penflow/actual-ui-tree.json --out /tmp/compare-report.json --json
+penflow validate-report /tmp/compare-report.json --schema --json
 ```
 
-For early migration, make `validate-flow-specs`, `validate-semantic-tree`, and `validate-pen` blocking. Add `actual-ui-tree.json` comparison once the app has a runtime adapter.
+For early migration, make `validate-flow-contract`, `validate-semantic-tree`, and `validate-pen` blocking. `validate-flow-specs` is compatibility-only for explicitly migrated legacy Markdown and must not run in the strict v2 gate. Add `actual-ui-tree.json` comparison once the app has a runtime adapter.
 
 ## Migration Checklist
 
 - Choose one Penflow workspace path, usually `penflow/`.
-- Add or recover `flow-ui-contract/flows/*.md` and `flow-ui-contract/screens/*.md`.
+- Add or migrate `flow-ui-contract/contract.json`; keep Markdown/YAML docs-only.
 - Generate and validate `semantic-ui-tree.json`.
 - Draft or enrich a Pencil file.
 - Review `pencil-context-map.json` for ambiguous or unmapped nodes.
 - Export `expected-ui-tree.json`.
-- Generate `code-ir.json` for implementation handoff.
+- Generate and validate `code-ir.json` for implementation handoff.
 - Add a runtime adapter that emits `actual-ui-tree.json`.
-- Compare expected vs actual and use `review.md` / `fix.md` for correction planning.
+- Compare expected vs actual and use `review-report.json` / `fix-report.json` for correction planning.
 - Add CI commands once the artifacts are stable.
 
 ## Common Decisions
@@ -230,4 +237,4 @@ For early migration, make `validate-flow-specs`, `validate-semantic-tree`, and `
 | Commit generated JSON? | Yes for contract artifacts; optional for transient reports. |
 | Who owns `actual-ui-tree.json`? | The app runtime adapter, not Penflow. |
 | Can agents edit `.pen` directly? | Yes, but only through Penflow commands or Pencil-aware tooling that preserves context. |
-| Can agents hand-write semantic trees? | No for production; write flow specs and run `export-semantic-tree`. |
+| Can agents hand-write semantic trees? | No for production; author or migrate `contract.json` and run `export-semantic-tree`. |

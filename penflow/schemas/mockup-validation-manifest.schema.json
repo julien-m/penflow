@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.dev/schemas/mockup-validation-manifest.schema.json",
+  "title": "Penflow Mockup Validation Manifest",
+  "type": "object",
+  "required": ["renderer", "sourceFile", "status", "validatedAt", "screens"],
+  "additionalProperties": false,
+  "properties": {
+    "renderer": {"type": "string"},
+    "sourceFile": {"type": "string"},
+    "status": {"type": "string"},
+    "validatedAt": {"type": "string"},
+    "screens": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["screen_id", "semantic_id", "pencil_node_id", "png", "layout_checked", "screenshot_checked"],
+        "additionalProperties": false,
+        "properties": {
+          "screen_id": {"type": "string"},
+          "semantic_id": {"type": "string"},
+          "pencil_node_id": {"type": "string"},
+          "png": {"type": "string"},
+          "layout_checked": {"type": "boolean"},
+          "screenshot_checked": {"type": "boolean"},
+          "notes": {"type": "string"}
+        }
+      }
+    }
+  }
+}

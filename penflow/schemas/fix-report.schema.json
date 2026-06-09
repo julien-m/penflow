@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.dev/schemas/fix-report.schema.json",
+  "title": "Penflow Fix Report",
+  "type": "object",
+  "required": ["version", "kind", "status", "fixes"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "integer"},
+    "kind": {"const": "penflow-fix-report"},
+    "status": {"type": "string"},
+    "score": {"type": ["number", "null"]},
+    "fixes": {"type": "array"}
+  }
+}

@@ -1,0 +1,195 @@
+{
+  "$id": "https://penflow.dev/schemas/flow-contract-v2.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Penflow Flow Contract v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "kind",
+    "contract_id",
+    "actors",
+    "entities",
+    "screens",
+    "nodes",
+    "guards",
+    "permissions",
+    "mutations",
+    "actions",
+    "flows",
+    "transitions",
+    "needs_review",
+    "needs_clarification"
+  ],
+  "properties": {
+    "version": {"const": 2},
+    "kind": {"const": "penflow-flow-contract"},
+    "contract_id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+    "actors": {"type": "array", "items": {"$ref": "#/$defs/namedIdObject"}},
+    "entities": {"type": "array", "items": {"$ref": "#/$defs/entity"}},
+    "screens": {"type": "array", "items": {"$ref": "#/$defs/screen"}},
+    "nodes": {"type": "array", "items": {"$ref": "#/$defs/node"}},
+    "guards": {"type": "array", "items": {"$ref": "#/$defs/usageObject"}},
+    "permissions": {"type": "array", "items": {"$ref": "#/$defs/permission"}},
+    "mutations": {"type": "array", "items": {"$ref": "#/$defs/mutation"}},
+    "actions": {"type": "array", "items": {"$ref": "#/$defs/action"}},
+    "flows": {"type": "array", "items": {"$ref": "#/$defs/flow"}},
+    "transitions": {"type": "array", "items": {"$ref": "#/$defs/transition"}},
+    "needs_review": {"type": "boolean"},
+    "needs_clarification": {"type": "array", "items": {"type": "string"}}
+  },
+  "$defs": {
+    "idObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"}
+      }
+    },
+    "namedIdObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "name": {"type": "string"}
+      }
+    },
+    "usageObject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "unused_allowed": {"type": "boolean"}
+      }
+    },
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "fields"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "fields": {"type": "array", "items": {"$ref": "#/$defs/field"}}
+      }
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "type": {"type": "string"}
+      }
+    },
+    "screen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "flow_id", "states", "root_node"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "flow_id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "title": {"type": "string"},
+        "surface": {"type": "string"},
+        "viewport": {"$ref": "#/$defs/viewport"},
+        "states": {"type": "array", "items": {"$ref": "#/$defs/idObject"}},
+        "root_node": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"}
+      }
+    },
+    "viewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width": {"type": "integer"},
+        "height": {"type": "integer"}
+      }
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "screen_id", "semantic_id", "role"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "screen_id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "semantic_id": {"type": "string"},
+        "test_id": {"type": "string"},
+        "role": {"type": "string"},
+        "text": {"type": "string"},
+        "binding": {"type": "string"},
+        "entity": {"type": "string"},
+        "action": {"type": "string"},
+        "children": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "permission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "actor", "action", "entity"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "actor": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "action": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "entity": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"}
+      }
+    },
+    "mutation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "method", "endpoint", "entity", "request", "response", "success_state", "error_state"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "method": {"enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]},
+        "endpoint": {"type": "string"},
+        "entity": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "request": {"type": "object", "additionalProperties": false},
+        "response": {"type": "object", "additionalProperties": false},
+        "success_state": {"type": "string"},
+        "error_state": {"type": "string"},
+        "unused_allowed": {"type": "boolean"}
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "node", "trigger", "guard", "permission", "mutation", "success_transition", "error_transition"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "node": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "trigger": {"type": "string"},
+        "guard": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "permission": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "mutation": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "success_transition": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "error_transition": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "unused_allowed": {"type": "boolean"}
+      }
+    },
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "entry_screen"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "entry_screen": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"}
+      }
+    },
+    "transition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "flow", "from_screen", "to_screen", "from_state", "to_state", "trigger", "action"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "flow": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "from_screen": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "to_screen": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "from_state": {"type": "string"},
+        "to_state": {"type": "string"},
+        "trigger": {"type": "string"},
+        "action": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "guard": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"}
+      }
+    }
+  }
+}

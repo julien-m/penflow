@@ -59,13 +59,12 @@ def test_semantic_ui_tree_example_uses_schema_fields_deterministically() -> None
     assert example["flows"][0]["entry_screen"] == "checkout"
     screen = example["screens"][0]
     assert screen["root"]["semantic_id"] == "checkout"
-    assert screen["root"]["children"][1]["role"] == "button"
-    assert screen["root"]["children"][1]["intent"] == "submit_payment"
-    assert screen["root"]["children"][1]["binding"] == "checkout.payment_method"
-    assert screen["root"]["children"][1]["entity"] == "payment"
-    assert screen["root"]["children"][1]["validations"][0]["rule"] == "payment_method_present"
-    assert screen["root"]["children"][1]["side_effects"][0]["effect"] == "create_payment_intent"
-    assert screen["root"]["children"][1]["source_map"]["flow_spec"].endswith("checkout.md")
+    button = next(child for child in screen["root"]["children"] if child["role"] == "button")
+    assert button["intent"] == "submit_payment"
+    assert button["binding"] == "checkout.selected_payment_method"
+    assert button["entity"] == "checkout"
+    assert button["test_id"] == "checkout-pay-now"
+    assert button["source_map"]["contract"].endswith("contract.json")
 
 
 def test_semantic_schema_does_not_add_feature_036_or_later_runtime_pipeline() -> None:
@@ -78,9 +77,9 @@ def test_semantic_schema_does_not_add_feature_036_or_later_runtime_pipeline() ->
     # coverage only. Feature 042 is in scope — it ships integration docs/tests
     # only. Feature 043 is in scope — it ships Mockup Factory skill/docs/tests
     # only. Feature 044 is in scope — it ships visual evidence docs/tests only.
-    # Feature 045 remains guarded.
+    # Feature 045 is specified; feature 046 remains guarded.
     future_feature_dirs: list[Path] = []
-    for feature_number in range(45, 46):
+    for feature_number in range(46, 47):
         future_feature_dirs.extend((ROOT / ".specs" / "features").glob(f"{feature_number:03d}-*"))
     assert future_feature_dirs == []
     assert not (ROOT / "penflow" / "semantic_validator.py").exists()

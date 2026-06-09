@@ -37,16 +37,15 @@ def test_c16_final_workflow_regression_chain(tmp_path: Path) -> None:
     enriched_pen = tmp_path / "ui.enriched.pen"
     reverse_output = tmp_path / "reverse-output"
     compare_json = tmp_path / "compare.json"
-    compare_md = tmp_path / "compare.md"
-    review_md = tmp_path / "review.md"
-    fix_md = tmp_path / "fix.md"
+    review_json = tmp_path / "review.json"
+    fix_json = tmp_path / "fix.json"
 
     assert main(["validate-flow-specs", str(FULL / "flow-ui-contract"), "--json"]) == 0
     assert (
         main(
             [
                 "export-semantic-tree",
-                str(FULL / "flow-ui-contract"),
+                str(FULL / "flow-ui-contract" / "contract.json"),
                 "--out",
                 str(semantic_tree),
                 "--json",
@@ -99,17 +98,14 @@ def test_c16_final_workflow_regression_chain(tmp_path: Path) -> None:
                 str(FULL / "actual-ui-tree.json"),
                 "--out",
                 str(compare_json),
-                "--markdown",
-                str(compare_md),
                 "--json",
             ]
         )
         == 0
     )
-    assert main(["review-report", str(compare_json), "--out", str(review_md)]) == 0
-    assert main(["fix-report", str(compare_json), "--out", str(fix_md)]) == 0
+    assert main(["review-report", str(compare_json), "--out", str(review_json)]) == 0
+    assert main(["fix-report", str(compare_json), "--out", str(fix_json)]) == 0
 
     assert json.loads(compare_json.read_text(encoding="utf-8"))["status"] == "PASS"
-    assert "# Penflow Compare Report" in compare_md.read_text(encoding="utf-8")
-    assert "# Penflow Review" in review_md.read_text(encoding="utf-8")
-    assert "# Penflow Fix Plan" in fix_md.read_text(encoding="utf-8")
+    assert json.loads(review_json.read_text(encoding="utf-8"))["kind"] == "penflow-review-report"
+    assert json.loads(fix_json.read_text(encoding="utf-8"))["kind"] == "penflow-fix-report"

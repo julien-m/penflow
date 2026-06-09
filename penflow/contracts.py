@@ -7,6 +7,11 @@ from pathlib import Path
 from typing import Any
 
 from .context import Context, format_context_string, infer_role
+from .flow_contract import (
+    FlowContractValidationError,
+    contract_registries,
+    validate_flow_contract_v2,
+)
 from .pen import load_pen, parse_pen, update_pen_by_semantic_id
 
 
@@ -172,7 +177,9 @@ def code_ir_from_pen(
     flow_name: str | None = None,
     semantic_tree: dict[str, Any] | str | Path | None = None,
     context_map: dict[str, Any] | str | Path | None = None,
+    contract: dict[str, Any] | str | Path | None = None,
 ) -> dict[str, Any]:
+    # @spec FR-008: Preserve v2 contract semantics in code IR — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-008
     """Build code IR from contextualized Pencil data.
 
     Args:
@@ -217,9 +224,56 @@ def code_ir_from_pen(
     if context_map is not None:
         _load_optional_input(context_map)
         inputs["context_map"] = _input_marker(context_map)
+    if contract is not None:
+        contract_data = _load_optional_input(contract)
+        issues = validate_flow_contract_v2(contract_data)
+        errors = [issue for issue in issues if issue["severity"] == "error"]
+        if errors:
+            first = errors[0]
+            raise FlowContractValidationError(
+                f"contract validation failed: {first['path']}: {first['message']}"
+            )
+        registries = contract_registries(contract_data)
+        contract_nodes = {str(node["id"]): node for node in contract_data.get("nodes", [])}
+        inputs["contract"] = _input_marker(contract)
+        ir["contract"] = {
+            "contract_id": contract_data["contract_id"],
+            "actors": sorted(registries["actors"].values(), key=lambda item: item["id"]),
+            "entities": sorted(registries["entities"].values(), key=lambda item: item["id"]),
+            "screens": sorted(registries["screens"].values(), key=lambda item: item["id"]),
+            "actions": sorted(
+                (
+                    _semantic_contract_action(action, contract_nodes)
+                    for action in registries["actions"].values()
+                ),
+                key=lambda item: item["id"],
+            ),
+            "mutations": sorted(registries["mutations"].values(), key=lambda item: item["id"]),
+            "guards": sorted(registries["guards"].values(), key=lambda item: item["id"]),
+            "permissions": sorted(registries["permissions"].values(), key=lambda item: item["id"]),
+            "bindings": sorted(registries["fields"]),
+            "states": sorted(
+                {
+                    f"{screen['id']}.{state['id']}"
+                    for screen in contract_data.get("screens", []) or []
+                    for state in screen.get("states", []) or []
+                }
+            ),
+            "transitions": sorted(registries["transitions"].values(), key=lambda item: item["id"]),
+        }
     if inputs:
         ir["inputs"] = inputs
     return ir
+
+
+def _semantic_contract_action(
+    action: dict[str, Any], contract_nodes: dict[str, dict[str, Any]]
+) -> dict[str, Any]:
+    handoff = dict(action)
+    node = contract_nodes.get(str(action.get("node")))
+    if node and node.get("semantic_id"):
+        handoff["node"] = node["semantic_id"]
+    return handoff
 
 
 def _load_optional_input(value: dict[str, Any] | str | Path) -> dict[str, Any]:
@@ -441,6 +495,15 @@ def _flat_components(screens: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "binding": node.get("binding"),
             "intent": node.get("intent"),
             "test_id": node.get("test_id"),
+            "children": [
+                {
+                    "id": child.get("semantic_id") or child.get("pencil_node_id"),
+                    "role": child.get("role"),
+                    "text": child.get("text"),
+                }
+                for child in node.get("children", []) or []
+                if isinstance(child, dict)
+            ],
         }
         for screen in screens
         for node in _walk_ir_nodes(screen["root"])

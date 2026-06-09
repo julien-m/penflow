@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.dev/schemas/review-report.schema.json",
+  "title": "Penflow Review Report",
+  "type": "object",
+  "required": ["version", "kind", "status", "issues"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "integer"},
+    "kind": {"const": "penflow-review-report"},
+    "status": {"type": "string"},
+    "score": {"type": ["number", "null"]},
+    "issues": {"type": "array"}
+  }
+}

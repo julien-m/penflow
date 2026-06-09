@@ -1,63 +1,90 @@
 {
-  "version": "2.11",
   "children": [
     {
-      "id": "checkoutScreen",
-      "type": "frame",
-      "name": "checkout",
-      "x": 0,
-      "y": 0,
-      "width": 390,
-      "height": 844,
-      "layout": "vertical",
-      "gap": 16,
-      "padding": 24,
-      "alignItems": "center",
-      "fill": "#FFFFFF",
-      "context": "role=screen; semantic_id=checkout",
+      "alignItems": "stretch",
       "children": [
         {
-          "id": "checkoutTitle0",
-          "name": "checkout.title",
-          "context": "role=text; semantic_id=checkout.title",
-          "type": "text",
-          "content": "Checkout",
-          "textGrowth": "fixed-width",
-          "width": "fill_container",
+          "content": "Order summary",
+          "context": "binding=checkout.order_summary; entity=checkout; role=text; semantic_id=checkout.order-summary",
+          "fill": "#111827",
           "fontSize": 24,
           "fontWeight": "600",
-          "fill": "#111827"
+          "id": "orderSummary",
+          "name": "Order summary",
+          "source_map": {
+            "contract": "examples/demo/flow-ui-contract/contract.json",
+            "contract_path": "$.nodes[1]"
+          },
+          "textGrowth": "fixed-width",
+          "type": "text",
+          "width": "fill_container"
         },
         {
-          "id": "checkoutPay1",
-          "name": "checkout.pay",
-          "context": "intent=submit_payment; role=button; semantic_id=checkout.pay",
-          "type": "frame",
-          "layout": "horizontal",
-          "width": "fill_container",
+          "content": "Selected payment method",
+          "context": "binding=checkout.selected_payment_method; entity=checkout; role=text; semantic_id=checkout.selected-payment-method",
+          "fill": "#374151",
+          "fontSize": 16,
+          "fontWeight": "400",
+          "id": "selectedPaymentMethod",
+          "name": "Selected payment method",
+          "source_map": {
+            "contract": "examples/demo/flow-ui-contract/contract.json",
+            "contract_path": "$.nodes[2]"
+          },
+          "textGrowth": "fixed-width",
+          "type": "text",
+          "width": "fill_container"
+        },
+        {
+          "alignItems": "center",
+          "children": [
+            {
+              "content": "Pay now",
+              "fill": "#FFFFFF",
+              "fontSize": 16,
+              "fontWeight": "600",
+              "id": "payNowLabel",
+              "type": "text"
+            }
+          ],
+          "context": "binding=checkout.selected_payment_method; entity=checkout; intent=submit_payment; role=button; semantic_id=checkout.pay-now; test_id=checkout-pay-now",
+          "cornerRadius": 8,
+          "fill": "#0057FF",
+          "gap": 8,
           "height": "fit_content(44)",
+          "id": "payNowButton",
+          "justifyContent": "center",
+          "layout": "horizontal",
+          "name": "Pay now",
           "padding": [
             12,
             16
           ],
-          "gap": 8,
-          "alignItems": "center",
-          "justifyContent": "center",
-          "cornerRadius": 8,
-          "fill": "#0057FF",
-          "children": [
-            {
-              "id": "checkoutPayLabel",
-              "type": "text",
-              "content": "Pay",
-              "fontSize": 16,
-              "fontWeight": "600",
-              "fill": "#FFFFFF",
-              "context": "role=text; semantic_id=checkout.pay.label"
-            }
-          ]
+          "source_map": {
+            "contract": "examples/demo/flow-ui-contract/contract.json",
+            "contract_path": "$.nodes[3]"
+          },
+          "type": "frame",
+          "width": "fill_container"
         }
-      ]
+      ],
+      "context": "role=screen; semantic_id=checkout",
+      "fill": "#FFFFFF",
+      "gap": 16,
+      "height": 844,
+      "id": "checkoutScreen",
+      "layout": "vertical",
+      "name": "checkout",
+      "padding": 24,
+      "source_map": {
+        "contract": "examples/demo/flow-ui-contract/contract.json",
+        "contract_path": "$.nodes[0]"
+      },
+      "type": "frame",
+      "width": 390,
+      "x": 0,
+      "y": 0
     }
-  ]
+  ],
+  "version": "2.11"
 }

@@ -41,9 +41,35 @@
     "inputs": {
       "type": "object",
       "additionalProperties": {"type": "string"}
+    },
+    "contract": {
+      "type": "object",
+      "required": ["contract_id", "actors", "entities", "screens", "actions", "mutations", "guards", "permissions", "bindings", "states", "transitions"],
+      "additionalProperties": false,
+      "properties": {
+        "contract_id": {"type": "string"},
+        "actors": {"type": "array", "items": {"$ref": "#/$defs/contract_id_object"}},
+        "entities": {"type": "array", "items": {"$ref": "#/$defs/contract_id_object"}},
+        "screens": {"type": "array", "items": {"$ref": "#/$defs/contract_id_object"}},
+        "actions": {"type": "array", "items": {"$ref": "#/$defs/contract_id_object"}},
+        "mutations": {"type": "array", "items": {"$ref": "#/$defs/contract_id_object"}},
+        "guards": {"type": "array", "items": {"$ref": "#/$defs/contract_id_object"}},
+        "permissions": {"type": "array", "items": {"$ref": "#/$defs/contract_id_object"}},
+        "bindings": {"type": "array", "items": {"type": "string"}},
+        "states": {"type": "array", "items": {"type": "string"}},
+        "transitions": {"type": "array", "items": {"$ref": "#/$defs/contract_id_object"}}
+      }
     }
   },
   "$defs": {
+    "contract_id_object": {
+      "type": "object",
+      "required": ["id"],
+      "additionalProperties": true,
+      "properties": {
+        "id": {"type": "string"}
+      }
+    },
     "screen": {
       "type": "object",
       "required": ["id", "root", "source_map"],

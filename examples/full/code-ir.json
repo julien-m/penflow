@@ -1,8 +1,8 @@
 {
   "actions": [
     {
-      "entity": "payments",
-      "intent": "post-payments-confirmation"
+      "entity": "checkout",
+      "intent": "submit_payment"
     }
   ],
   "bindings": [
@@ -12,6 +12,23 @@
   "components": [
     {
       "binding": null,
+      "children": [
+        {
+          "id": "checkout.order-summary",
+          "role": "text",
+          "text": "Order summary"
+        },
+        {
+          "id": "checkout.selected-payment-method",
+          "role": "text",
+          "text": "Selected payment method"
+        },
+        {
+          "id": "checkout.pay-now",
+          "role": "button",
+          "text": "Pay now"
+        }
+      ],
       "id": "checkout",
       "intent": null,
       "role": "screen",
@@ -21,6 +38,7 @@
     },
     {
       "binding": "checkout.order_summary",
+      "children": [],
       "id": "checkout.order-summary",
       "intent": null,
       "role": "text",
@@ -30,6 +48,7 @@
     },
     {
       "binding": "checkout.selected_payment_method",
+      "children": [],
       "id": "checkout.selected-payment-method",
       "intent": null,
       "role": "text",
@@ -38,16 +57,24 @@
       "type": "text"
     },
     {
-      "binding": null,
+      "binding": "checkout.selected_payment_method",
+      "children": [
+        {
+          "id": "payNowLabel",
+          "role": "text",
+          "text": "Pay now"
+        }
+      ],
       "id": "checkout.pay-now",
-      "intent": "post-payments-confirmation",
+      "intent": "submit_payment",
       "role": "button",
-      "test_id": null,
+      "test_id": "checkout-pay-now",
       "text": "Pay now",
       "type": "frame"
     },
     {
       "binding": null,
+      "children": [],
       "id": "payNowLabel",
       "intent": null,
       "role": "text",
@@ -56,12 +83,129 @@
       "type": "text"
     }
   ],
+  "contract": {
+    "actions": [
+      {
+        "error_transition": "payment_error",
+        "guard": "payment_ready",
+        "id": "submit_payment",
+        "mutation": "create_payment",
+        "node": "checkout.pay-now",
+        "permission": "buyer_can_pay",
+        "success_transition": "payment_success",
+        "trigger": "click"
+      }
+    ],
+    "actors": [
+      {
+        "id": "buyer",
+        "name": "Buyer"
+      }
+    ],
+    "bindings": [
+      "checkout.order_summary",
+      "checkout.selected_payment_method"
+    ],
+    "contract_id": "checkout-contract",
+    "entities": [
+      {
+        "fields": [
+          {
+            "id": "order_summary",
+            "type": "string"
+          },
+          {
+            "id": "selected_payment_method",
+            "type": "string"
+          }
+        ],
+        "id": "checkout"
+      }
+    ],
+    "guards": [
+      {
+        "id": "payment_ready"
+      }
+    ],
+    "mutations": [
+      {
+        "endpoint": "/payments",
+        "entity": "checkout",
+        "error_state": "error",
+        "id": "create_payment",
+        "method": "POST",
+        "request": {},
+        "response": {},
+        "success_state": "submitting"
+      }
+    ],
+    "permissions": [
+      {
+        "action": "submit_payment",
+        "actor": "buyer",
+        "entity": "checkout",
+        "id": "buyer_can_pay"
+      }
+    ],
+    "screens": [
+      {
+        "flow_id": "checkout",
+        "id": "checkout",
+        "root_node": "checkout.root",
+        "states": [
+          {
+            "id": "default"
+          },
+          {
+            "id": "submitting"
+          },
+          {
+            "id": "error"
+          }
+        ],
+        "surface": "web",
+        "title": "Checkout",
+        "viewport": {
+          "height": 844,
+          "width": 390
+        }
+      }
+    ],
+    "states": [
+      "checkout.default",
+      "checkout.error",
+      "checkout.submitting"
+    ],
+    "transitions": [
+      {
+        "action": "submit_payment",
+        "flow": "checkout",
+        "from_screen": "checkout",
+        "from_state": "default",
+        "id": "payment_error",
+        "to_screen": "checkout",
+        "to_state": "error",
+        "trigger": "submit_payment"
+      },
+      {
+        "action": "submit_payment",
+        "flow": "checkout",
+        "from_screen": "checkout",
+        "from_state": "default",
+        "id": "payment_success",
+        "to_screen": "checkout",
+        "to_state": "submitting",
+        "trigger": "submit_payment"
+      }
+    ]
+  },
   "flow": {
     "id": "checkout",
     "name": "Checkout"
   },
   "inputs": {
     "context_map": "examples/full/pencil-context-map.json",
+    "contract": "examples/full/flow-ui-contract/contract.json",
     "semantic_tree": "examples/full/semantic-ui-tree.json"
   },
   "kind": "penflow-code-ir",
@@ -89,12 +233,10 @@
                 "role": "text",
                 "semantic_id": "checkout.order-summary"
               },
-              "notes": [
-                "section: ## Donn\u00e9es affich\u00e9es"
-              ],
+              "contract": "examples/full/flow-ui-contract/contract.json",
+              "contract_path": "$.nodes[1]",
               "pencil_node_id": "orderSummary",
               "pencil_path": "0.0",
-              "screen_spec": "examples/full/flow-ui-contract/screens/checkout.md",
               "semantic_id": "checkout.order-summary"
             },
             "text": "Order summary",
@@ -116,12 +258,10 @@
                 "role": "text",
                 "semantic_id": "checkout.selected-payment-method"
               },
-              "notes": [
-                "section: ## Donn\u00e9es affich\u00e9es"
-              ],
+              "contract": "examples/full/flow-ui-contract/contract.json",
+              "contract_path": "$.nodes[2]",
               "pencil_node_id": "selectedPaymentMethod",
               "pencil_path": "0.1",
-              "screen_spec": "examples/full/flow-ui-contract/screens/checkout.md",
               "semantic_id": "checkout.selected-payment-method"
             },
             "text": "Selected payment method",
@@ -130,10 +270,11 @@
           {
             "actions": [
               {
-                "entity": "payments",
-                "intent": "post-payments-confirmation"
+                "entity": "checkout",
+                "intent": "submit_payment"
               }
             ],
+            "binding": "checkout.selected_payment_method",
             "children": [
               {
                 "id": "payNowLabel",
@@ -148,43 +289,32 @@
                 "type": "text"
               }
             ],
-            "entity": "payments",
+            "entity": "checkout",
             "id": "checkout.pay-now",
-            "intent": "post-payments-confirmation",
+            "intent": "submit_payment",
             "name": "Pay now",
             "path": "0.2",
             "pencil_node_id": "payNowButton",
             "role": "button",
             "semantic_id": "checkout.pay-now",
-            "side_effects": [
-              {
-                "effect": "post-payments-confirmation",
-                "target": "payments"
-              }
-            ],
             "source_map": {
               "context": {
-                "entity": "payments",
-                "intent": "post-payments-confirmation",
+                "binding": "checkout.selected_payment_method",
+                "entity": "checkout",
+                "intent": "submit_payment",
                 "role": "button",
-                "semantic_id": "checkout.pay-now"
+                "semantic_id": "checkout.pay-now",
+                "test_id": "checkout-pay-now"
               },
-              "notes": [
-                "section: ## Actions"
-              ],
+              "contract": "examples/full/flow-ui-contract/contract.json",
+              "contract_path": "$.nodes[3]",
               "pencil_node_id": "payNowButton",
               "pencil_path": "0.2",
-              "screen_spec": "examples/full/flow-ui-contract/screens/checkout.md",
               "semantic_id": "checkout.pay-now"
             },
+            "test_id": "checkout-pay-now",
             "text": "Pay now",
-            "type": "frame",
-            "validations": [
-              {
-                "rule": "required-inputs-present",
-                "source": "POST /payments \u2192 confirmation"
-              }
-            ]
+            "type": "frame"
           }
         ],
         "id": "checkout",
@@ -193,80 +323,32 @@
         "pencil_node_id": "checkoutScreen",
         "role": "screen",
         "semantic_id": "checkout",
-        "side_effects": [
-          {
-            "effect": "the-submitting-state-is-shown-while-the-payment-request-is-in-flight",
-            "when": "The submitting state is shown while the payment request is in flight"
-          }
-        ],
         "source_map": {
           "context": {
             "role": "screen",
             "semantic_id": "checkout"
           },
-          "mockup": "checkout.png",
-          "notes": [
-            "section: # \u00c9cran"
-          ],
+          "contract": "examples/full/flow-ui-contract/contract.json",
+          "contract_path": "$.nodes[0]",
           "pencil_node_id": "checkoutScreen",
           "pencil_path": "0",
-          "screen_spec": "examples/full/flow-ui-contract/screens/checkout.md",
           "semantic_id": "checkout"
         },
-        "state_kinds": [
-          "error"
-        ],
-        "states": [
-          {
-            "name": "default"
-          },
-          {
-            "name": "submitting"
-          },
-          {
-            "name": "error"
-          },
-          {
-            "name": "success"
-          }
-        ],
         "text": "Order summary",
-        "type": "frame",
-        "validations": [
-          {
-            "message": "A selected payment method is required before submitting payment",
-            "rule": "a-selected-payment-method-is-required-before-submitting-payment"
-          }
-        ]
+        "type": "frame"
       },
       "source_map": {
         "context": {
           "role": "screen",
           "semantic_id": "checkout"
         },
-        "mockup": "checkout.png",
-        "notes": [
-          "section: # \u00c9cran"
-        ],
+        "contract": "examples/full/flow-ui-contract/contract.json",
+        "contract_path": "$.nodes[0]",
         "pencil_node_id": "checkoutScreen",
         "pencil_path": "0",
-        "screen_spec": "examples/full/flow-ui-contract/screens/checkout.md",
         "semantic_id": "checkout"
       },
-      "states": [
-        {
-          "name": "default"
-        },
-        {
-          "name": "submitting"
-        },
-        {
-          "name": "error"
-        },
-        {
-          "name": "success"
-        }
-      ],
+      "states": [],
       "test_id": null,
       "viewport": {
         "height": 844,
@@ -275,6 +357,8 @@
     }
   ],
   "source": "pencil-context",
-  "test_ids": [],
+  "test_ids": [
+    "checkout-pay-now"
+  ],
   "version": 1
 }

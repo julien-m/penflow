@@ -29,6 +29,10 @@ def _walk(node: dict) -> list[dict]:
     return nodes
 
 
+def _first_button(root: dict) -> dict:
+    return next(child for child in root["children"] if "role=button" in child.get("context", ""))
+
+
 def test_write_pen_draft_from_semantic_tree_creates_valid_pen_with_context(tmp_path: Path) -> None:
     tree_path = tmp_path / "semantic-ui-tree.json"
     tree_path.write_text(json.dumps(load_example_without_mockup()), encoding="utf-8")
@@ -38,16 +42,16 @@ def test_write_pen_draft_from_semantic_tree_creates_valid_pen_with_context(tmp_p
 
     assert draft["version"] == "2.11"
     root = draft["children"][0]
-    button = root["children"][1]
+    button = _first_button(root)
     assert root["name"] == "checkout"
     assert "role=screen" in root["context"]
     assert "semantic_id=checkout" in root["context"]
     assert "role=button" in button["context"]
     assert "intent=submit_payment" in button["context"]
-    assert "binding=checkout.payment_method" in button["context"]
-    assert "entity=payment" in button["context"]
-    assert "test_id=checkout-pay" in button["context"]
-    assert button["source_map"]["screen_spec"].endswith("screens/checkout.md")
+    assert "binding=checkout.selected_payment_method" in button["context"]
+    assert "entity=checkout" in button["context"]
+    assert "test_id=checkout-pay-now" in button["context"]
+    assert button["source_map"]["contract"].endswith("contract.json")
     assert validate_pen_context(parse_pen(out_path)) == []
 
 
@@ -98,11 +102,11 @@ def test_write_pen_draft_from_semantic_tree_applies_theme_tokens(tmp_path: Path)
 
     assert draft["variables"]["pf-primary"] == {"type": "color", "value": "#0f5132"}
     root = draft["children"][0]
-    button = root["children"][1]
+    button = _first_button(root)
     assert root["fill"] == "$pf-background"
     assert button["fill"] == "$pf-primary"
     assert "#0057FF" not in out_path.read_text(encoding="utf-8")
-    assert "semantic_id=checkout.pay" in button["context"]
+    assert "semantic_id=checkout.pay-now" in button["context"]
 
 
 def test_draft_pen_from_tree_cli_accepts_theme_css(tmp_path: Path) -> None:

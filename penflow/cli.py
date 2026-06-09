@@ -25,9 +25,15 @@ from .contracts import (
 )
 from .demo import build_demo
 from .drift import detect_drift
+from .flow_contract import (
+    FlowContractValidationError,
+    load_flow_contract_v2,
+    validate_flow_contract_v2,
+)
+from .flow_contract_migration import migrate_flow_md_to_contract_json
 from .flow_specs import validate_flow_specs_dir
 from .llm import fix_compare_report, review_compare_report
-from .pen import inspect_pen, parse_pen, validate_pen_context
+from .pen import inspect_pen, parse_pen, validate_pen_context, validate_pen_context_against_contract
 from .reverse import reverse_pen
 from .semantic import write_semantic_tree
 from .semantic_draft import write_pen_draft_from_semantic_tree
@@ -42,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         return int(args.func(args) or 0)
-    except PenflowError as error:
+    except (PenflowError, FlowContractValidationError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 2
 
@@ -63,6 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
         "validate-pen", aliases=["validate"], help="validate .pen context"
     )
     validate_pen.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    validate_pen.add_argument("--contract", default=None, help="v2 flow contract.json")
     validate_pen.add_argument("pen")
     validate_pen.set_defaults(func=cmd_validate_pen)
 
@@ -88,6 +95,26 @@ def build_parser() -> argparse.ArgumentParser:
     )
     validate_flow_specs.add_argument("specs_dir")
     validate_flow_specs.set_defaults(func=cmd_validate_flow_specs)
+
+    validate_flow_contract_cmd = sub.add_parser(
+        "validate-flow-contract", help="validate strict v2 flow contract JSON"
+    )
+    validate_flow_contract_cmd.add_argument(
+        "--json", action="store_true", help="print machine-readable JSON"
+    )
+    validate_flow_contract_cmd.add_argument("contract")
+    validate_flow_contract_cmd.set_defaults(func=cmd_validate_flow_contract)
+
+    migrate_flow_contract_cmd = sub.add_parser(
+        "migrate-flow-md-to-contract-json",
+        help="explicitly migrate legacy Markdown flow specs to review-blocked v2 JSON",
+    )
+    migrate_flow_contract_cmd.add_argument(
+        "--json", action="store_true", help="print machine-readable JSON"
+    )
+    migrate_flow_contract_cmd.add_argument("specs_dir")
+    migrate_flow_contract_cmd.add_argument("--out", required=True)
+    migrate_flow_contract_cmd.set_defaults(func=cmd_migrate_flow_contract)
 
     validate_semantic = sub.add_parser(
         "validate-semantic-tree", help="validate semantic UI tree contract"
@@ -155,7 +182,6 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument("expected")
     compare.add_argument("actual")
     compare.add_argument("--out", default="compare-report.json")
-    compare.add_argument("--markdown", default=None)
     compare.add_argument("--threshold", type=float, default=0.9)
     compare.set_defaults(func=cmd_compare_tree)
 
@@ -208,10 +234,18 @@ def build_parser() -> argparse.ArgumentParser:
     code_ir.add_argument("--from-context", dest="from_context", required=True)
     code_ir.add_argument("--semantic-tree", dest="semantic_tree", default=None)
     code_ir.add_argument("--context-map", dest="context_map", default=None)
+    code_ir.add_argument("--contract", dest="contract", default=None)
     code_ir.add_argument("--flow-id", dest="flow_id", default=None)
     code_ir.add_argument("--flow-name", dest="flow_name", default=None)
     code_ir.add_argument("-o", "--out", required=True)
     code_ir.set_defaults(func=cmd_code_ir)
+
+    validate_code_ir_cmd = sub.add_parser("validate-code-ir", help="validate code IR JSON")
+    validate_code_ir_cmd.add_argument(
+        "--json", action="store_true", help="print machine-readable JSON"
+    )
+    validate_code_ir_cmd.add_argument("code_ir")
+    validate_code_ir_cmd.set_defaults(func=cmd_validate_code_ir)
 
     codegen = sub.add_parser("codegen", help="generate SwiftUI, React, or Rust Dioxus code from IR")
     codegen.add_argument("--json", action="store_true", help="print machine-readable JSON")
@@ -241,6 +275,12 @@ def build_parser() -> argparse.ArgumentParser:
     fix.add_argument("-o", "--out", default=None)
     fix.set_defaults(func=cmd_fix_report)
 
+    validate_report = sub.add_parser("validate-report", help="validate JSON report artifacts")
+    validate_report.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    validate_report.add_argument("--schema", action="store_true", help="run bundled JSON Schema")
+    validate_report.add_argument("report")
+    validate_report.set_defaults(func=cmd_validate_report)
+
     demo = sub.add_parser("demo", help="write an end-to-end demo project")
     demo.add_argument("--json", action="store_true", help="print machine-readable JSON")
     demo.add_argument("--out", default="examples/generated-demo")
@@ -255,7 +295,18 @@ def cmd_inspect(args: argparse.Namespace) -> int:
 
 
 def cmd_validate_pen(args: argparse.Namespace) -> int:
-    issues = [asdict(issue) for issue in validate_pen_context(parse_pen(args.pen))]
+    roots = parse_pen(args.pen)
+    if args.contract:
+        contract = load_flow_contract_v2(args.contract)
+        contract_issues = validate_flow_contract_v2(contract)
+        if _has_errors(contract_issues):
+            issues = contract_issues
+        else:
+            issues = [
+                asdict(issue) for issue in validate_pen_context_against_contract(roots, contract)
+            ]
+    else:
+        issues = [asdict(issue) for issue in validate_pen_context(roots)]
     _print({"status": "PASS" if not _has_errors(issues) else "FAIL", "issues": issues}, args.json)
     return 1 if _has_errors(issues) else 0
 
@@ -283,7 +334,21 @@ def cmd_export_semantic_tree(args: argparse.Namespace) -> int:
 
 
 def cmd_validate_flow_specs(args: argparse.Namespace) -> int:
+    # @spec FR-006: Deprecated compatibility surface — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-006
     report = validate_flow_specs_dir(args.specs_dir)
+    _print(report, args.json)
+    return 0 if report["status"] == "PASS" else 1
+
+
+def cmd_validate_flow_contract(args: argparse.Namespace) -> int:
+    # @spec FR-004: Primary strict contract CLI — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-004
+    issues = validate_flow_contract_v2(load_flow_contract_v2(args.contract))
+    _print({"status": "PASS" if not _has_errors(issues) else "FAIL", "issues": issues}, args.json)
+    return 1 if _has_errors(issues) else 0
+
+
+def cmd_migrate_flow_contract(args: argparse.Namespace) -> int:
+    report = migrate_flow_md_to_contract_json(args.specs_dir, args.out)
     _print(report, args.json)
     return 0 if report["status"] == "PASS" else 1
 
@@ -371,7 +436,7 @@ def cmd_compare_tree(args: argparse.Namespace) -> int:
         args.expected,
         args.actual,
         json_out=args.out,
-        markdown_out=args.markdown,
+        markdown_out=None,
         threshold=args.threshold,
     )
     _print(
@@ -379,7 +444,6 @@ def cmd_compare_tree(args: argparse.Namespace) -> int:
             "status": report["status"],
             "score": report["score"],
             "out": args.out,
-            "markdown": args.markdown,
         },
         args.json,
     )
@@ -447,12 +511,14 @@ def cmd_export_ir(args: argparse.Namespace) -> int:
 
 
 def cmd_code_ir(args: argparse.Namespace) -> int:
+    # @spec FR-008: v2 contract handoff in code IR — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-008
     ir = code_ir_from_pen(
         args.from_context,
         flow_id=args.flow_id,
         flow_name=args.flow_name,
         semantic_tree=args.semantic_tree,
         context_map=args.context_map,
+        contract=args.contract,
     )
     _raise_if_no_context(ir["screens"], args.from_context)
     issues = validate_code_ir(ir)
@@ -467,6 +533,13 @@ def cmd_code_ir(args: argparse.Namespace) -> int:
         args.json,
     )
     return 0
+
+
+def cmd_validate_code_ir(args: argparse.Namespace) -> int:
+    # @spec FR-008: Strict code IR validation CLI — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-008
+    issues = validate_code_ir(load_tree(args.code_ir))
+    _print({"status": "PASS" if not _has_errors(issues) else "FAIL", "issues": issues}, args.json)
+    return 1 if _has_errors(issues) else 0
 
 
 def cmd_codegen(args: argparse.Namespace) -> int:
@@ -492,19 +565,33 @@ def cmd_ci(args: argparse.Namespace) -> int:
 
 
 def cmd_review_report(args: argparse.Namespace) -> int:
-    markdown = review_compare_report(args.report)
+    # @spec FR-009: JSON-only review report artifact — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-009
+    report = review_compare_report(args.report)
     if args.out:
-        Path(args.out).write_text(markdown, encoding="utf-8")
-    _print({"status": "PASS", "out": args.out, "markdown": markdown}, args.json)
+        Path(args.out).write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+    _print(report | {"out": args.out}, args.json)
     return 0
 
 
 def cmd_fix_report(args: argparse.Namespace) -> int:
-    markdown = fix_compare_report(args.report)
+    # @spec FR-009: JSON-only fix report artifact — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-009
+    report = fix_compare_report(args.report)
     if args.out:
-        Path(args.out).write_text(markdown, encoding="utf-8")
-    _print({"status": "PASS", "out": args.out, "markdown": markdown}, args.json)
+        Path(args.out).write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+    _print(report | {"out": args.out}, args.json)
     return 0
+
+
+def cmd_validate_report(args: argparse.Namespace) -> int:
+    # @spec FR-009: Structured report schema validation — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-009
+    report = load_tree(args.report)
+    issues = _validate_report_schema(report, args.report) if args.schema else []
+    _print({"status": "PASS" if not _has_errors(issues) else "FAIL", "issues": issues}, args.json)
+    return 1 if _has_errors(issues) else 0
 
 
 def cmd_demo(args: argparse.Namespace) -> int:
@@ -527,6 +614,140 @@ def _print(data: dict[str, Any], as_json: bool) -> None:
 
 def _has_errors(issues: list[dict[str, Any]]) -> bool:
     return any(issue.get("severity") == "error" for issue in issues)
+
+
+_SUPPORTED_REPORT_SCHEMA_KEYWORDS = frozenset(
+    {
+        "$id",
+        "$schema",
+        "additionalProperties",
+        "const",
+        "description",
+        "enum",
+        "items",
+        "properties",
+        "required",
+        "title",
+        "type",
+    }
+)
+
+
+def _validate_report_schema(report: Any, report_path: str | Path) -> list[dict[str, Any]]:
+    if not isinstance(report, dict):
+        return [{"severity": "error", "path": "$", "message": "report must be an object"}]
+    schema_name = _report_schema_name(report, Path(report_path).name)
+    schema_path = Path(__file__).parent / "schemas" / schema_name
+    schema = load_tree(schema_path)
+    return _validate_json_schema_subset(report, schema, "$")
+
+
+def _validate_json_schema_subset(
+    value: Any, schema: dict[str, Any], path: str
+) -> list[dict[str, Any]]:
+    """Validate the strict subset used by bundled report schemas."""
+    issues = _unsupported_schema_keyword_issues(schema, path)
+    if issues:
+        return issues
+    expected_type = schema.get("type")
+    if expected_type and not _matches_json_type(value, expected_type):
+        issues.append({"severity": "error", "path": path, "message": f"expected {expected_type}"})
+        return issues
+    if "const" in schema and value != schema["const"]:
+        issues.append(
+            {"severity": "error", "path": path, "message": f"expected {schema['const']!r}"}
+        )
+    if "enum" in schema and value not in schema["enum"]:
+        issues.append(
+            {"severity": "error", "path": path, "message": f"expected one of {schema['enum']}"}
+        )
+    if isinstance(value, dict):
+        for key in schema.get("required", []) or []:
+            if key not in value:
+                issues.append(
+                    {"severity": "error", "path": f"{path}.{key}", "message": f"{key} is required"}
+                )
+        properties = (
+            schema.get("properties", {}) if isinstance(schema.get("properties"), dict) else {}
+        )
+        if schema.get("additionalProperties") is False:
+            for key in sorted(set(value) - set(properties)):
+                issues.append(
+                    {
+                        "severity": "error",
+                        "path": f"{path}.{key}",
+                        "message": "additional property is not allowed",
+                    }
+                )
+        for key, child_schema in properties.items():
+            if key in value and isinstance(child_schema, dict):
+                issues.extend(
+                    _validate_json_schema_subset(value[key], child_schema, f"{path}.{key}")
+                )
+    elif isinstance(value, list) and isinstance(schema.get("items"), dict):
+        for index, item in enumerate(value):
+            issues.extend(_validate_json_schema_subset(item, schema["items"], f"{path}[{index}]"))
+    return issues
+
+
+def _unsupported_schema_keyword_issues(schema: dict[str, Any], path: str) -> list[dict[str, Any]]:
+    issues = [
+        {
+            "severity": "error",
+            "path": f"{path}.__schema__.{keyword}",
+            "message": f"unsupported schema keyword: {keyword}",
+        }
+        for keyword in sorted(set(schema) - _SUPPORTED_REPORT_SCHEMA_KEYWORDS)
+    ]
+    properties = schema.get("properties", {})
+    if isinstance(properties, dict):
+        for key, child_schema in properties.items():
+            if isinstance(child_schema, dict):
+                issues.extend(_unsupported_schema_keyword_issues(child_schema, f"{path}.{key}"))
+    items = schema.get("items")
+    if isinstance(items, dict):
+        issues.extend(_unsupported_schema_keyword_issues(items, f"{path}[]"))
+    additional_properties = schema.get("additionalProperties")
+    if isinstance(additional_properties, dict):
+        issues.extend(_unsupported_schema_keyword_issues(additional_properties, f"{path}.*"))
+    return issues
+
+
+def _matches_json_type(value: Any, expected: str | list[str]) -> bool:
+    expected_types = [expected] if isinstance(expected, str) else expected
+    checks = {
+        "object": lambda item: isinstance(item, dict),
+        "array": lambda item: isinstance(item, list),
+        "string": lambda item: isinstance(item, str),
+        "integer": lambda item: isinstance(item, int) and not isinstance(item, bool),
+        "number": lambda item: isinstance(item, (int, float)) and not isinstance(item, bool),
+        "boolean": lambda item: isinstance(item, bool),
+        "null": lambda item: item is None,
+    }
+    return any(
+        checks[schema_type](value) for schema_type in expected_types if schema_type in checks
+    )
+
+
+def _report_schema_name(report: dict[str, Any], filename: str) -> str:
+    kind = report.get("kind")
+    if kind == "penflow-review-report":
+        return "review-report.schema.json"
+    if kind == "penflow-fix-report":
+        return "fix-report.schema.json"
+    if kind == "penflow-drift-report":
+        return "drift-report.schema.json"
+    if "compare" in filename or {"score", "summary", "issues"}.issubset(report):
+        return "compare-report.schema.json"
+    if "visual" in filename:
+        return "mockup-validation-visual-report.schema.json"
+    if "checklist" in filename:
+        return "mockup-validation-checklist.schema.json"
+    if "audit" in filename:
+        return "mockup-validation-audit.schema.json"
+    if "manifest" in filename:
+        return "mockup-validation-manifest.schema.json"
+    raise PenflowError(f"Unknown report schema for {filename}")
 
 
 class PenflowError(RuntimeError):

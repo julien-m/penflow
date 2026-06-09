@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.dev/schemas/drift-report.schema.json",
+  "title": "Penflow Drift Report",
+  "type": "object",
+  "required": ["version", "kind", "status", "summary", "inputs", "issues"],
+  "additionalProperties": true,
+  "properties": {
+    "version": {"type": "integer"},
+    "kind": {"const": "penflow-drift-report"},
+    "status": {"enum": ["PASS", "DRIFT"]},
+    "summary": {"type": "object"},
+    "inputs": {"type": "object"},
+    "issues": {"type": "array"}
+  }
+}

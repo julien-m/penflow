@@ -1,14 +1,14 @@
 {
-  "version": 1,
-  "status": "PASS",
+  "issues": [],
   "score": 1.0,
-  "threshold": 0.9,
+  "status": "PASS",
   "summary": {
-    "checks": 4,
+    "checks": 5,
+    "errors": 0,
     "failed": 0,
     "issues": 0,
-    "errors": 0,
     "warnings": 0
   },
-  "issues": []
+  "threshold": 0.9,
+  "version": 1
 }

@@ -11,11 +11,11 @@ description: >
 
 # flow-ui-contract — Skill Posture
 
-Guided pipeline that captures product behavior visible in Pencil/mockup artifacts and writes validated `flow-ui-contract/flows/*.md` and `flow-ui-contract/screens/*.md` specs.
+Guided pipeline that captures product behavior visible in Pencil/mockup artifacts and now promotes reviewed behavior into canonical `flow-ui-contract/contract.json`. Legacy `flow-ui-contract/flows/*.md` and `flow-ui-contract/screens/*.md` files are documentation or explicit migration inputs only.
 
 ## Purpose
 
-Use this skill before Penflow needs a `semantic-ui-tree.json`. It turns product behavior into flow/screen Markdown that Penflow can parse, validate, convert into Pencil context, reverse from Pencil, and compare against runtime output later.
+Use this skill before Penflow needs a `semantic-ui-tree.json`. It turns product behavior into a strict JSON contract that Penflow can validate, convert into Pencil context, reverse/migrate from Pencil docs, and compare against runtime output later.
 
 This skill prepares inputs. It does **not** run browser, Xcode, simulator, Playwright, React Native, Metro, app builds, or runtime adapters.
 
@@ -30,7 +30,7 @@ This skill prepares inputs. It does **not** run browser, Xcode, simulator, Playw
 
 ## Positioning
 
-- **Forward mode:** write flow/screen specs, export `semantic-ui-tree.json`, validate it, draft or enrich `ui.pen`, export expected tree, and generate code IR.
+- **Forward mode:** write/review `contract.json`, export `semantic-ui-tree.json`, validate it, draft or enrich `ui.pen`, export expected tree, and generate code IR.
 - **Pencil enrichment:** use an existing visual `.pen`, inject Penflow context from the semantic tree, map semantic nodes to Pencil nodes, and validate the enriched file.
 - **Reverse mode:** run `reverse-pen` on legacy `ui.pen` to reconstruct flow/screen specs and `semantic-ui-tree.json`; unknown business logic becomes `[NEEDS CLARIFICATION]`.
 - **Runtime verification:** external adapters emit `actual-ui-tree.json`; Penflow validates, compares, and writes review/fix reports.
@@ -52,9 +52,9 @@ Screen specs must describe visible hierarchy using those conventions: app shell/
 
 ## Tree Formation Contract
 
-This skill does not ask the LLM to hand-write `semantic-ui-tree.json`. It asks the LLM to author flow/screen specs precise enough for `penflow export-semantic-tree` to generate the tree deterministically.
+This skill does not ask the LLM to hand-write `semantic-ui-tree.json`. It asks the LLM to author or migrate `contract.json` precise enough for `penflow export-semantic-tree` to generate the tree deterministically.
 
-The LLM must still understand the formation contract: flow specs become `flows[]`; screen specs become `screens[]`; visible hierarchy becomes recursive semantic nodes; business intent becomes `intent`, `binding`, `entity`, `states`, `validations`, `side_effects`, `test_id`, and `source_map`; unknown rules stay `[NEEDS CLARIFICATION]`. **Read** [`references/semantic-ui-tree.md`](references/semantic-ui-tree.md) before explaining or debugging tree output.
+The LLM must still understand the formation contract: v2 contract objects become `flows[]` and `screens[]`; legacy flow specs become `flows[]`; screen specs become `screens[]`; visible hierarchy becomes recursive semantic nodes; business intent becomes `intent`, `binding`, `entity`, `states`, `validations`, `side_effects`, `test_id`, and `source_map`; unknown rules stay `[NEEDS CLARIFICATION]`. **Read** [`references/semantic-ui-tree.md`](references/semantic-ui-tree.md) before explaining or debugging tree output.
 
 Mini example:
 
@@ -204,7 +204,8 @@ Open questions: <N> [NEEDS CLARIFICATION]
 ## Forward Command Sequence
 
 ```bash
-penflow export-semantic-tree <target>/flow-ui-contract --out semantic-ui-tree.json --json
+penflow validate-flow-contract <target>/flow-ui-contract/contract.json --json
+penflow export-semantic-tree <target>/flow-ui-contract/contract.json --out semantic-ui-tree.json --json
 penflow validate-semantic-tree semantic-ui-tree.json --json
 penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --theme-css <target>/theme.css --json
 penflow validate-pen ui.pen --json
@@ -236,9 +237,9 @@ penflow validate-pen reverse-output/ui.enriched.pen --json
 
 ```bash
 penflow validate-actual actual-ui-tree.json --schema --json
-penflow compare-tree expected-ui-tree.json actual-ui-tree.json --out compare-report.json --markdown compare-report.md --json
-penflow review-report compare-report.json --out review-report.md
-penflow fix-report compare-report.json --out fix-report.md
+penflow compare-tree expected-ui-tree.json actual-ui-tree.json --out compare-report.json --json
+penflow review-report compare-report.json --out review-report.json --json
+penflow fix-report compare-report.json --out fix-report.json --json
 ```
 
 ## Full Demo Sequence

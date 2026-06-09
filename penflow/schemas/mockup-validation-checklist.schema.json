@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.dev/schemas/mockup-validation-checklist.schema.json",
+  "title": "Penflow Mockup Validation Checklist",
+  "type": "object",
+  "required": ["status"],
+  "additionalProperties": true,
+  "properties": {"status": {"type": "string"}}
+}

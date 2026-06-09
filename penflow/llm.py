@@ -8,59 +8,49 @@ from typing import Any
 from .tree import load_tree
 
 
-def review_compare_report(report_path: str | Path) -> str:
-    """Return stable Markdown explaining compare-report issues by semantic id."""
-
+def review_compare_report(report_path: str | Path) -> dict[str, Any]:
+    # @spec FR-009: Review reports are JSON-only handoff artifacts — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-009
+    """Return stable JSON explaining compare-report issues by semantic id."""
     report = load_tree(report_path)
-    lines = [
-        "# Penflow Review",
-        "",
-        f"**Status:** {report.get('status', 'UNKNOWN')}",
-        f"**Score:** {report.get('score', 'n/a')}",
-        "",
-        "| Severity | Semantic ID | Likely Cause | Owner |",
-        "|---|---|---|---|",
-    ]
     issues = report.get("issues", []) or []
-    if not issues:
-        lines.append("| info | - | No structural issues found. | none |")
-    for issue in issues:
-        lines.append(
-            "| {severity} | {semantic_id} | {cause} | {owner} |".format(
-                severity=issue.get("severity", "unknown"),
-                semantic_id=issue.get("semantic_id") or "-",
-                cause=_cause(issue),
-                owner=_owner(issue),
-            )
-        )
-    return "\n".join(lines) + "\n"
+    return {
+        "version": 1,
+        "kind": "penflow-review-report",
+        "status": report.get("status", "UNKNOWN"),
+        "score": report.get("score"),
+        "issues": [
+            {
+                "severity": issue.get("severity", "unknown"),
+                "semantic_id": issue.get("semantic_id"),
+                "code": issue.get("code"),
+                "likely_cause": _cause(issue),
+                "owner": _owner(issue),
+            }
+            for issue in issues
+        ],
+    }
 
 
-def fix_compare_report(report_path: str | Path) -> str:
-    """Return stable Markdown fix suggestions for compare-report issues."""
-
+def fix_compare_report(report_path: str | Path) -> dict[str, Any]:
+    # @spec FR-009: Fix reports are JSON-only handoff artifacts — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-009
+    """Return stable JSON fix suggestions for compare-report issues."""
     report = load_tree(report_path)
-    lines = [
-        "# Penflow Fix Plan",
-        "",
-        f"**Status:** {report.get('status', 'UNKNOWN')}",
-        f"**Score:** {report.get('score', 'n/a')}",
-        "",
-        "| Semantic ID | Fix | Target |",
-        "|---|---|---|",
-    ]
     issues = report.get("issues", []) or []
-    if not issues:
-        lines.append("| - | No fixes required. | none |")
-    for issue in issues:
-        lines.append(
-            "| {semantic_id} | {fix} | {target} |".format(
-                semantic_id=issue.get("semantic_id") or "-",
-                fix=_fix(issue),
-                target=_owner(issue),
-            )
-        )
-    return "\n".join(lines) + "\n"
+    return {
+        "version": 1,
+        "kind": "penflow-fix-report",
+        "status": report.get("status", "UNKNOWN"),
+        "score": report.get("score"),
+        "fixes": [
+            {
+                "semantic_id": issue.get("semantic_id"),
+                "code": issue.get("code"),
+                "fix": _fix(issue),
+                "target": _owner(issue),
+            }
+            for issue in issues
+        ],
+    }
 
 
 def _cause(issue: dict[str, Any]) -> str:

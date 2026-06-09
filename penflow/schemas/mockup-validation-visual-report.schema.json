@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.dev/schemas/mockup-validation-visual-report.schema.json",
+  "title": "Penflow Mockup Validation Visual Report",
+  "type": "object",
+  "required": ["status", "renderer", "sourceFile", "screens"],
+  "additionalProperties": false,
+  "properties": {
+    "status": {"type": "string"},
+    "renderer": {"type": "string"},
+    "sourceFile": {"type": "string"},
+    "validatedAt": {"type": "string"},
+    "screens": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["screen_id", "semantic_id", "pencil_node_id", "png", "evidence", "audit"],
+        "additionalProperties": false,
+        "properties": {
+          "screen_id": {"type": "string"},
+          "semantic_id": {"type": "string"},
+          "pencil_node_id": {"type": "string"},
+          "png": {"type": "string"},
+          "size": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "width": {"type": "integer"},
+              "height": {"type": "integer"}
+            }
+          },
+          "visible_children": {"type": "array", "items": {"type": "string"}},
+          "evidence": {"type": "array", "items": {"type": "string"}},
+          "audit": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["category", "result", "finding"],
+              "additionalProperties": false,
+              "properties": {
+                "category": {"type": "string"},
+                "result": {"type": "string"},
+                "finding": {"type": "string"}
+              }
+            }
+          },
+          "final_gate": {"type": "string"}
+        }
+      }
+    }
+  }
+}

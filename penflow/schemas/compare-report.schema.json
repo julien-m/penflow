@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.dev/schemas/compare-report.schema.json",
+  "title": "Penflow Compare Report",
+  "type": "object",
+  "required": ["version", "status", "score", "summary", "issues"],
+  "additionalProperties": true,
+  "properties": {
+    "version": {"type": "integer"},
+    "status": {"enum": ["PASS", "FAIL"]},
+    "score": {"type": "number"},
+    "summary": {"type": "object"},
+    "issues": {"type": "array"}
+  }
+}

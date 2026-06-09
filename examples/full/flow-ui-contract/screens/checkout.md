@@ -22,7 +22,7 @@ generated_at: "2026-05-20"
 
 | Élément | Type | Effet |
 |---------|------|-------|
-| Pay now | button | POST /payments → confirmation |
+| Pay now | button | POST /payments → submitting |
 
 ## Validations
 
@@ -30,7 +30,7 @@ generated_at: "2026-05-20"
 
 ## États UI
 
-default · submitting · error · success
+default · submitting · error
 
 ## Erreurs
 

@@ -18,13 +18,13 @@ Mockup Factory is a tree-aware, guided optimizer for Pencil mockups. It may orch
 
 Treat these artifacts as first-class inputs, not optional notes:
 
-- `flow-ui-contract/flows/*.md` and `flow-ui-contract/screens/*.md` — product behavior source.
+- `flow-ui-contract/contract.json` — canonical product behavior source.
 - `semantic-ui-tree.json` — before-code semantic anchor exported from flow specs.
 - `theme.css` — product theme input for canonical forward Pencil composition.
 - `ui.pen` or `ui.enriched.pen` — Pencil visual contract to optimize.
 - `pencil-context-map.json` — `screen_id` / `semantic_id` / `pencil_node_id` linkage and ambiguity buckets.
 - `expected-ui-tree.json` — design-derived structural baseline.
-- `drift-report.json` and optional `drift-report.md` from `penflow detect-drift` — deterministic contract drift report.
+- `drift-report.json` from `penflow detect-drift` — deterministic contract drift report.
 - Screenshots and exported PNGs — visual evidence captured by Pencil MCP or an equivalent renderer when available; never a substitute for the tree anchors.
 
 ## Preconditions
@@ -32,14 +32,14 @@ Treat these artifacts as first-class inputs, not optional notes:
 Run from the target project root and produce missing anchors before auditing UX:
 
 ```bash
-penflow validate-flow-specs <target>/flow-ui-contract --json
-penflow export-semantic-tree <target>/flow-ui-contract --out <target>/semantic-ui-tree.json --json
+penflow validate-flow-contract <target>/flow-ui-contract/contract.json --json
+penflow export-semantic-tree <target>/flow-ui-contract/contract.json --out <target>/semantic-ui-tree.json --json
 penflow validate-semantic-tree <target>/semantic-ui-tree.json --json
 penflow draft-pen-from-tree <target>/semantic-ui-tree.json --out <target>/ui.pen --theme-css <target>/theme.css --json
 penflow validate-pen <target>/ui.pen --json
 penflow map-pencil-context <target>/ui.pen <target>/semantic-ui-tree.json --out <target>/pencil-context-map.json --json
 penflow export-expected <target>/ui.pen --out <target>/expected-ui-tree.json --json
-penflow detect-drift <target>/flow-ui-contract <target>/semantic-ui-tree.json <target>/ui.pen --out <target>/drift-report.json --markdown <target>/drift-report.md --json
+penflow detect-drift <target>/flow-ui-contract/contract.json <target>/semantic-ui-tree.json <target>/ui.pen --out <target>/drift-report.json --json
 ```
 
 If any command fails, stop and report the failing artifact. Do not optimize a mockup whose semantic anchors are invalid.
@@ -59,11 +59,11 @@ A themed but structurally generic output is a failure. Reject screens that ignor
 
 1. **Load anchors and conventions:** **Read** [`references/workflow.md`](references/workflow.md), **Read** [`references/audit-rubric.md`](references/audit-rubric.md), **Read** [`references/visual-validation.md`](references/visual-validation.md), then apply the Design Convention Gate above.
 2. **Build an anchor table:** for every screen, list `screen_id`, `semantic_id`, `pencil_node_id` when available, source flow/screen file, and drift severity.
-3. **Freeze checklist:** write or update only the orchestrator-owned checklist under `.mockup-validation/<group>/checklist.md`; each item must reference `screen_id` plus `semantic_id` or `pencil_node_id` when available.
+3. **Freeze checklist:** write or update only the orchestrator-owned checklist under `.mockup-validation/<group>/checklist.json`; each item must reference `screen_id` plus `semantic_id` or `pencil_node_id` when available.
 4. **Audit UX + contract:** use the rubric to identify semantic contract gaps and critical UX/UI issues. A critical issue in either category blocks PASS.
 5. **Apply guided fixes:** change only audited checklist items. No broad redesign, no unanchored "polish pass", no invented product behavior.
 6. **Revalidate anchors:** rerun the Penflow commands from Preconditions after fixes.
-7. **Run Visual Evidence Gate:** open/render the `.pen`, capture `snapshot_layout`, inspect `get_screenshot`, export PNGs, and write `.mockup-validation/visual-evidence/manifest.json` plus `visual-report.md`.
+7. **Run Visual Evidence Gate:** open/render the `.pen`, capture `snapshot_layout`, inspect `get_screenshot`, export PNGs, and write `.mockup-validation/visual-evidence/manifest.json` plus `visual-report.json`.
 8. **Decide final state:** PASS requires valid anchors, no blocking drift, no critical UX/UI checklist items, and complete visual evidence when a renderer is available.
 
 ## Quality Gate
@@ -88,13 +88,13 @@ Forbidden in Penflow Python core: importing or depending on Pencil MCP, cc-hub, 
 ```text
 <target>/
   .mockup-validation/
-    audit-report.md
+    audit-report.json
     visual-evidence/
       manifest.json
-      visual-report.md
+      visual-report.json
       *.png
     <group>/
-      checklist.md
+      checklist.json
       state.json
       manifest.json
       drift-report.json

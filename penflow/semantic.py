@@ -9,6 +9,12 @@ from typing import Any
 
 import yaml
 
+from .flow_contract import (
+    FlowContractValidationError,
+    load_flow_contract_v2,
+    validate_flow_contract_v2,
+)
+
 
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 SECTION_RE = re.compile(r"^(## .+)$", re.MULTILINE)
@@ -60,11 +66,199 @@ def semantic_tree_from_specs(specs_dir: str | Path) -> dict[str, Any]:
     }
 
 
+def semantic_tree_from_contract(path_or_contract: str | Path | dict[str, Any]) -> dict[str, Any]:
+    # @spec FR-005: Semantic export reads v2 contract.json — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-005
+    """Build a semantic UI tree from canonical v2 `contract.json`.
+
+    Args:
+        path_or_contract: Path to `contract.json`, or an already loaded v2 contract object.
+
+    Returns:
+        Deterministic semantic UI tree generated from the strict JSON contract.
+    """
+    contract_path: str | None = None
+    if isinstance(path_or_contract, dict):
+        contract = path_or_contract
+    else:
+        contract_path = str(path_or_contract)
+        contract = load_flow_contract_v2(path_or_contract)
+    issues = validate_flow_contract_v2(contract)
+    if any(issue["severity"] == "error" for issue in issues):
+        first = next(issue for issue in issues if issue["severity"] == "error")
+        raise FlowContractValidationError(
+            f"contract validation failed: {first['path']}: {first['message']}"
+        )
+    nodes = {str(node["id"]): node for node in contract["nodes"]}
+    node_paths = {
+        str(node["id"]): f"$.nodes[{index}]" for index, node in enumerate(contract["nodes"])
+    }
+    actions = {str(action["id"]): action for action in contract["actions"]}
+    behaviors = _screen_behaviors(contract)
+    screens = []
+    for screen_index, screen in enumerate(contract["screens"]):
+        root = _contract_node(
+            nodes[str(screen["root_node"])],
+            nodes,
+            actions,
+            node_paths,
+            contract_path,
+        )
+        screen_behaviors = behaviors.get(str(screen["id"]), {})
+        screens.append(
+            {
+                "id": screen["id"],
+                "flow_id": screen["flow_id"],
+                "surface": screen.get("surface", "web"),
+                "viewport": screen.get("viewport", {}),
+                "states": [{"name": state["id"]} for state in screen.get("states", [])],
+                "validations": screen_behaviors.get("validations", []),
+                "side_effects": screen_behaviors.get("side_effects", []),
+                "source_map": {
+                    "contract": contract_path or "inline",
+                    "contract_path": f"$.screens[{screen_index}]",
+                },
+                "root": root,
+            }
+        )
+    return {
+        "version": 1,
+        "kind": "semantic-ui-tree",
+        "tree_id": contract["contract_id"],
+        "source": {
+            "contract": contract_path or "inline",
+            "notes": ["Generated deterministically from v2 contract.json."],
+        },
+        "flows": [
+            {
+                "id": flow["id"],
+                "title": flow.get("title", flow["id"]),
+                "entry_screen": flow["entry_screen"],
+                "steps": [
+                    {
+                        "id": f"{flow['id']}-entry",
+                        "screen_id": flow["entry_screen"],
+                        "intent": flow["id"],
+                    }
+                ],
+                "transitions": [
+                    _contract_transition(transition)
+                    for transition in contract.get("transitions", [])
+                    if transition.get("flow") == flow["id"]
+                ],
+                "source_map": {
+                    "contract": contract_path or "inline",
+                    "contract_path": f"$.flows[{flow_index}]",
+                },
+            }
+            for flow_index, flow in enumerate(contract["flows"])
+        ],
+        "screens": screens,
+    }
+
+
 def write_semantic_tree(specs_dir: str | Path, out_path: str | Path) -> dict[str, Any]:
-    """Write a semantic UI tree JSON file and return the generated tree."""
-    tree = semantic_tree_from_specs(specs_dir)
+    # @spec FR-005: Contract path dispatch for strict v2 export — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-005
+    """Write a strict v2 semantic UI tree JSON file.
+
+    Args:
+        specs_dir: Either `flow-ui-contract/contract.json` or a directory containing it.
+        out_path: Destination `semantic-ui-tree.json` path.
+
+    Returns:
+        The generated semantic UI tree.
+    """
+    source = Path(specs_dir)
+    contract_path = source if source.name == "contract.json" else source / "contract.json"
+    if contract_path.is_file():
+        tree = semantic_tree_from_contract(contract_path)
+    else:
+        raise FlowContractValidationError(f"contract.json is required: {contract_path}")
     Path(out_path).write_text(json.dumps(tree, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return tree
+
+
+def _contract_node(
+    node: dict[str, Any],
+    nodes: dict[str, dict[str, Any]],
+    actions: dict[str, dict[str, Any]],
+    node_paths: dict[str, str],
+    contract_path: str | None,
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "semantic_id": node["semantic_id"],
+        "role": node["role"],
+        "source_map": {
+            "contract": contract_path or "inline",
+            "contract_path": node_paths[node["id"]],
+        },
+        "children": [
+            _contract_node(nodes[child_id], nodes, actions, node_paths, contract_path)
+            for child_id in node.get("children", []) or []
+        ],
+    }
+    for key in ("text", "binding", "entity", "test_id"):
+        if node.get(key):
+            result[key] = node[key]
+    if result.get("binding") and not result.get("entity"):
+        result["entity"] = str(result["binding"]).split(".", 1)[0]
+    if node.get("action") and node["action"] in actions:
+        action = dict(actions[node["action"]])
+        action["node"] = node["semantic_id"]
+        result["actions"] = [action]
+        result["intent"] = node["action"]
+    return {key: value for key, value in result.items() if value not in (None, [], {})}
+
+
+def _screen_behaviors(contract: dict[str, Any]) -> dict[str, dict[str, list[dict[str, Any]]]]:
+    """Derive semantic screen behaviors from guards, permissions, and mutations."""
+    nodes = {str(node["id"]): node for node in contract.get("nodes", [])}
+    guards = {str(item["id"]): item for item in contract.get("guards", [])}
+    permissions = {str(item["id"]): item for item in contract.get("permissions", [])}
+    mutations = {str(item["id"]): item for item in contract.get("mutations", [])}
+    by_screen: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    for action in contract.get("actions", []) or []:
+        node = nodes.get(str(action.get("node")))
+        if not node:
+            continue
+        bucket = by_screen.setdefault(
+            str(node.get("screen_id")), {"validations": [], "side_effects": []}
+        )
+        if action.get("guard"):
+            bucket["validations"].append(
+                {
+                    "kind": "guard",
+                    "id": action["guard"],
+                    "source": guards.get(str(action["guard"]), {}),
+                }
+            )
+        if action.get("permission"):
+            bucket["validations"].append(
+                {
+                    "kind": "permission",
+                    "id": action["permission"],
+                    "source": permissions.get(str(action["permission"]), {}),
+                }
+            )
+        if action.get("mutation"):
+            bucket["side_effects"].append(
+                {
+                    "kind": "mutation",
+                    "id": action["mutation"],
+                    "source": mutations.get(str(action["mutation"]), {}),
+                }
+            )
+    return by_screen
+
+
+def _contract_transition(transition: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": transition["id"],
+        "from": transition.get("from_screen"),
+        "to": transition.get("to_screen"),
+        "trigger": transition.get("trigger"),
+        **({"action": transition["action"]} if transition.get("action") else {}),
+        **({"guard": transition["guard"]} if transition.get("guard") else {}),
+    }
 
 
 def _flow_from_markdown(path: Path, screens: list[dict[str, Any]]) -> dict[str, Any]:

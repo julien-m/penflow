@@ -107,11 +107,14 @@ def _swift_component(component: dict[str, Any]) -> list[str]:
     text = component.get("text") or component.get("id") or ""
     sid = component.get("id") or "component"
     if component.get("role") == "button":
-        return [
+        lines = [
             f'            Button("{_escape(text)}") {{',
             f"                // intent: {component.get('intent', sid)}",
             "            }",
         ]
+        if test_id := component.get("test_id"):
+            lines.append(f'            .accessibilityIdentifier("{_escape(test_id)}")')
+        return lines
     return [f'            Text("{_escape(text)}")']
 
 
@@ -119,8 +122,24 @@ def _react_component(component: dict[str, Any]) -> list[str]:
     text = _escape(component.get("text") or component.get("id") or "")
     sid = component.get("id") or "component"
     if component.get("role") == "button":
+        test_attr = (
+            f' data-testid="{_escape(component["test_id"])}"' if component.get("test_id") else ""
+        )
+        children = [
+            child for child in component.get("children", []) or [] if isinstance(child, dict)
+        ]
+        if children:
+            lines = [
+                f'      <button data-penflow-id="{sid}"{test_attr} onClick={{() => undefined}}>'
+            ]
+            for child in children:
+                child_id = _escape(child.get("id") or child.get("semantic_id") or "label")
+                child_text = _escape(child.get("text") or child.get("name") or child_id)
+                lines.append(f'        <span data-penflow-id="{child_id}">{child_text}</span>')
+            lines.append("      </button>")
+            return lines
         return [
-            f'      <button data-penflow-id="{sid}" onClick={{() => undefined}}>{text}</button>'
+            f'      <button data-penflow-id="{sid}"{test_attr} onClick={{() => undefined}}>{text}</button>'
         ]
     return [f'      <span data-penflow-id="{sid}">{text}</span>']
 
@@ -129,7 +148,25 @@ def _rust_component(component: dict[str, Any]) -> list[str]:
     text = _escape(component.get("text") or component.get("id") or "")
     sid = component.get("id") or "component"
     if component.get("role") == "button":
-        return [f'            button {{ "data-penflow-id": "{sid}", "{text}" }}']
+        test_attr = (
+            f', "data-testid": "{_escape(component["test_id"])}"'
+            if component.get("test_id")
+            else ""
+        )
+        children = [
+            child for child in component.get("children", []) or [] if isinstance(child, dict)
+        ]
+        if children:
+            lines = [f'            button {{ "data-penflow-id": "{sid}"{test_attr},']
+            for child in children:
+                child_id = _escape(child.get("id") or child.get("semantic_id") or "label")
+                child_text = _escape(child.get("text") or child.get("name") or child_id)
+                lines.append(
+                    f'                span {{ "data-penflow-id": "{child_id}", "{child_text}" }}'
+                )
+            lines.append("            }")
+            return lines
+        return [f'            button {{ "data-penflow-id": "{sid}"{test_attr}, "{text}" }}']
     return [f'            span {{ "data-penflow-id": "{sid}", "{text}" }}']
 
 

@@ -403,7 +403,18 @@ def _validate_source_map(
             )
         )
         return
-    if required_key and not source_map.get(required_key):
+    if source_map.get("contract") and not source_map.get("contract_path"):
+        issues.append(
+            SemanticIssue(
+                "error",
+                f"semantic.{owner}_source_map_contract_path_required",
+                f"{path}.contract_path",
+                "source_map.contract_path is required",
+                semantic_id,
+            )
+        )
+        return
+    if required_key and not source_map.get(required_key) and not source_map.get("contract"):
         issues.append(
             SemanticIssue(
                 "error",

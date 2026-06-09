@@ -24,7 +24,7 @@ generated_at: "2026-05-20"
 
 ## Input
 
-The full demo proves the Penflow forward chain from product-level flow specs to runtime comparison artifacts. The checkout flow is intentionally small so every generated artifact stays inspectable.
+The full demo proves the Penflow forward chain from canonical `flow-ui-contract/contract.json` to runtime comparison artifacts. These Markdown flow/screen files are documentation-only migration copies; they are not machine inputs for the strict v2 pipeline.
 
 ## User Scenarios & Testing
 
@@ -63,13 +63,13 @@ flowchart TD
 
 ## Acceptance Criteria
 
-- **AC-001** — The demo includes flow and screen Markdown specs.
+- **AC-001** — The demo includes canonical `contract.json`; Markdown flow/screen files are documentation-only copies.
 - **AC-002** — The semantic tree, enriched Pencil file, expected tree, code IR, actual tree, and reports regenerate deterministically.
 - **AC-003** — The generated actual tree validates and the compare report passes.
 
 ## Functional Requirements
 
-- **FR-001** — Provide flow and screen specs under `flow-ui-contract/`. (mappe AC-001)
+- **FR-001** — Provide canonical `flow-ui-contract/contract.json`; keep flow/screen Markdown as docs-only migration references. (mappe AC-001)
 - **FR-002** — Generate semantic, Pencil, expected, code IR, actual, compare, review, and fix artifacts from local commands. (mappe AC-002)
 - **FR-003** — Keep the actual tree external-runtime-shaped while validating through `validate-actual --schema`. (mappe AC-003)
 

@@ -1,0 +1,38 @@
+{
+  "ambiguous": [],
+  "created": [],
+  "kind": "pencil-context-map",
+  "matched": [
+    {
+      "pencil_node_id": "checkoutScreen",
+      "pencil_path": "0",
+      "role": "screen",
+      "semantic_id": "checkout",
+      "strategy": "semantic_id"
+    },
+    {
+      "pencil_node_id": "orderSummary",
+      "pencil_path": "0.0",
+      "role": "text",
+      "semantic_id": "checkout.order-summary",
+      "strategy": "semantic_id"
+    },
+    {
+      "pencil_node_id": "selectedPaymentMethod",
+      "pencil_path": "0.1",
+      "role": "text",
+      "semantic_id": "checkout.selected-payment-method",
+      "strategy": "semantic_id"
+    },
+    {
+      "pencil_node_id": "payNowButton",
+      "pencil_path": "0.2",
+      "role": "button",
+      "semantic_id": "checkout.pay-now",
+      "strategy": "semantic_id"
+    }
+  ],
+  "status": "PASS",
+  "unmapped": [],
+  "version": 1
+}

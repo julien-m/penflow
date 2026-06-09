@@ -34,6 +34,7 @@ class PenNode:
     type: str
     name: str | None = None
     content: str | None = None
+    semantic: dict[str, Any] = field(default_factory=dict)
     context: Context = field(default_factory=Context)
     bbox: BBox = field(default_factory=BBox)
     visual: dict[str, Any] = field(default_factory=dict)

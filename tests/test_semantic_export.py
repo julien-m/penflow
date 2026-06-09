@@ -7,6 +7,7 @@ from pathlib import Path
 from penflow.cli import main
 from penflow.semantic import semantic_tree_from_specs
 from penflow.semantic_validation import validate_semantic_tree
+from tests.test_flow_contract_v2 import valid_contract, write_json
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -155,15 +156,15 @@ viewport:
 
 
 def test_export_semantic_tree_cli_writes_stable_json(tmp_path: Path) -> None:
-    specs = build_specs_dir(tmp_path)
+    contract = write_json(tmp_path / "flow-ui-contract" / "contract.json", valid_contract())
     first = tmp_path / "semantic-ui-tree.json"
     second = tmp_path / "semantic-ui-tree-second.json"
 
-    assert main(["export-semantic-tree", str(specs), "--out", str(first), "--json"]) == 0
-    assert main(["export-semantic-tree", str(specs), "--out", str(second), "--json"]) == 0
+    assert main(["export-semantic-tree", str(contract), "--out", str(first), "--json"]) == 0
+    assert main(["export-semantic-tree", str(contract), "--out", str(second), "--json"]) == 0
 
     assert first.read_bytes() == second.read_bytes()
     exported = json.loads(first.read_text(encoding="utf-8"))
-    assert exported["screens"][0]["root"]["children"][0]["source_map"]["screen_spec"].endswith(
-        "screens/mobile_booking_form.md"
+    assert (
+        exported["screens"][0]["root"]["children"][0]["source_map"]["contract_path"] == "$.nodes[1]"
     )

@@ -12,7 +12,7 @@ Use Pencil MCP or an equivalent Pencil renderer to capture visual evidence:
 4. Capture `get_screenshot` for visual inspection.
 5. Export a PNG for each audited screen.
 6. Write `.mockup-validation/visual-evidence/manifest.json`.
-7. Write `.mockup-validation/visual-evidence/visual-report.md`.
+7. Write `.mockup-validation/visual-evidence/visual-report.json`.
 
 If no renderer is available, do not mark PASS. Use `BLOCKED_VISUAL_NOT_RUN` or `ESCALATED` and include the missing tool reason.
 
@@ -40,7 +40,7 @@ If no renderer is available, do not mark PASS. Use `BLOCKED_VISUAL_NOT_RUN` or `
 
 ## Visual Report
 
-`visual-report.md` must include:
+`visual-report.json` must include:
 
 - status: `PASS`, `PASSED_WITH_WARNINGS`, `ESCALATED`, or `BLOCKED_VISUAL_NOT_RUN`;
 - source `.pen` path and renderer;

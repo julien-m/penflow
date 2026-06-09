@@ -6,6 +6,7 @@ from penflow.cli import main
 
 
 FULL_DEMO_FILES = [
+    "flow-ui-contract/contract.json",
     "flow-ui-contract/flows/checkout.md",
     "flow-ui-contract/screens/checkout.md",
     "semantic-ui-tree.json",
@@ -16,9 +17,8 @@ FULL_DEMO_FILES = [
     "code-ir.json",
     "actual-ui-tree.json",
     "compare-report.json",
-    "compare-report.md",
-    "review-report.md",
-    "fix-report.md",
+    "review-report.json",
+    "fix-report.json",
 ]
 
 
@@ -37,7 +37,7 @@ def test_demo_command_rebuilds_full_flow_ui_contract_chain(tmp_path: Path) -> No
         main(
             [
                 "export-semantic-tree",
-                str(out / "flow-ui-contract"),
+                str(out / "flow-ui-contract" / "contract.json"),
                 "--out",
                 str(out / "semantic-ui-tree.json"),
                 "--json",
@@ -95,6 +95,8 @@ def test_demo_command_rebuilds_full_flow_ui_contract_chain(tmp_path: Path) -> No
                 str(out / "semantic-ui-tree.json"),
                 "--context-map",
                 str(out / "pencil-context-map.json"),
+                "--contract",
+                str(out / "flow-ui-contract" / "contract.json"),
                 "--flow-id",
                 "checkout",
                 "--flow-name",
@@ -115,8 +117,6 @@ def test_demo_command_rebuilds_full_flow_ui_contract_chain(tmp_path: Path) -> No
                 str(out / "actual-ui-tree.json"),
                 "--out",
                 str(out / "compare-report.json"),
-                "--markdown",
-                str(out / "compare-report.md"),
                 "--json",
             ]
         )
@@ -128,7 +128,7 @@ def test_demo_command_rebuilds_full_flow_ui_contract_chain(tmp_path: Path) -> No
                 "review-report",
                 str(out / "compare-report.json"),
                 "--out",
-                str(out / "review-report.md"),
+                str(out / "review-report.json"),
                 "--json",
             ]
         )
@@ -140,7 +140,7 @@ def test_demo_command_rebuilds_full_flow_ui_contract_chain(tmp_path: Path) -> No
                 "fix-report",
                 str(out / "compare-report.json"),
                 "--out",
-                str(out / "fix-report.md"),
+                str(out / "fix-report.json"),
                 "--json",
             ]
         )

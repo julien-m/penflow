@@ -2,12 +2,12 @@
 
 ## Sequence
 
-1. Validate `flow-ui-contract/` with `penflow validate-flow-specs`.
+1. Validate `flow-ui-contract/contract.json` with `penflow validate-flow-contract`.
 2. Export and validate `semantic-ui-tree.json`.
 3. Validate the source `.pen`.
 4. Build `pencil-context-map.json`.
 5. Export `expected-ui-tree.json`.
-6. Run `penflow detect-drift` and keep `drift-report.json` / `drift-report.md` with the audit packet.
+6. Run `penflow detect-drift` and keep `drift-report.json` with the audit packet.
 7. Freeze a checklist whose items reference `screen_id` plus `semantic_id` or `pencil_node_id` when available.
 8. Fix only checklist items; no broad redesign and no invented product behavior.
 9. Re-run the full Penflow command chain before PASS.

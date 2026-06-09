@@ -1,0 +1,73 @@
+{
+  "status": "PASSED_WITH_WARNINGS",
+  "renderer": "pencil-mcp",
+  "sourceFile": "examples/full/ui.pen",
+  "validatedAt": "2026-05-21",
+  "screens": [
+    {
+      "screen_id": "checkout",
+      "semantic_id": "checkout",
+      "pencil_node_id": "checkoutScreen",
+      "png": "checkoutScreen.png",
+      "size": {
+        "width": 390,
+        "height": 844
+      },
+      "visible_children": [
+        "orderSummary",
+        "selectedPaymentMethod",
+        "payNowButton"
+      ],
+      "evidence": [
+        "Pencil MCP opened examples/full/ui.pen.",
+        "batch_get confirmed the contextual screen and child nodes.",
+        "snapshot_layout confirmed no overlap and no horizontal overflow.",
+        "get_screenshot rendered the user-visible checkout screen.",
+        "export_nodes wrote checkoutScreen.png."
+      ],
+      "audit": [
+        {
+          "category": "Visual alignment",
+          "result": "PASS",
+          "finding": "All visible elements share the same left/right axis and the CTA fills the content column."
+        },
+        {
+          "category": "Hierarchy",
+          "result": "PASS",
+          "finding": "Title, supporting text, and primary CTA are readable in priority order."
+        },
+        {
+          "category": "CTA placement",
+          "result": "PASS",
+          "finding": "Single primary action is visible and close to the summary copy."
+        },
+        {
+          "category": "Density",
+          "result": "WARNING",
+          "finding": "The demo fixture is intentionally minimal and leaves most of the phone viewport blank; not critical for this regression fixture."
+        },
+        {
+          "category": "Accessibility",
+          "result": "PASS",
+          "finding": "Text is readable, CTA contrast is strong, and touch target height is acceptable for the fixture."
+        },
+        {
+          "category": "Responsive behavior",
+          "result": "WARNING",
+          "finding": "Only a phone-sized frame is present in this fixture; broader responsive proof belongs to product mockups."
+        },
+        {
+          "category": "Modernity",
+          "result": "PASS",
+          "finding": "Simple SaaS-style typography, spacing, radius, and primary button treatment."
+        },
+        {
+          "category": "Polish",
+          "result": "PASS",
+          "finding": "No clipping, text overflow, accidental overlap, or broken image/render artifact observed."
+        }
+      ],
+      "final_gate": "Complete for this fixture with warnings only. A production mockup would need all target viewports exported before PASS."
+    }
+  ]
+}

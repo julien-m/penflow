@@ -173,10 +173,10 @@ def test_project_integration_guide_documents_existing_project_adoption() -> None
         "code-ir.json",
         "actual-ui-tree.json",
         "compare-report.json",
-        "review.md",
-        "fix.md",
-        "validate-flow-specs penflow/flow-ui-contract",
-        "export-semantic-tree penflow/flow-ui-contract",
+        "review-report.json",
+        "fix-report.json",
+        "validate-flow-contract penflow/flow-ui-contract/contract.json",
+        "export-semantic-tree penflow/flow-ui-contract/contract.json",
         "draft-pen-from-tree penflow/semantic-ui-tree.json",
         "enrich-pen design/ui.pen",
         "map-pencil-context penflow/ui.enriched.pen",
@@ -216,7 +216,7 @@ def test_mockup_factory_skill_is_penflow_local_and_tree_aware() -> None:
     for phrase in (
         "name: mockup-factory",
         "Penflow-local guided UX/UI optimizer",
-        "flow-ui-contract/flows/*.md",
+        "flow-ui-contract/contract.json",
         "semantic-ui-tree.json",
         "ui.pen",
         "pencil-context-map.json",
@@ -256,7 +256,7 @@ def test_mockup_factory_visual_evidence_gate_is_documented() -> None:
         "get_screenshot",
         "export PNG",
         ".mockup-validation/visual-evidence/manifest.json",
-        "visual-report.md",
+        "visual-report.json",
         "BLOCKED_VISUAL_NOT_RUN",
         "PASSED_WITH_WARNINGS",
         "ESCALATED",
@@ -272,11 +272,11 @@ def test_mockup_factory_visual_evidence_gate_is_documented() -> None:
 
 def test_examples_full_visual_evidence_packet_is_real_and_anchored() -> None:
     manifest_path = EXAMPLE_VISUAL_DIR / "manifest.json"
-    report_path = EXAMPLE_VISUAL_DIR / "visual-report.md"
+    report_path = EXAMPLE_VISUAL_DIR / "visual-report.json"
     png_path = EXAMPLE_VISUAL_DIR / "checkoutScreen.png"
 
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    report = report_path.read_text(encoding="utf-8")
+    report = json.loads(report_path.read_text(encoding="utf-8"))
 
     assert manifest["renderer"] == "pencil-mcp"
     assert manifest["sourceFile"] == "examples/full/ui.pen"
@@ -291,17 +291,16 @@ def test_examples_full_visual_evidence_packet_is_real_and_anchored() -> None:
 
     assert png_path.exists()
     assert png_path.stat().st_size > 0
-    for phrase in (
-        "Status: `PASSED_WITH_WARNINGS`",
-        "Renderer: `pencil-mcp`",
-        "`checkoutScreen`",
-        "snapshot_layout",
-        "get_screenshot",
-        "export_nodes",
-        "Density",
-        "Responsive behavior",
-    ):
-        assert phrase in report
+    assert report["status"] == "PASSED_WITH_WARNINGS"
+    assert report["renderer"] == "pencil-mcp"
+    screen_report = report["screens"][0]
+    assert screen_report["pencil_node_id"] == "checkoutScreen"
+    assert any("snapshot_layout" in item for item in screen_report["evidence"])
+    assert any("get_screenshot" in item for item in screen_report["evidence"])
+    assert any("export_nodes" in item for item in screen_report["evidence"])
+    categories = {item["category"] for item in screen_report["audit"]}
+    assert "Density" in categories
+    assert "Responsive behavior" in categories
 
 
 def test_mockup_factory_rubric_covers_guided_optimizer_gate() -> None:

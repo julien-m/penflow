@@ -17,6 +17,7 @@ from .tree import expected_tree_from_pen
 
 
 def build_demo(out_dir: str | Path) -> dict[str, str]:
+    # @spec FR-011: Demo fixtures use canonical contract.json and JSON reports — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-011
     """Write a deterministic full Penflow demo and return generated file paths.
 
     Args:
@@ -34,6 +35,7 @@ def build_demo(out_dir: str | Path) -> dict[str, str]:
 
     (flows / "checkout.md").write_text(_flow_spec(), encoding="utf-8")
     (screens / "checkout.md").write_text(_screen_spec(), encoding="utf-8")
+    _write_json(specs / "contract.json", _flow_contract())
     _write_json(out / "ui.visual.pen", _visual_pen())
 
     semantic_path = out / "semantic-ui-tree.json"
@@ -58,6 +60,7 @@ def build_demo(out_dir: str | Path) -> dict[str, str]:
         flow_name="Checkout",
         semantic_tree=semantic_path,
         context_map=context_map_path,
+        contract=specs / "contract.json",
     )
     errors = [issue for issue in validate_code_ir(ir) if issue.get("severity") == "error"]
     if errors:
@@ -68,14 +71,9 @@ def build_demo(out_dir: str | Path) -> dict[str, str]:
         expected_path,
         out / "actual-ui-tree.json",
         json_out=out / "compare-report.json",
-        markdown_out=out / "compare-report.md",
     )
-    (out / "review-report.md").write_text(
-        review_compare_report(out / "compare-report.json"), encoding="utf-8"
-    )
-    (out / "fix-report.md").write_text(
-        fix_compare_report(out / "compare-report.json"), encoding="utf-8"
-    )
+    _write_json(out / "review-report.json", review_compare_report(out / "compare-report.json"))
+    _write_json(out / "fix-report.json", fix_compare_report(out / "compare-report.json"))
 
     _write_codegen_files(out, ir)
     return {
@@ -87,6 +85,133 @@ def build_demo(out_dir: str | Path) -> dict[str, str]:
 
 def _write_json(path: Path, data: dict[str, Any]) -> None:
     path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _flow_contract() -> dict[str, Any]:
+    return {
+        "version": 2,
+        "kind": "penflow-flow-contract",
+        "contract_id": "checkout-contract",
+        "actors": [{"id": "buyer", "name": "Buyer"}],
+        "entities": [
+            {
+                "id": "checkout",
+                "fields": [
+                    {"id": "order_summary", "type": "string"},
+                    {"id": "selected_payment_method", "type": "string"},
+                ],
+            }
+        ],
+        "screens": [
+            {
+                "id": "checkout",
+                "flow_id": "checkout",
+                "title": "Checkout",
+                "surface": "web",
+                "viewport": {"width": 390, "height": 844},
+                "states": [{"id": "default"}, {"id": "submitting"}, {"id": "error"}],
+                "root_node": "checkout.root",
+            }
+        ],
+        "nodes": [
+            {
+                "id": "checkout.root",
+                "screen_id": "checkout",
+                "semantic_id": "checkout",
+                "role": "screen",
+                "children": [
+                    "checkout.order_summary",
+                    "checkout.selected_payment_method",
+                    "checkout.pay_now",
+                ],
+            },
+            {
+                "id": "checkout.order_summary",
+                "screen_id": "checkout",
+                "semantic_id": "checkout.order-summary",
+                "role": "text",
+                "text": "Order summary",
+                "binding": "checkout.order_summary",
+            },
+            {
+                "id": "checkout.selected_payment_method",
+                "screen_id": "checkout",
+                "semantic_id": "checkout.selected-payment-method",
+                "role": "text",
+                "text": "Selected payment method",
+                "binding": "checkout.selected_payment_method",
+            },
+            {
+                "id": "checkout.pay_now",
+                "screen_id": "checkout",
+                "semantic_id": "checkout.pay-now",
+                "test_id": "checkout-pay-now",
+                "role": "button",
+                "text": "Pay now",
+                "binding": "checkout.selected_payment_method",
+                "entity": "checkout",
+                "action": "submit_payment",
+            },
+        ],
+        "guards": [{"id": "payment_ready"}],
+        "permissions": [
+            {
+                "id": "buyer_can_pay",
+                "actor": "buyer",
+                "action": "submit_payment",
+                "entity": "checkout",
+            }
+        ],
+        "mutations": [
+            {
+                "id": "create_payment",
+                "method": "POST",
+                "endpoint": "/payments",
+                "entity": "checkout",
+                "request": {},
+                "response": {},
+                "success_state": "submitting",
+                "error_state": "error",
+            }
+        ],
+        "actions": [
+            {
+                "id": "submit_payment",
+                "node": "checkout.pay_now",
+                "trigger": "click",
+                "guard": "payment_ready",
+                "permission": "buyer_can_pay",
+                "mutation": "create_payment",
+                "success_transition": "payment_success",
+                "error_transition": "payment_error",
+            }
+        ],
+        "flows": [{"id": "checkout", "entry_screen": "checkout"}],
+        "transitions": [
+            {
+                "id": "payment_success",
+                "flow": "checkout",
+                "from_screen": "checkout",
+                "to_screen": "checkout",
+                "from_state": "default",
+                "to_state": "submitting",
+                "trigger": "submit_payment",
+                "action": "submit_payment",
+            },
+            {
+                "id": "payment_error",
+                "flow": "checkout",
+                "from_screen": "checkout",
+                "to_screen": "checkout",
+                "from_state": "default",
+                "to_state": "error",
+                "trigger": "submit_payment",
+                "action": "submit_payment",
+            },
+        ],
+        "needs_review": False,
+        "needs_clarification": [],
+    }
 
 
 def _flow_spec() -> str:
@@ -116,7 +241,7 @@ generated_at: "2026-05-20"
 
 ## Input
 
-The full demo proves the Penflow forward chain from product-level flow specs to runtime comparison artifacts. The checkout flow is intentionally small so every generated artifact stays inspectable.
+The full demo proves the Penflow forward chain from canonical `flow-ui-contract/contract.json` to runtime comparison artifacts. These Markdown flow/screen files are documentation-only migration copies; they are not machine inputs for the strict v2 pipeline.
 
 ## User Scenarios & Testing
 
@@ -155,13 +280,13 @@ flowchart TD
 
 ## Acceptance Criteria
 
-- **AC-001** — The demo includes flow and screen Markdown specs.
+- **AC-001** — The demo includes canonical `contract.json`; Markdown flow/screen files are documentation-only copies.
 - **AC-002** — The semantic tree, enriched Pencil file, expected tree, code IR, actual tree, and reports regenerate deterministically.
 - **AC-003** — The generated actual tree validates and the compare report passes.
 
 ## Functional Requirements
 
-- **FR-001** — Provide flow and screen specs under `flow-ui-contract/`. (mappe AC-001)
+- **FR-001** — Provide canonical `flow-ui-contract/contract.json`; keep flow/screen Markdown as docs-only migration references. (mappe AC-001)
 - **FR-002** — Generate semantic, Pencil, expected, code IR, actual, compare, review, and fix artifacts from local commands. (mappe AC-002)
 - **FR-003** — Keep the actual tree external-runtime-shaped while validating through `validate-actual --schema`. (mappe AC-003)
 
@@ -207,7 +332,7 @@ generated_at: "2026-05-20"
 
 | Élément | Type | Effet |
 |---------|------|-------|
-| Pay now | button | POST /payments → confirmation |
+| Pay now | button | POST /payments → submitting |
 
 ## Validations
 
@@ -215,7 +340,7 @@ generated_at: "2026-05-20"
 
 ## États UI
 
-default · submitting · error · success
+default · submitting · error
 
 ## Erreurs
 
@@ -313,6 +438,13 @@ def _actual_tree_from_expected(expected: dict[str, Any]) -> dict[str, Any]:
 
 
 def _write_codegen_files(out: Path, ir: dict[str, Any]) -> None:
+    child_ids = {
+        str(child.get("id"))
+        for component in ir.get("components", [])
+        if component.get("role") != "screen"
+        for child in component.get("children", []) or []
+        if isinstance(child, dict) and child.get("id")
+    }
     legacy_ir = {
         "screen": ir["flow"]["id"],
         "components": [
@@ -321,10 +453,21 @@ def _write_codegen_files(out: Path, ir: dict[str, Any]) -> None:
                 "role": component.get("role"),
                 "text": component.get("text"),
                 "intent": component.get("intent"),
+                "test_id": component.get("test_id"),
+                "children": [
+                    {
+                        "id": child.get("semantic_id") or child.get("id"),
+                        "role": child.get("role"),
+                        "text": child.get("text"),
+                    }
+                    for child in component.get("children", []) or []
+                    if isinstance(child, dict) and child.get("role") == "text"
+                ],
             }
             for component in ir.get("components", [])
             if component.get("role") in {"text", "button"}
             and not str(component.get("id", "")).endswith(".label")
+            and str(component.get("id", "")) not in child_ids
         ],
     }
     (out / "Checkout.jsx").write_text(react(legacy_ir), encoding="utf-8")

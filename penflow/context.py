@@ -15,6 +15,8 @@ ALLOWED_KEYS = {
     "entity",
     "variant",
     "test_id",
+    "action",
+    "permission",
     "mask",
     "mask_text",
     "tolerance",
@@ -67,6 +69,8 @@ class Context:
     entity: str | None = None
     variant: str | None = None
     test_id: str | None = None
+    action: str | None = None
+    permission: str | None = None
     mask: bool | str | None = None
     mask_text: bool | str | None = None
     tolerance: dict[str, Any] = field(default_factory=dict)

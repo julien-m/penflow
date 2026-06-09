@@ -6,9 +6,9 @@ struct CheckoutView: View {
             Text("Order summary")
             Text("Selected payment method")
             Button("Pay now") {
-                // intent: post-payments-confirmation
+                // intent: submit_payment
             }
-            Text("Pay now")
+            .accessibilityIdentifier("checkout-pay-now")
         }
         .padding(24)
     }

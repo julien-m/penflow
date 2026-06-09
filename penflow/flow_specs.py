@@ -9,6 +9,7 @@ from typing import Any
 
 import yaml
 
+from .flow_contract import load_flow_contract_v2, validate_flow_contract_v2
 from .semantic import semantic_tree_from_specs
 from .semantic_validation import validate_semantic_tree
 
@@ -54,6 +55,37 @@ def validate_flow_specs_dir(specs_dir: str | Path) -> dict[str, Any]:
     Returns:
         Deterministic report with status, issue list, and artifact counts.
     """
+    root = Path(specs_dir)
+    contract_path = root / "contract.json"
+    if contract_path.is_file():
+        contract = load_flow_contract_v2(contract_path)
+        issues = validate_flow_contract_v2(contract)
+        return {
+            "status": "PASS" if not _has_errors_dicts(issues) else "FAIL",
+            "specs_dir": str(root),
+            "contract": str(contract_path),
+            "flows": len(contract.get("flows", []) or []),
+            "screens": len(contract.get("screens", []) or []),
+            "issues": issues,
+        }
+    return {
+        "status": "FAIL",
+        "specs_dir": str(root),
+        "flows": 0,
+        "screens": 0,
+        "issues": [
+            FlowSpecIssue(
+                "error",
+                "flow_specs.contract_json_required",
+                str(contract_path),
+                "contract.json is required; run migrate-flow-md-to-contract-json explicitly for legacy Markdown specs",
+            ).to_dict()
+        ],
+    }
+
+
+def validate_legacy_markdown_flow_specs_dir(specs_dir: str | Path) -> dict[str, Any]:
+    """Validate legacy Markdown specs for the explicit migration tool only."""
     root = Path(specs_dir)
     issues: list[FlowSpecIssue] = []
     flow_files = _markdown_files(root / "flows", issues)
@@ -201,3 +233,7 @@ def _validate_semantic_export(root: Path, issues: list[FlowSpecIssue]) -> None:
 
 def _has_errors(issues: list[FlowSpecIssue]) -> bool:
     return any(issue.severity == "error" for issue in issues)
+
+
+def _has_errors_dicts(issues: list[dict[str, Any]]) -> bool:
+    return any(issue.get("severity") == "error" for issue in issues)
