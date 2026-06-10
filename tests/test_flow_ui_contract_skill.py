@@ -1,3 +1,6 @@
+# @spec(FR-001)
+# @spec(FR-002)
+# @spec(FR-005)
 from __future__ import annotations
 
 import subprocess

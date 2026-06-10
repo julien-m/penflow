@@ -1,3 +1,4 @@
+# @spec(FR-010)
 """Explicit one-time migration from Markdown flow specs to v2 contract JSON."""
 
 from __future__ import annotations

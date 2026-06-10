@@ -1,3 +1,6 @@
+<!-- LiveSpec traceability anchors -->
+<!-- @spec(FR-007) -->
+
 # Semantic UI Tree Formation
 
 Use this reference when an agent must understand how flow/screen specs become `semantic-ui-tree.json`. The normal workflow is still command-driven: author flow/screen Markdown, then run `penflow export-semantic-tree`. Do not hand-write `semantic-ui-tree.json` except for fixtures, tests, or debugging.

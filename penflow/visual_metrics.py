@@ -1,3 +1,5 @@
+# @spec(FR-001)
+# @spec(FR-002)
 """Deterministic visual metrics audit for expected UI trees — zero vision needed."""
 
 from __future__ import annotations

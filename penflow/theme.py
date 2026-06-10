@@ -1,3 +1,4 @@
+# @spec(FR-001)
 """Theme loading from project CSS custom properties."""
 
 from __future__ import annotations

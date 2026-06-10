@@ -1,3 +1,4 @@
+# @spec(FR-002)
 """Hex color parsing and pen variable resolution helpers."""
 
 from __future__ import annotations

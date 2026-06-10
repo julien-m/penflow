@@ -1,3 +1,7 @@
+<!-- LiveSpec traceability anchors -->
+<!-- @spec(FR-005) -->
+<!-- @spec(FR-007) -->
+
 # Mockup Factory Workflow — Bounded Fix-Re-Audit Loop
 
 ## Deterministic Command Chain

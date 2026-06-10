@@ -1,3 +1,4 @@
+# @spec(FR-005)
 """Feature 054 — direct unit coverage for `penflow/codegen.py`.
 
 Invariant protected: the three generators (SwiftUI, React, Dioxus) are pure

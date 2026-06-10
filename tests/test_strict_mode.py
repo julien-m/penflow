@@ -1,3 +1,5 @@
+# @spec(AC-001)
+# @spec(FR-012)
 """Feature 049 — strict-by-default exit codes, blocking drift, surfaced coercions."""
 
 from __future__ import annotations

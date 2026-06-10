@@ -1,3 +1,4 @@
+# @spec(FR-008)
 """Drift reporting across flow specs, semantic trees, and Pencil mockups."""
 
 from __future__ import annotations

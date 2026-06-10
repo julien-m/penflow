@@ -1,3 +1,7 @@
+<!-- LiveSpec traceability anchors -->
+<!-- @spec(FR-003) -->
+<!-- @spec(FR-004) -->
+
 # flow-ui-contract
 
 Penflow-local migration of the old specify-flows workflow. It captures behavior around visual mockups and Pencil `.pen` files, then promotes reviewed behavior into canonical `flow-ui-contract/contract.json` for semantic UI tree export and Pencil enrichment.

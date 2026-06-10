@@ -1,3 +1,9 @@
+<!-- LiveSpec traceability anchors -->
+<!-- @spec(AC-002) -->
+<!-- @spec(FR-002) -->
+<!-- @spec(FR-004) -->
+<!-- @spec(FR-007) -->
+
 # Visual Evidence Gate
 
 Run this gate after the deterministic Penflow anchors pass and before final PASS. It proves the mockup was rendered as a user-visible Pencil screen and that a vision pass answered the vision-only questions — Penflow never runs vision; it validates the evidence packet.

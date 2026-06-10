@@ -1,3 +1,6 @@
+# @spec(FR-001)
+# @spec(FR-002)
+# @spec(FR-004)
 """Deterministic cross-screen component consistency checks for expected UI trees."""
 
 from __future__ import annotations

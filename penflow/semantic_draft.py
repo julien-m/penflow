@@ -1,3 +1,4 @@
+# @spec(FR-001)
 """Semantic UI tree to Pencil draft generation."""
 
 from __future__ import annotations

@@ -8,6 +8,12 @@ description: >
   Triggers on: flow-ui-contract, flow ui contract, specify flows, génère les flow specs,
   flow specs, spec flows.
 ---
+<!-- LiveSpec traceability anchors -->
+<!-- @spec(AC-002) -->
+<!-- @spec(FR-002) -->
+<!-- @spec(FR-003) -->
+<!-- @spec(FR-004) -->
+<!-- @spec(FR-012) -->
 
 # flow-ui-contract — Skill Posture
 

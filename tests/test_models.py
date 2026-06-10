@@ -1,3 +1,4 @@
+# @spec(FR-004)
 """Feature 054 — direct unit coverage for `penflow/models.py`.
 
 Invariant protected: bbox coercion is deterministic and matches the 049

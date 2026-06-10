@@ -1,3 +1,6 @@
+<!-- LiveSpec traceability anchors -->
+<!-- @spec(FR-006) -->
+
 # Context Grammar V1
 
 `context` can be a JSON object or `key=value; key=value` shorthand.

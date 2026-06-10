@@ -1,3 +1,5 @@
+# @spec(AC-007)
+# @spec(FR-006)
 """Feature 054 — direct unit coverage for `penflow/context.py`.
 
 Invariant protected: the Pencil context grammar is a closed contract —

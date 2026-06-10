@@ -1,3 +1,5 @@
+# @spec(FR-002)
+# @spec(FR-003)
 """Strict v2 JSON flow contract loading and validation."""
 
 from __future__ import annotations

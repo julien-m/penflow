@@ -1,3 +1,4 @@
+# @spec(AC-005)
 from __future__ import annotations
 
 import copy

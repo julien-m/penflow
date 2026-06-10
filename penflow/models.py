@@ -1,3 +1,6 @@
+# @spec(FR-001)
+# @spec(FR-002)
+# @spec(FR-003)
 """Shared data models."""
 
 from __future__ import annotations

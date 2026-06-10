@@ -1,3 +1,7 @@
+<!-- LiveSpec traceability anchors -->
+<!-- @spec(AC-002) -->
+<!-- @spec(FR-004) -->
+
 <!-- @spec FR-004: Screen spec template — ../../../../../.specs/features/027-define-flow-screen-spec-grammar/spec.md#fr-004 -->
 
 <!-- TEMPLATE: Copy this file as <target>/flow-ui-contract/screens/<screen-id>.md -->

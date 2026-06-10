@@ -1,3 +1,8 @@
+# @spec(AC-003)
+# @spec(AC-014)
+# @spec(FR-001)
+# @spec(FR-002)
+# @spec(FR-003)
 from __future__ import annotations
 
 import json
@@ -190,6 +195,26 @@ def test_report_schema_subset_fails_closed_on_unsupported_keywords() -> None:
             "message": "unsupported schema keyword: pattern",
         }
     ]
+
+
+def test_report_schema_subset_ignores_json_schema_comments() -> None:
+    issues = _validate_json_schema_subset(
+        {"status": "PASS"},
+        {
+            "$comment": "LiveSpec traceability anchors: @spec(FR-001)",
+            "type": "object",
+            "properties": {
+                "status": {
+                    "$comment": "status traceability",
+                    "type": "string",
+                    "const": "PASS",
+                }
+            },
+        },
+        "$",
+    )
+
+    assert issues == []
 
 
 def _contextualized_pen() -> dict:

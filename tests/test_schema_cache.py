@@ -1,3 +1,4 @@
+# @spec(FR-003)
 """Feature 054 — schema cache contract (C29) and perf regression.
 
 Invariant protected: bundled JSON Schemas are immutable package data read at

@@ -1,3 +1,8 @@
+# @spec(AC-001)
+# @spec(AC-002)
+# @spec(FR-006)
+# @spec(FR-007)
+# @spec(FR-008)
 from __future__ import annotations
 
 import json

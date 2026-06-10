@@ -1,3 +1,4 @@
+# @spec(FR-007)
 """Feature 054 — direct unit coverage for `penflow/llm.py`.
 
 Invariant protected: review/fix guidance is a pure deterministic mapping from

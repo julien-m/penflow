@@ -1,3 +1,4 @@
+# @spec(FR-006)
 """Validation for flow-ui-contract Markdown directories."""
 
 from __future__ import annotations

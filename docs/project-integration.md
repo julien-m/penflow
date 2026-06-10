@@ -1,3 +1,7 @@
+<!-- LiveSpec traceability anchors -->
+<!-- @spec(FR-007) -->
+<!-- @spec(FR-012) -->
+
 # Integrating Penflow Into an Existing Project
 
 Use this guide when an application already exists and you want Penflow to become the project-local contract layer between product intent, Pencil mockups, code generation, and runtime verification.

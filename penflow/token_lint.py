@@ -1,3 +1,5 @@
+# @spec(FR-003)
+# @spec(FR-011)
 """Deterministic design-token lint for .pen files."""
 
 from __future__ import annotations

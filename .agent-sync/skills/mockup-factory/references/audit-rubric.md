@@ -1,3 +1,7 @@
+<!-- LiveSpec traceability anchors -->
+<!-- @spec(FR-004) -->
+<!-- @spec(FR-007) -->
+
 # Prescriptive Audit Rubric — Gate Table
 
 PASS/FAIL comes **only** from the scripted gates below. Prose judgment never decides a verdict; it can only annotate. Each checklist item must include severity, blocking, evidence, and the best available anchor: `screen_id`, `semantic_id`, and `pencil_node_id`.

@@ -1,3 +1,4 @@
+# @spec(AC-001)
 """Regression tests for the deterministic visual metrics audit and CLI behavior."""
 
 from __future__ import annotations

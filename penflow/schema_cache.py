@@ -1,3 +1,4 @@
+# @spec(FR-001)
 """Process-wide cache for bundled JSON Schemas and compiled validators.
 
 Bundled schemas under ``penflow/schemas/`` are immutable package data, so each

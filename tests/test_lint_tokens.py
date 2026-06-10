@@ -1,3 +1,5 @@
+# @spec(AC-001)
+# @spec(FR-007)
 """Regression tests for deterministic design-token lint reports and CLI behavior."""
 
 from __future__ import annotations

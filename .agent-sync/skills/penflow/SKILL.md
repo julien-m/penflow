@@ -2,6 +2,13 @@
 name: penflow
 description: Use the Penflow CLI for Pencil .pen context validation, semantic/expected/actual UI-tree workflows, codegen handoff, reports, and deterministic visual-fix review.
 ---
+<!-- LiveSpec traceability anchors -->
+<!-- @spec(FR-001) -->
+<!-- @spec(FR-002) -->
+<!-- @spec(FR-003) -->
+<!-- @spec(FR-006) -->
+<!-- @spec(FR-008) -->
+<!-- @spec(FR-012) -->
 
 # Penflow Skill
 

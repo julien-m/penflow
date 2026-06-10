@@ -1,3 +1,4 @@
+# @spec(FR-002)
 """Semantic UI tree validation."""
 
 from __future__ import annotations

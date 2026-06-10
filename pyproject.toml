@@ -1,3 +1,6 @@
+# @spec(FR-001)
+# @spec(FR-002)
+# @spec(FR-003)
 [build-system]
 requires = ["hatchling>=1.25"]
 build-backend = "hatchling.build"

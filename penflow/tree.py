@@ -1,3 +1,6 @@
+# @spec(FR-001)
+# @spec(FR-002)
+# @spec(FR-003)
 """Expected and actual UI tree normalization."""
 
 from __future__ import annotations

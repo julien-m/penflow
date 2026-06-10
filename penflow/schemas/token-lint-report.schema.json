@@ -1,4 +1,5 @@
 {
+  "$comment": "LiveSpec traceability anchors: @spec(FR-005) @spec(FR-011)",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://penflow.dev/schemas/token-lint-report.schema.json",
   "title": "Penflow Token Lint Report",

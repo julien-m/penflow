@@ -1,3 +1,6 @@
+# @spec(FR-001)
+# @spec(FR-002)
+# @spec(FR-003)
 """Small deterministic code generators from Penflow IR."""
 
 from __future__ import annotations

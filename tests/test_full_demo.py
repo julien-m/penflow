@@ -1,3 +1,8 @@
+# @spec(AC-014)
+# @spec(FR-001)
+# @spec(FR-002)
+# @spec(FR-003)
+# @spec(FR-006)
 from __future__ import annotations
 
 from pathlib import Path

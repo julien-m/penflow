@@ -1,4 +1,5 @@
 {
+  "$comment": "LiveSpec traceability anchors: @spec(FR-006)",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://penflow.dev/schemas/mockup-validation-visual-report.schema.json",
   "title": "Penflow Mockup Validation Visual Report",

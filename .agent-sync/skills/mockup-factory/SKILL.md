@@ -5,6 +5,9 @@ description: >
   semantic-ui-tree, theme.css, .pen, pencil-context-map, expected-ui-tree, and
   detect-drift reports as deterministic anchors before any Pencil/Codex audit loop.
 ---
+<!-- LiveSpec traceability anchors -->
+<!-- @spec(FR-006) -->
+<!-- @spec(FR-007) -->
 
 # Mockup Factory — Penflow Guided Optimizer
 

@@ -1,3 +1,7 @@
+# @spec(FR-001)
+# @spec(FR-002)
+# @spec(FR-003)
+# @spec(FR-004)
 """Structural expected/actual UI-tree comparison."""
 
 from __future__ import annotations

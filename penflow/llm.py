@@ -1,3 +1,7 @@
+# @spec(FR-001)
+# @spec(FR-002)
+# @spec(FR-003)
+# @spec(FR-009)
 """Deterministic report review and fix guidance helpers."""
 
 from __future__ import annotations

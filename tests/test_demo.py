@@ -1,3 +1,4 @@
+# @spec(FR-008)
 """Feature 054 — direct unit coverage for `penflow/demo.py`.
 
 Invariant protected: `build_demo` is a deterministic fixture generator — it

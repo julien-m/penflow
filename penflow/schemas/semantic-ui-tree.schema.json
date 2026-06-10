@@ -1,4 +1,5 @@
 {
+  "$comment": "LiveSpec traceability anchors: @spec(FR-001)",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://penflow.local/schemas/semantic-ui-tree.schema.json",
   "title": "Penflow Semantic UI Tree",

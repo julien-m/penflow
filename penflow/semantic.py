@@ -1,3 +1,4 @@
+# @spec(FR-005)
 """Flow-ui-contract Markdown to semantic UI tree export."""
 
 from __future__ import annotations

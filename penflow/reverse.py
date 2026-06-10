@@ -1,3 +1,4 @@
+# @spec(FR-006)
 """Reverse Pencil `.pen` files into flow-ui-contract specs and semantic trees."""
 
 from __future__ import annotations

@@ -1,3 +1,5 @@
+# @spec(FR-002)
+# @spec(FR-003)
 """Deterministic visual-evidence packet validator.
 
 Penflow NEVER runs vision, Pencil, or any renderer. The vision pass lives at

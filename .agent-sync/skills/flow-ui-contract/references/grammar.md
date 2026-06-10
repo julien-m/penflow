@@ -1,3 +1,6 @@
+<!-- LiveSpec traceability anchors -->
+<!-- @spec(FR-001) -->
+
 <!-- @spec FR-001: Grammar frozen contract — ../../../../.specs/features/027-define-flow-screen-spec-grammar/spec.md#fr-001 -->
 
 # Grammar — flow-ui-contract Output Contract (Frozen)

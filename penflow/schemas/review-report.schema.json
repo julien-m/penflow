@@ -1,4 +1,5 @@
 {
+  "$comment": "LiveSpec traceability anchors: @spec(FR-009)",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://penflow.dev/schemas/review-report.schema.json",
   "title": "Penflow Review Report",

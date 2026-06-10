@@ -1,3 +1,8 @@
+# @spec(FR-001)
+# @spec(FR-002)
+# @spec(FR-003)
+# @spec(FR-007)
+# @spec(FR-010)
 """Pencil .pen parsing, inspection, and update helpers."""
 
 from __future__ import annotations

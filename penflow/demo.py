@@ -1,3 +1,8 @@
+# @spec(FR-001)
+# @spec(FR-002)
+# @spec(FR-003)
+# @spec(FR-004)
+# @spec(FR-011)
 """End-to-end flow UI contract demo generation."""
 
 from __future__ import annotations

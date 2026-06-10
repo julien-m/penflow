@@ -1,3 +1,12 @@
+<!-- LiveSpec traceability anchors -->
+<!-- @spec(FR-001) -->
+<!-- @spec(FR-002) -->
+<!-- @spec(FR-003) -->
+<!-- @spec(FR-006) -->
+<!-- @spec(FR-007) -->
+<!-- @spec(FR-008) -->
+<!-- @spec(FR-012) -->
+
 # Penflow
 
 Penflow is a deterministic Python CLI for Pencil `.pen` design contracts. It parses `.pen` JSON, validates `context`, exports expected UI trees, validates external actual UI trees, compares both trees structurally, writes JSON reports, and generates simple screen/code artifacts.
