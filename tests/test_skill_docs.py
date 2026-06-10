@@ -401,6 +401,40 @@ def test_mockup_factory_rubric_maps_every_category_to_a_scripted_gate() -> None:
         assert gate in rubric
 
 
+# @spec AC-008: contact-sheet protocol documented — .specs/features/053-cross-mockup-coherence-contact-sheet/spec.md#ac-008
+def test_mockup_factory_documents_cross_mockup_coherence_contact_sheet() -> None:
+    visual = MOCKUP_VISUAL.read_text(encoding="utf-8")
+    workflow = MOCKUP_WORKFLOW.read_text(encoding="utf-8")
+
+    for phrase in (
+        "Cross-Mockup Coherence (Contact Sheet)",
+        "uniform scale",
+        "contact sheet",
+        "contact_sheet_png",
+        "cross_screen_rhythm",
+        "palette_coherence",
+        "typography_coherence",
+        "component_recognition",
+        "evidence.coherence.missing",
+        "evidence.contact_sheet.missing",
+        "evidence.coherence.category_missing",
+        "penflow check-consistency",
+        "≥ 2 screens",
+    ):
+        assert phrase in visual
+
+    # The numeric anchor stays deterministic; vision never restates it.
+    assert "047" in visual
+
+    for phrase in (
+        "contact sheet",
+        "coherence",
+        "uniform scale",
+        "check-consistency",
+    ):
+        assert phrase in workflow
+
+
 # @spec AC-003: bounded fix-re-audit loop — .specs/features/052-prescriptive-rubric-bounded-fix-loop/spec.md#ac-003
 def test_mockup_factory_workflow_bounds_the_fix_loop() -> None:
     workflow = MOCKUP_WORKFLOW.read_text(encoding="utf-8")

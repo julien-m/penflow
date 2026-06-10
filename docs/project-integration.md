@@ -198,10 +198,11 @@ penflow/.mockup-validation/
   audit-report.json
   visual-evidence/
     manifest.json
-    vision-report.json
+    vision-report.json   # with a coherence section when the expected tree has >= 2 screens (053)
     layout-snapshot.json
     visual-report.json   # legacy 044 artifact, deprecated
     checkout.png
+    contact-sheet.png    # uniform-scale cross-mockup contact sheet (053)
   <group>/
     checklist.json
     state.json

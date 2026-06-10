@@ -18,14 +18,32 @@ Use Pencil MCP or an equivalent Pencil renderer. All artifacts go to `.mockup-va
    - `imagery_quality`
 
    Deterministic facts — contrast, touch targets, overlap/overflow, tokens, consistency — are already computed by `penflow audit-visual`, `lint-tokens`, and `check-consistency`. The vision-report schema **rejects** any other category, so vision cannot hand-wave computable facts.
-4. **Write the evidence artifacts** — `manifest.json` (one entry per screen with `screen_id`, `semantic_id`, `pencil_node_id`, `png`, `layout_checked`, `screenshot_checked`) and `vision-report.json` (`kind: penflow-vision-report`, `version`, `status`, `renderer`, `sourceFile`, `model`, `screens[]` each with `screen_id`, `png`, and `criteria[]` of `{category, result pass|fail|warning, evidence, blocking}`).
-5. **Run the gate:**
+4. **Run the cross-mockup coherence pass (contact sheet)** — after the per-screen vision pass, judge the mockup *set* as one product. See § Cross-Mockup Coherence below. Required whenever the expected tree has ≥ 2 screens (`evidence.coherence.missing`).
+5. **Write the evidence artifacts** — `manifest.json` (one entry per screen with `screen_id`, `semantic_id`, `pencil_node_id`, `png`, `layout_checked`, `screenshot_checked`) and `vision-report.json` (`kind: penflow-vision-report`, `version`, `status`, `renderer`, `sourceFile`, `model`, `screens[]` each with `screen_id`, `png`, and `criteria[]` of `{category, result pass|fail|warning, evidence, blocking}`, plus the top-level `coherence` section when the coherence pass ran).
+6. **Run the gate:**
 
    ```bash
    penflow validate-visual-evidence .mockup-validation/visual-evidence --expected expected-ui-tree.json --json
    ```
 
-   Exit 0 is the only acceptable proof. Exit 1 means the packet is incomplete or invalid: missing/empty PNG, invalid manifest or vision report, a screen of the expected tree left uncovered (`evidence.screen.uncovered`), an unanswered vision category, or a layout snapshot mismatch.
+   Exit 0 is the only acceptable proof. Exit 1 means the packet is incomplete or invalid: missing/empty PNG, invalid manifest or vision report, a screen of the expected tree left uncovered (`evidence.screen.uncovered`), an unanswered vision category, a layout snapshot mismatch, a missing coherence section for a multi-screen tree (`evidence.coherence.missing`), a missing/empty contact sheet (`evidence.contact_sheet.missing` / `evidence.contact_sheet.empty`), or an unanswered coherence category (`evidence.coherence.category_missing`).
+
+## Cross-Mockup Coherence (Contact Sheet)
+
+Per-screen criteria judge each mockup in isolation; the coherence pass proves the set reads as one product. Run it after the per-screen vision pass:
+
+1. **Export all audited screens at a uniform scale** — `export_nodes` every audited screen with the same scale factor, so size differences on the sheet are real design differences, not export artifacts.
+2. **Capture one contact sheet** — a single `get_screenshot` of the board showing all screens, or a grid composed from the exported PNGs listed in the manifest. Save it in the evidence directory and reference it as `coherence.contact_sheet_png`. It must exist non-empty on disk.
+3. **Run one vision pass over the contact sheet** answering **ONLY** the four locked coherence categories, one evidence sentence each (≥ 10 characters):
+   - `cross_screen_rhythm` — do spacing rhythm and layout density read consistently across screens?
+   - `palette_coherence` — does the set read as one palette, with accent colors used for the same intents?
+   - `typography_coherence` — do type scale and hierarchy levels read the same across screens?
+   - `component_recognition` — are recurring components (buttons, cards, nav) recognizable as the same component everywhere?
+
+   **The numeric anchor for cross-screen consistency remains the feature 047 `penflow check-consistency` report** (the `consistency` gate in the 052 gate table). Signature property divergence — fills, radii, font sizes, gaps — is computed there; the coherence schema **rejects** any other category, so the contact-sheet pass answers only what perception can judge and never restates numeric checks.
+4. **Write the `coherence` section** into `vision-report.json`: `{"contact_sheet_png": "...", "criteria": [{category, result pass|fail|warning, evidence, blocking}]}`. All four categories are required (`evidence.coherence.category_missing`).
+
+The section is optional schema-wise but **required by `penflow validate-visual-evidence` whenever the expected tree has ≥ 2 screens** (`evidence.coherence.missing`); single-screen trees pass without it.
 
 ## Vision Report
 
@@ -39,6 +57,17 @@ Use Pencil MCP or an equivalent Pencil renderer. All artifacts go to `.mockup-va
   "renderer": "pencil-mcp",
   "sourceFile": "penflow/ui.pen",
   "model": "claude-fable-5",
+  "coherence": {
+    "contact_sheet_png": "contact-sheet.png",
+    "criteria": [
+      {
+        "category": "palette_coherence",
+        "result": "pass",
+        "evidence": "All screens share one neutral surface palette with a single accent intent.",
+        "blocking": false
+      }
+    ]
+  },
   "screens": [
     {
       "screen_id": "checkout",
@@ -58,7 +87,7 @@ Use Pencil MCP or an equivalent Pencil renderer. All artifacts go to `.mockup-va
 }
 ```
 
-All five categories are required per screen; `blocking: true` marks a criterion that must block PASS in the audit loop.
+All five categories are required per screen; all four coherence categories are required when the `coherence` section is present; `blocking: true` marks a criterion (per-screen or coherence) that must block PASS in the audit loop.
 
 ## Legacy Artifacts
 

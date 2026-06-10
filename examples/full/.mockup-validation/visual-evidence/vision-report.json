@@ -6,6 +6,35 @@
   "sourceFile": "examples/full/ui.pen",
   "model": "claude-fable-5",
   "validatedAt": "2026-06-10",
+  "coherence": {
+    "contact_sheet_png": "contact-sheet.png",
+    "criteria": [
+      {
+        "category": "cross_screen_rhythm",
+        "result": "pass",
+        "evidence": "The single checkout screen on the sheet keeps one spacing rhythm; nothing diverges across the set.",
+        "blocking": false
+      },
+      {
+        "category": "palette_coherence",
+        "result": "pass",
+        "evidence": "The sheet reads as one neutral palette with a single primary accent on the pay button.",
+        "blocking": false
+      },
+      {
+        "category": "typography_coherence",
+        "result": "pass",
+        "evidence": "Title, body, and label sizes form one consistent type scale across the sheet.",
+        "blocking": false
+      },
+      {
+        "category": "component_recognition",
+        "result": "pass",
+        "evidence": "The button and summary card styles are recognizable as the same components throughout the sheet.",
+        "blocking": false
+      }
+    ]
+  },
   "screens": [
     {
       "screen_id": "checkout",

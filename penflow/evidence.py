@@ -5,8 +5,10 @@ the skill layer (mockup-factory); this module only proves — from local files �
 that the pass happened in a structured, complete, non-overlapping way:
 the manifest validates, every screen PNG exists non-empty, the vision report
 validates against the locked vision-only category enum, every expected-tree
-screen is covered, and an optional layout snapshot matches the expected
-root bboxes within tolerance.
+screen is covered, an optional layout snapshot matches the expected
+root bboxes within tolerance, and — for multi-screen expected trees — a
+cross-mockup coherence pass over one contact sheet answered the four locked
+coherence categories with a non-empty contact-sheet PNG on disk.
 """
 
 from __future__ import annotations
@@ -32,6 +34,16 @@ VISION_CATEGORIES = (
     "readability",
     "perceived_hierarchy",
     "imagery_quality",
+)
+
+# The locked cross-mockup coherence categories (C28). Numeric cross-screen
+# ground — signature property divergence — belongs to check-consistency
+# (feature 047) and is rejected by the coherence schema enum.
+COHERENCE_CATEGORIES = (
+    "cross_screen_rhythm",
+    "palette_coherence",
+    "typography_coherence",
+    "component_recognition",
 )
 
 # Rendering-evidence tolerance for the layout snapshot cross-check; looser
@@ -87,6 +99,7 @@ def validate_visual_evidence(
     )
     issues.extend(_png_issues(directory, manifest))
     issues.extend(_category_issues(vision_report))
+    issues.extend(_coherence_issues(directory, vision_report, expected_screens))
     if expected_tree_path is not None:
         issues.extend(_coverage_issues(expected_screens, manifest, MANIFEST_FILENAME))
         issues.extend(_coverage_issues(expected_screens, vision_report, VISION_REPORT_FILENAME))
@@ -206,6 +219,72 @@ def _category_issues(vision_report: dict[str, Any] | None) -> list[dict[str, Any
                     )
                 )
     return issues
+
+
+def _coherence_issues(
+    directory: Path,
+    vision_report: dict[str, Any] | None,
+    expected_screens: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    # @spec FR-002: Coherence required for multi-screen expected trees — .specs/features/053-cross-mockup-coherence-contact-sheet/spec.md#fr-002
+    """Cross-mockup coherence checks (C28) over the contact-sheet section."""
+    if vision_report is None:
+        return []  # the missing/invalid vision report already surfaced its own error
+    coherence = vision_report.get("coherence")
+    if not isinstance(coherence, dict):
+        # A single mockup has nothing to compare across screens, so the
+        # contact-sheet pass only becomes mandatory at >= 2 expected screens.
+        if len(expected_screens) >= 2:
+            return [
+                _issue(
+                    "evidence.coherence.missing",
+                    "$.coherence",
+                    f"expected tree has {len(expected_screens)} screens but"
+                    " vision-report.json has no coherence section",
+                )
+            ]
+        return []
+    issues = _contact_sheet_issues(directory, coherence)
+    issues.extend(_coherence_category_issues(coherence))
+    return issues
+
+
+def _contact_sheet_issues(directory: Path, coherence: dict[str, Any]) -> list[dict[str, Any]]:
+    # @spec FR-003: Contact sheet PNG must exist non-empty — .specs/features/053-cross-mockup-coherence-contact-sheet/spec.md#fr-003
+    """The contact-sheet PNG must exist non-empty inside the evidence dir."""
+    png = coherence.get("contact_sheet_png")
+    if not isinstance(png, str) or not png:
+        return []  # the vision-report schema already flags the malformed key
+    path = directory / png
+    json_path = "$.coherence.contact_sheet_png"
+    if not path.is_file():
+        return [
+            _issue(
+                "evidence.contact_sheet.missing", json_path, f"contact sheet PNG not found: {png}"
+            )
+        ]
+    if path.stat().st_size == 0:
+        return [
+            _issue("evidence.contact_sheet.empty", json_path, f"contact sheet PNG is empty: {png}")
+        ]
+    return []
+
+
+def _coherence_category_issues(coherence: dict[str, Any]) -> list[dict[str, Any]]:
+    """A coherence pass must answer all four locked categories."""
+    criteria = coherence.get("criteria")
+    if not isinstance(criteria, list):
+        return []  # the vision-report schema already flags the malformed section
+    answered = {criterion.get("category") for criterion in criteria if isinstance(criterion, dict)}
+    return [
+        _issue(
+            "evidence.coherence.category_missing",
+            "$.coherence.criteria",
+            f"coherence pass does not answer category {category!r}",
+        )
+        for category in COHERENCE_CATEGORIES
+        if category not in answered
+    ]
 
 
 def _coverage_issues(
