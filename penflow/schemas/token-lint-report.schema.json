@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.dev/schemas/token-lint-report.schema.json",
+  "title": "Penflow Token Lint Report",
+  "type": "object",
+  "required": ["version", "kind", "status", "summary", "inputs", "violations"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "integer"},
+    "kind": {"const": "penflow-token-lint-report"},
+    "status": {"enum": ["PASS", "FAIL"]},
+    "summary": {
+      "type": "object",
+      "required": ["errors", "warnings", "nodes_checked"],
+      "additionalProperties": false,
+      "properties": {
+        "errors": {"type": "integer"},
+        "warnings": {"type": "integer"},
+        "nodes_checked": {"type": "integer"}
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "required": ["pen", "theme_css", "spacing_scale", "radius_scale", "fontsize_scale"],
+      "additionalProperties": false,
+      "properties": {
+        "pen": {"type": "string"},
+        "theme_css": {"type": ["string", "null"]},
+        "spacing_scale": {"type": "array", "items": {"type": "number"}},
+        "radius_scale": {"type": "array", "items": {"type": "number"}},
+        "fontsize_scale": {"type": "array", "items": {"type": "number"}}
+      }
+    },
+    "violations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "severity", "node_id", "semantic_id", "property", "value", "message"],
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "token.color.unknown",
+              "token.spacing.offscale",
+              "token.radius.offscale",
+              "token.fontsize.offscale",
+              "token.fontfamily.mismatch",
+              "token.variable.unresolved"
+            ]
+          },
+          "severity": {"enum": ["error", "warning"]},
+          "node_id": {"type": "string"},
+          "semantic_id": {"type": ["string", "null"]},
+          "property": {"type": "string"},
+          "value": {"type": ["number", "string"]},
+          "message": {"type": "string"}
+        }
+      }
+    }
+  }
+}

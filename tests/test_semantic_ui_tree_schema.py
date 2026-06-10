@@ -77,9 +77,11 @@ def test_semantic_schema_does_not_add_feature_036_or_later_runtime_pipeline() ->
     # coverage only. Feature 042 is in scope — it ships integration docs/tests
     # only. Feature 043 is in scope — it ships Mockup Factory skill/docs/tests
     # only. Feature 044 is in scope — it ships visual evidence docs/tests only.
-    # Feature 045 is specified; feature 046 remains guarded.
+    # Feature 045 is in scope — strict JSON contract v2. Feature 046 is in
+    # scope — it ships the deterministic token lint (local files only, no
+    # runtime adapter); feature 047 remains guarded.
     future_feature_dirs: list[Path] = []
-    for feature_number in range(46, 47):
+    for feature_number in range(47, 48):
         future_feature_dirs.extend((ROOT / ".specs" / "features").glob(f"{feature_number:03d}-*"))
     assert future_feature_dirs == []
     assert not (ROOT / "penflow" / "semantic_validator.py").exists()

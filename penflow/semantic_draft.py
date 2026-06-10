@@ -3,50 +3,27 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 from typing import Any
 
 from .context import format_context_string
 from .semantic_validation import validate_semantic_tree
 
+# Re-exported for backward compatibility: theme parsing moved to penflow.theme
+# (feature 046) without changing draft-pen-from-tree behavior.
+from .theme import DEFAULT_STYLE, THEME_TOKEN_MAP, load_theme
+
+__all__ = [
+    "DEFAULT_STYLE",
+    "THEME_TOKEN_MAP",
+    "pen_draft_from_semantic_tree",
+    "write_pen_draft_from_semantic_tree",
+]
+
 PEN_VERSION = "2.11"
 SCREEN_GAP = 16
 SCREEN_PADDING = 24
 NODE_GAP = 8
-
-THEME_TOKEN_MAP = {
-    "background": ("pf-background", "color"),
-    "foreground": ("pf-foreground", "color"),
-    "card": ("pf-card", "color"),
-    "card-foreground": ("pf-card-foreground", "color"),
-    "primary": ("pf-primary", "color"),
-    "primary-foreground": ("pf-primary-foreground", "color"),
-    "border": ("pf-border", "color"),
-    "input": ("pf-input", "color"),
-    "muted": ("pf-muted", "color"),
-    "muted-foreground": ("pf-muted-foreground", "color"),
-    "accent": ("pf-accent", "color"),
-    "destructive": ("pf-destructive", "color"),
-    "ring": ("pf-ring", "color"),
-    "radius": ("pf-radius", "number"),
-    "font-sans": ("pf-font-sans", "string"),
-}
-
-DEFAULT_STYLE = {
-    "background": "#FFFFFF",
-    "foreground": "#111827",
-    "card": "#FFFFFF",
-    "card_foreground": "#111827",
-    "primary": "#0057FF",
-    "primary_foreground": "#FFFFFF",
-    "border": "#CBD5E1",
-    "input": "#CBD5E1",
-    "muted": "#F8FAFC",
-    "muted_foreground": "#374151",
-    "radius": 8,
-    "font_sans": None,
-}
 
 
 def pen_draft_from_semantic_tree(
@@ -66,7 +43,7 @@ def pen_draft_from_semantic_tree(
     issues = validate_semantic_tree(tree)
     if _has_errors(issues):
         raise ValueError(f"semantic UI tree is invalid: {issues[0]['code']}")
-    theme = _theme_from_css(theme_css_path) if theme_css_path else _default_theme()
+    theme = load_theme(theme_css_path)
     screens = [
         _screen_to_pen(screen, index, theme=theme) for index, screen in enumerate(tree["screens"])
     ]
@@ -255,51 +232,6 @@ def _label_child(
 
 def _stroke(fill: str) -> dict[str, Any]:
     return {"fill": fill, "thickness": 1}
-
-
-def _theme_from_css(theme_css_path: str | Path) -> dict[str, Any]:
-    path = Path(theme_css_path)
-    if not path.exists():
-        raise FileNotFoundError(f"theme CSS not found: {path}")
-    raw_tokens = _parse_css_custom_properties(path.read_text(encoding="utf-8"))
-    variables: dict[str, dict[str, Any]] = {}
-    style = dict(DEFAULT_STYLE)
-    for source_name, (variable_name, variable_type) in THEME_TOKEN_MAP.items():
-        raw_value = raw_tokens.get(source_name)
-        if raw_value is None:
-            continue
-        value: Any = _theme_number(raw_value) if variable_type == "number" else raw_value
-        variables[variable_name] = {"type": variable_type, "value": value}
-        style_name = source_name.replace("-", "_")
-        style[style_name] = f"${variable_name}"
-    return {"variables": variables, "style": style}
-
-
-def _default_theme() -> dict[str, Any]:
-    return {"variables": {}, "style": dict(DEFAULT_STYLE)}
-
-
-def _parse_css_custom_properties(css: str) -> dict[str, str]:
-    custom_property_re = re.compile(r"--([A-Za-z0-9_-]+)\s*:\s*([^;{}]+)")
-    return {name: value.strip() for name, value in custom_property_re.findall(css)}
-
-
-def _theme_number(raw_value: str) -> int | float | str:
-    value = raw_value.strip()
-    if value.endswith("rem"):
-        try:
-            return round(float(value[:-3]) * 16)
-        except ValueError:
-            return value
-    if value.endswith("px"):
-        try:
-            return round(float(value[:-2]))
-        except ValueError:
-            return value
-    try:
-        return int(value)
-    except ValueError:
-        return value
 
 
 def _context_from_semantic_node(node: dict[str, Any]) -> str:

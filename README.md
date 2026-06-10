@@ -23,6 +23,7 @@ penflow validate-flow-contract examples/full/flow-ui-contract/contract.json --js
 penflow export-semantic-tree path/to/flow-ui-contract/contract.json --out semantic-ui-tree.json
 penflow validate-semantic-tree semantic-ui-tree.json --json
 penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --theme-css theme.css --json
+penflow lint-tokens ui.pen --theme-css theme.css --out token-lint-report.json --json
 penflow enrich-pen existing-ui.pen semantic-ui-tree.json --out ui.enriched.pen --json
 penflow map-pencil-context ui.pen semantic-ui-tree.json --out pencil-context-map.json --json
 penflow migrate-flow-md-to-contract-json flow-ui-contract --out flow-ui-contract/contract.json --json
