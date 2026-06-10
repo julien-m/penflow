@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.dev/schemas/visual-metrics-report.schema.json",
+  "title": "Penflow Visual Metrics Report",
+  "type": "object",
+  "required": ["version", "kind", "status", "summary", "inputs", "issues"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "integer"},
+    "kind": {"const": "penflow-visual-metrics-report"},
+    "status": {"enum": ["PASS", "FAIL"]},
+    "summary": {
+      "type": "object",
+      "required": ["errors", "warnings", "infos", "nodes_checked", "screens_checked"],
+      "additionalProperties": false,
+      "properties": {
+        "errors": {"type": "integer"},
+        "warnings": {"type": "integer"},
+        "infos": {"type": "integer"},
+        "nodes_checked": {"type": "integer"},
+        "screens_checked": {"type": "integer"}
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "required": ["expected_tree", "theme_css"],
+      "additionalProperties": false,
+      "properties": {
+        "expected_tree": {"type": "string"},
+        "theme_css": {"type": ["string", "null"]}
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["code", "severity", "screen_id", "semantic_id", "message"],
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "visual.contrast.below_aa",
+              "visual.contrast.unresolved",
+              "visual.touch_target.too_small",
+              "visual.bbox.unmeasured",
+              "visual.bbox.overlap",
+              "visual.bbox.overflow",
+              "visual.text.likely_overflow",
+              "visual.color.unparsed"
+            ]
+          },
+          "severity": {"enum": ["error", "warning", "info"]},
+          "screen_id": {"type": "string"},
+          "semantic_id": {"type": ["string", "null"]},
+          "message": {"type": "string"},
+          "ratio": {"type": "number"},
+          "required": {"type": "number"},
+          "width": {"type": "number"},
+          "height": {"type": "number"},
+          "other_semantic_id": {"type": ["string", "null"]},
+          "value": {"type": "string"}
+        }
+      }
+    }
+  }
+}
