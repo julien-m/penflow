@@ -40,6 +40,13 @@ from .semantic_draft import write_pen_draft_from_semantic_tree
 from .semantic_enrichment import enrich_pen_from_semantic_tree
 from .semantic_mapping import write_pencil_context_map
 from .semantic_validation import validate_semantic_tree_file
+from .theme import load_theme
+from .token_lint import (
+    DEFAULT_FONTSIZE_SCALE,
+    DEFAULT_RADIUS_SCALE,
+    DEFAULT_SPACING_SCALE,
+    lint_tokens,
+)
 from .tree import load_tree, validate_actual_tree, write_expected_tree
 
 
@@ -219,6 +226,30 @@ def build_parser() -> argparse.ArgumentParser:
     tokens.add_argument("pen")
     tokens.add_argument("-o", "--out", default=None)
     tokens.set_defaults(func=cmd_extract_tokens)
+
+    lint = sub.add_parser(
+        "lint-tokens", help="lint .pen design tokens against a theme and numeric scales"
+    )
+    lint.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    lint.add_argument("pen")
+    lint.add_argument("--theme-css", default=None, help="project theme.css defining the palette")
+    lint.add_argument("-o", "--out", default="token-lint-report.json")
+    lint.add_argument(
+        "--spacing-scale",
+        default=None,
+        help=f"comma-separated gap/padding scale (default: {','.join(str(int(v)) for v in DEFAULT_SPACING_SCALE)})",
+    )
+    lint.add_argument(
+        "--radius-scale",
+        default=None,
+        help=f"comma-separated cornerRadius scale (default: {','.join(str(int(v)) for v in DEFAULT_RADIUS_SCALE)}; theme radius is always allowed)",
+    )
+    lint.add_argument(
+        "--fontsize-scale",
+        default=None,
+        help=f"comma-separated fontSize scale (default: {','.join(str(int(v)) for v in DEFAULT_FONTSIZE_SCALE)})",
+    )
+    lint.set_defaults(func=cmd_lint_tokens)
 
     ir = sub.add_parser("export-ir", help="export code IR from screen contract")
     ir.add_argument("--json", action="store_true", help="print machine-readable JSON")
@@ -501,6 +532,50 @@ def cmd_extract_tokens(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_lint_tokens(args: argparse.Namespace) -> int:
+    # @spec FR-004: lint-tokens CLI with exit codes 0/1/2 — .specs/features/046-lint-design-tokens/spec.md#fr-004
+    pen_path = Path(args.pen)
+    if not pen_path.exists():
+        raise PenflowError(f"pen file not found: {pen_path}")
+    try:
+        theme = load_theme(args.theme_css) if args.theme_css else None
+    except FileNotFoundError as error:
+        raise PenflowError(str(error)) from error
+    report = lint_tokens(
+        pen_path,
+        theme=theme,
+        theme_css=args.theme_css,
+        spacing_scale=_parse_scale(args.spacing_scale, "--spacing-scale"),
+        radius_scale=_parse_scale(args.radius_scale, "--radius-scale"),
+        fontsize_scale=_parse_scale(args.fontsize_scale, "--fontsize-scale"),
+    )
+    if args.out:
+        Path(args.out).write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+    _print(
+        {
+            "status": report["status"],
+            "violations": len(report["violations"]),
+            "out": args.out,
+        },
+        args.json,
+    )
+    return 0 if report["status"] == "PASS" else 1
+
+
+def _parse_scale(raw: str | None, flag: str) -> tuple[float, ...] | None:
+    if raw is None:
+        return None
+    parts = [part.strip() for part in raw.split(",")]
+    if any(part == "" for part in parts):
+        raise PenflowError(f"{flag} must not be empty")
+    try:
+        return tuple(float(part) for part in parts)
+    except ValueError as error:
+        raise PenflowError(f"{flag} must be comma-separated numbers, got: {raw!r}") from error
+
+
 def cmd_export_ir(args: argparse.Namespace) -> int:
     screen = load_tree(args.screen)
     expected = load_tree(args.expected) if args.expected else None
@@ -737,6 +812,9 @@ def _report_schema_name(report: dict[str, Any], filename: str) -> str:
         return "fix-report.schema.json"
     if kind == "penflow-drift-report":
         return "drift-report.schema.json"
+    if kind == "penflow-token-lint-report":
+        # @spec FR-005: Strict report schema registration — .specs/features/046-lint-design-tokens/spec.md#fr-005
+        return "token-lint-report.schema.json"
     if "compare" in filename or {"score", "summary", "issues"}.issubset(report):
         return "compare-report.schema.json"
     if "visual" in filename:

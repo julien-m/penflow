@@ -91,15 +91,31 @@ def update_pencil(path: str | Path, updates_path: str | Path, out_path: str | Pa
     update_pen_by_semantic_id(path, updates, out_path)
 
 
-def extract_design_tokens(pen_path: str | Path) -> dict[str, Any]:
+def extract_design_tokens(
+    pen_path: str | Path, *, theme: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    # @spec FR-006: Optional theme adds violations — .specs/features/046-lint-design-tokens/spec.md#fr-006
+    """Extract design tokens from a `.pen` file, optionally linting against a theme.
+
+    Args:
+        pen_path: Path to the `.pen` file.
+        theme: Optional loaded theme (`penflow.theme.load_theme` shape). When
+            provided, the returned dict gains a `violations` list computed by
+            the token lint engine; without it the legacy shape is unchanged.
+
+    Returns:
+        Token summary with `colors`, `spacing`, `radius`, `typography`,
+        `proposals`, and (with `theme`) `violations`.
+    """
     nodes = [node for root in parse_pen(pen_path) for node in root.walk()]
     tokens: dict[str, Any] = {
         "colors": sorted(
             {
-                value
+                color
                 for node in nodes
                 for key, value in node.visual.items()
                 if key in {"fill", "stroke"}
+                for color in _color_values(value)
             }
         ),
         "spacing": sorted(
@@ -129,7 +145,20 @@ def extract_design_tokens(pen_path: str | Path) -> dict[str, Any]:
         else (tokens["spacing"][0] if tokens["spacing"] else None),
         "base_radius": tokens["radius"][0] if tokens["radius"] else None,
     }
+    if theme is not None:
+        # Local import to keep module load order stable (token_lint imports pen).
+        from .token_lint import lint_tokens
+
+        tokens["violations"] = lint_tokens(pen_path, theme=theme)["violations"]
     return tokens
+
+
+def _color_values(value: Any) -> list[str]:
+    # Drafted strokes are objects {"fill": ..., "thickness": ...}; unwrap them.
+    if isinstance(value, dict):
+        fill = value.get("fill")
+        return [fill] if isinstance(fill, str) else []
+    return [value] if isinstance(value, str) else []
 
 
 def _spacing_values(value: Any) -> list[int | float]:
