@@ -75,8 +75,23 @@ def test_c16_final_workflow_regression_chain(tmp_path: Path) -> None:
     )
     assert main(["validate-pen", str(enriched_pen), "--json"]) == 0
 
+    # Strict default (feature 049): the legacy reverse output still needs
+    # clarification, so the command exits 1; --lenient keeps the chain green.
     assert (
-        main(["reverse-pen", str(LEGACY / "ui.pen"), "--out", str(reverse_output), "--json"]) == 0
+        main(["reverse-pen", str(LEGACY / "ui.pen"), "--out", str(reverse_output), "--json"]) == 1
+    )
+    assert (
+        main(
+            [
+                "reverse-pen",
+                str(LEGACY / "ui.pen"),
+                "--out",
+                str(reverse_output),
+                "--lenient",
+                "--json",
+            ]
+        )
+        == 0
     )
     assert (
         main(

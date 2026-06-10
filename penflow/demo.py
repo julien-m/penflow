@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .codegen import react, rust_dioxus, swiftui
-from .compare import compare_tree_files
+from .compare import STRICT_THRESHOLD, compare_tree_files
 from .contracts import code_ir_from_pen, validate_code_ir
 from .llm import fix_compare_report, review_compare_report
 from .semantic import write_semantic_tree
@@ -67,10 +67,12 @@ def build_demo(out_dir: str | Path) -> dict[str, str]:
         raise ValueError(f"demo code IR failed validation: {errors[0]}")
     _write_json(out / "code-ir.json", ir)
 
+    # Strict default threshold (feature 049) so the fixture matches the CLI.
     compare_tree_files(
         expected_path,
         out / "actual-ui-tree.json",
         json_out=out / "compare-report.json",
+        threshold=STRICT_THRESHOLD,
     )
     _write_json(out / "review-report.json", review_compare_report(out / "compare-report.json"))
     _write_json(out / "fix-report.json", fix_compare_report(out / "compare-report.json"))

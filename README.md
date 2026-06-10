@@ -6,6 +6,19 @@ Penflow is a deterministic Python CLI for Pencil `.pen` design contracts. It par
 
 `flow-ui-contract/contract.json` is the canonical strict v2 business contract. Markdown/YAML flow files are documentation or explicit migration input only; strict validation, semantic export, `.pen` contract checks, code IR, and report handoff use JSON artifacts.
 
+## Strict by Default (Breaking Change, Feature 049 / C24)
+
+Penflow exits non-zero on **warning-severity issues by default**. Errors always fail; warnings fail unless you pass the global `--lenient` flag (accepted before or after the subcommand on every validating command):
+
+- Applies to `validate-pen`, `validate-flow-specs`, `validate-flow-contract`, `validate-semantic-tree`, `validate-actual`, `validate-flow`, `validate-screen`, `validate-code-ir`, `validate-report`, `compare-tree`, `detect-drift`, `lint-tokens`, `check-consistency`, `export-expected`, `ci`.
+- `compare-tree` and `ci` default threshold is **0.98** (was 0.9). `--lenient` restores the 0.9 default; an explicit `--threshold` always wins.
+- `export-semantic-tree`, `reverse-pen`, and `extract-tokens` now report issues and exit 1 on them (previously always exit 0). `reverse-pen` flags every generated artifact still containing `[NEEDS CLARIFICATION]` as `reverse.clarification_needed`; `extract-tokens` flags uninterpretable values as `tokens.value.unparsed`.
+- `detect-drift` carries blocking data: each issue has a `blocking` boolean (`BLOCKING_DRIFT_CODES` = `drift.semantic_tree_invalid`, `drift.semantic_node_missing_in_pen`, `drift.pencil_context_obsolete`, `drift.clarification_marker`), the summary has a `blocking` count, and the report status gains `BLOCKED`. **Blocking issues exit 1 even with `--lenient`.**
+- Silent coercions now warn: non-keyword string bbox values emit `pen.bbox.invalid` (via `validate-pen`/`inspect`; Pencil sizing keywords `fill_container`/`fit_content(...)` are exempt), and unparsable theme dimensions emit `theme.value.unparsed` (via `lint-tokens`).
+- `jsonschema>=4` is a hard dependency; the minimal fallback validators were removed.
+
+Migration: append `--lenient` to any pipeline that tolerated warnings, or fix the warnings (recommended).
+
 ## Install
 
 ```bash
@@ -120,6 +133,7 @@ penflow validate-pen reverse-output/ui.enriched.pen --json
 
 `reverse-pen --out <dir>` writes a directory containing `semantic-ui-tree.json` and `flow-ui-contract/`; validate `<dir>/semantic-ui-tree.json`, not the directory path itself.
 Reverse output marks missing business logic as `[NEEDS CLARIFICATION]`; do not invent unknown validations, side effects, or state transitions.
+Strict default: `reverse-pen` exits 1 while clarification markers remain (`reverse.clarification_needed`); pass `--lenient` to keep scripted chains green, then resolve the markers.
 
 #### Post-Implementation Compare
 
@@ -147,7 +161,7 @@ penflow validate-pen /tmp/ui.pen --json
 penflow export-expected /tmp/ui.pen -o /tmp/expected-ui-tree.json --json
 penflow enrich-pen examples/legacy/ui.pen /tmp/semantic-ui-tree.json --out /tmp/ui.enriched.pen --json
 penflow validate-pen /tmp/ui.enriched.pen --json
-penflow reverse-pen examples/legacy/ui.pen --out /tmp/reverse-output --json
+penflow reverse-pen examples/legacy/ui.pen --out /tmp/reverse-output --lenient --json
 penflow validate-semantic-tree /tmp/reverse-output/semantic-ui-tree.json --json
 penflow validate-actual examples/full/actual-ui-tree.json --schema --json
 penflow compare-tree /tmp/expected-ui-tree.json examples/full/actual-ui-tree.json --out /tmp/compare.json --json

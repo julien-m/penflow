@@ -16,6 +16,10 @@ DEFAULT_TOLERANCE = {
     "order": 0,
 }
 
+# Historical lenient threshold (pre-049) vs the strict default (feature 049).
+LENIENT_THRESHOLD = 0.9
+STRICT_THRESHOLD = 0.98
+
 MASK_ROLES = {"timer", "clock"}
 
 

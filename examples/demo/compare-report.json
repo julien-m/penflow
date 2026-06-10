@@ -9,6 +9,6 @@
     "issues": 0,
     "warnings": 0
   },
-  "threshold": 0.9,
+  "threshold": 0.98,
   "version": 1
 }

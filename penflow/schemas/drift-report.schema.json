@@ -4,13 +4,48 @@
   "title": "Penflow Drift Report",
   "type": "object",
   "required": ["version", "kind", "status", "summary", "inputs", "issues"],
-  "additionalProperties": true,
+  "additionalProperties": false,
   "properties": {
     "version": {"type": "integer"},
     "kind": {"const": "penflow-drift-report"},
-    "status": {"enum": ["PASS", "DRIFT"]},
-    "summary": {"type": "object"},
-    "inputs": {"type": "object"},
-    "issues": {"type": "array"}
+    "status": {"enum": ["PASS", "DRIFT", "BLOCKED"]},
+    "summary": {
+      "type": "object",
+      "required": ["errors", "warnings", "blocking", "total"],
+      "additionalProperties": false,
+      "properties": {
+        "errors": {"type": "integer"},
+        "warnings": {"type": "integer"},
+        "blocking": {"type": "integer"},
+        "total": {"type": "integer"}
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "required": ["flow_ui_contract", "semantic_tree", "pen"],
+      "additionalProperties": false,
+      "properties": {
+        "flow_ui_contract": {"type": "string"},
+        "semantic_tree": {"type": "string"},
+        "pen": {"type": "string"}
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["severity", "code", "path", "message", "blocking"],
+        "additionalProperties": false,
+        "properties": {
+          "severity": {"enum": ["error", "warning", "info"]},
+          "code": {"type": "string"},
+          "path": {"type": "string"},
+          "message": {"type": "string"},
+          "blocking": {"type": "boolean"},
+          "semantic_id": {"type": ["string", "null"]},
+          "pencil_node_id": {"type": ["string", "null"]}
+        }
+      }
+    }
   }
 }

@@ -20,6 +20,15 @@ Penflow owns file validation and tree comparison only:
 
 Penflow does **not** run browsers, Xcode, simulators, Playwright, React Native, Metro, or app builds. External adapters produce `actual-ui-tree.json`; Penflow validates and compares it.
 
+## Strict by Default (Feature 049 / C24)
+
+- Warning-severity issues exit 1 on every validating command (`validate-*`, `compare-tree`, `detect-drift`, `lint-tokens`, `check-consistency`, `export-expected`, `ci`); errors always exit 1. The global `--lenient` flag (before or after the subcommand) makes warnings non-blocking.
+- `compare-tree`/`ci` default threshold is 0.98; `--lenient` restores 0.9; explicit `--threshold` always wins.
+- `export-semantic-tree`, `reverse-pen`, `extract-tokens` report issues and exit 1 on them: `reverse.clarification_needed` per generated artifact still containing `[NEEDS CLARIFICATION]`, `tokens.value.unparsed` for uninterpretable token values.
+- `detect-drift` issues carry `blocking: bool` (`BLOCKING_DRIFT_CODES`: `drift.semantic_tree_invalid`, `drift.semantic_node_missing_in_pen`, `drift.pencil_context_obsolete`, `drift.clarification_marker`); summary has a `blocking` count; status adds `BLOCKED`. Blocking issues exit 1 even with `--lenient` — gate on `summary.blocking == 0`.
+- Surfaced coercions: `pen.bbox.invalid` warning for non-keyword string bbox values (`fill_container`/`fit_content(...)` exempt) via `validate-pen`/`inspect`; `theme.value.unparsed` warning for unparsable theme dimensions via `lint-tokens`.
+- `jsonschema>=4` is a hard dependency (no minimal fallbacks).
+
 ## Tree Contracts
 
 The LLM should not hand-write production trees, but it must understand their contracts before debugging or explaining results:
@@ -112,6 +121,7 @@ penflow validate-pen reverse-output/ui.enriched.pen --json
 
 `reverse-pen --out <dir>` writes a directory containing `semantic-ui-tree.json` and `flow-ui-contract/`; validate `<dir>/semantic-ui-tree.json`, not the directory path itself.
 Reverse mode marks missing business rules as `[NEEDS CLARIFICATION]`. Do not invent backend side effects, validations, state transitions, or access rules.
+Strict default: `reverse-pen` exits 1 while clarification markers remain; use `--lenient` for scripted chains, then resolve the markers.
 
 ## Post-Implementation Compare Mode
 
@@ -141,7 +151,7 @@ penflow validate-pen /tmp/ui.pen --json
 penflow export-expected /tmp/ui.pen -o /tmp/expected-ui-tree.json --json
 penflow enrich-pen examples/legacy/ui.pen /tmp/semantic-ui-tree.json --out /tmp/ui.enriched.pen --json
 penflow validate-pen /tmp/ui.enriched.pen --json
-penflow reverse-pen examples/legacy/ui.pen --out /tmp/reverse-output --json
+penflow reverse-pen examples/legacy/ui.pen --out /tmp/reverse-output --lenient --json
 penflow validate-semantic-tree /tmp/reverse-output/semantic-ui-tree.json --json
 penflow validate-actual examples/full/actual-ui-tree.json --schema --json
 penflow compare-tree /tmp/expected-ui-tree.json examples/full/actual-ui-tree.json --out /tmp/compare.json --json

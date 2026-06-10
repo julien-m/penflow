@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from .codegen import react, rust_dioxus, swiftui
-from .compare import compare_tree_files
+from .compare import LENIENT_THRESHOLD, STRICT_THRESHOLD, compare_tree_files
 from .consistency import check_consistency, write_consistency_report
 from .contracts import (
     _raise_if_no_context,
@@ -34,13 +34,20 @@ from .flow_contract import (
 from .flow_contract_migration import migrate_flow_md_to_contract_json
 from .flow_specs import validate_flow_specs_dir
 from .llm import fix_compare_report, review_compare_report
-from .pen import inspect_pen, parse_pen, validate_pen_context, validate_pen_context_against_contract
+from .pen import (
+    bbox_issues,
+    inspect_pen,
+    load_pen,
+    parse_pen,
+    validate_pen_context,
+    validate_pen_context_against_contract,
+)
 from .reverse import reverse_pen
 from .semantic import write_semantic_tree
 from .semantic_draft import write_pen_draft_from_semantic_tree
 from .semantic_enrichment import enrich_pen_from_semantic_tree
 from .semantic_mapping import write_pencil_context_map
-from .semantic_validation import validate_semantic_tree_file
+from .semantic_validation import validate_semantic_tree, validate_semantic_tree_file
 from .theme import load_theme
 from .token_lint import (
     DEFAULT_FONTSIZE_SCALE,
@@ -66,6 +73,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--json", action="store_true", help="print machine-readable JSON when supported"
     )
+    # Distinct dest: argparse subparser defaults must not clobber the global flag.
+    parser.add_argument(
+        "--lenient",
+        dest="lenient_global",
+        action="store_true",
+        help="do not fail on warning-severity issues (strict is the default)",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     inspect_cmd = sub.add_parser("inspect", help="inspect a .pen file")
@@ -79,12 +93,14 @@ def build_parser() -> argparse.ArgumentParser:
     validate_pen.add_argument("--json", action="store_true", help="print machine-readable JSON")
     validate_pen.add_argument("--contract", default=None, help="v2 flow contract.json")
     validate_pen.add_argument("pen")
+    _add_lenient(validate_pen)
     validate_pen.set_defaults(func=cmd_validate_pen)
 
     expected = sub.add_parser("export-expected", help="export expected UI tree from .pen")
     expected.add_argument("--json", action="store_true", help="print machine-readable JSON")
     expected.add_argument("pen")
     expected.add_argument("-o", "--out", default="expected-ui-tree.json")
+    _add_lenient(expected)
     expected.set_defaults(func=cmd_export_expected)
 
     semantic = sub.add_parser(
@@ -93,6 +109,7 @@ def build_parser() -> argparse.ArgumentParser:
     semantic.add_argument("--json", action="store_true", help="print machine-readable JSON")
     semantic.add_argument("specs_dir")
     semantic.add_argument("-o", "--out", default="semantic-ui-tree.json")
+    _add_lenient(semantic)
     semantic.set_defaults(func=cmd_export_semantic_tree)
 
     validate_flow_specs = sub.add_parser(
@@ -102,6 +119,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true", help="print machine-readable JSON"
     )
     validate_flow_specs.add_argument("specs_dir")
+    _add_lenient(validate_flow_specs)
     validate_flow_specs.set_defaults(func=cmd_validate_flow_specs)
 
     validate_flow_contract_cmd = sub.add_parser(
@@ -111,6 +129,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true", help="print machine-readable JSON"
     )
     validate_flow_contract_cmd.add_argument("contract")
+    _add_lenient(validate_flow_contract_cmd)
     validate_flow_contract_cmd.set_defaults(func=cmd_validate_flow_contract)
 
     migrate_flow_contract_cmd = sub.add_parser(
@@ -131,6 +150,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true", help="print machine-readable JSON"
     )
     validate_semantic.add_argument("semantic_tree")
+    _add_lenient(validate_semantic)
     validate_semantic.set_defaults(func=cmd_validate_semantic_tree)
 
     semantic_draft = sub.add_parser(
@@ -162,6 +182,7 @@ def build_parser() -> argparse.ArgumentParser:
     reverse.add_argument("pen")
     reverse.add_argument("--out", required=True)
     reverse.add_argument("--enrich", action="store_true")
+    _add_lenient(reverse)
     reverse.set_defaults(func=cmd_reverse_pen)
 
     drift = sub.add_parser(
@@ -173,6 +194,7 @@ def build_parser() -> argparse.ArgumentParser:
     drift.add_argument("pen")
     drift.add_argument("--out", required=True)
     drift.add_argument("--markdown", default=None)
+    _add_lenient(drift)
     drift.set_defaults(func=cmd_detect_drift)
 
     actual = sub.add_parser("validate-actual", help="validate actual runtime UI tree")
@@ -183,6 +205,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="also run JSON Schema validation (draft 2020-12)",
     )
     actual.add_argument("actual")
+    _add_lenient(actual)
     actual.set_defaults(func=cmd_validate_actual)
 
     compare = sub.add_parser("compare-tree", help="compare expected and actual UI trees")
@@ -190,7 +213,9 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument("expected")
     compare.add_argument("actual")
     compare.add_argument("--out", default="compare-report.json")
-    compare.add_argument("--threshold", type=float, default=0.9)
+    # Default None: distinguish an explicit threshold from the mode default.
+    compare.add_argument("--threshold", type=float, default=None)
+    _add_lenient(compare)
     compare.set_defaults(func=cmd_compare_tree)
 
     consistency = sub.add_parser(
@@ -206,16 +231,19 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="coarsen the component signature (default: role+intent+variant)",
     )
+    _add_lenient(consistency)
     consistency.set_defaults(func=cmd_check_consistency)
 
     flow = sub.add_parser("validate-flow", help="validate flow contract")
     flow.add_argument("--json", action="store_true", help="print machine-readable JSON")
     flow.add_argument("flow")
+    _add_lenient(flow)
     flow.set_defaults(func=cmd_validate_flow)
 
     screen = sub.add_parser("validate-screen", help="validate screen contract")
     screen.add_argument("--json", action="store_true", help="print machine-readable JSON")
     screen.add_argument("screen")
+    _add_lenient(screen)
     screen.set_defaults(func=cmd_validate_screen)
 
     flow_to_screen = sub.add_parser("flow-to-screens", help="generate screen contracts from flow")
@@ -241,6 +269,7 @@ def build_parser() -> argparse.ArgumentParser:
     tokens.add_argument("--json", action="store_true", help="print machine-readable JSON")
     tokens.add_argument("pen")
     tokens.add_argument("-o", "--out", default=None)
+    _add_lenient(tokens)
     tokens.set_defaults(func=cmd_extract_tokens)
 
     lint = sub.add_parser(
@@ -265,6 +294,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help=f"comma-separated fontSize scale (default: {','.join(str(int(v)) for v in DEFAULT_FONTSIZE_SCALE)})",
     )
+    _add_lenient(lint)
     lint.set_defaults(func=cmd_lint_tokens)
 
     ir = sub.add_parser("export-ir", help="export code IR from screen contract")
@@ -292,6 +322,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--json", action="store_true", help="print machine-readable JSON"
     )
     validate_code_ir_cmd.add_argument("code_ir")
+    _add_lenient(validate_code_ir_cmd)
     validate_code_ir_cmd.set_defaults(func=cmd_validate_code_ir)
 
     codegen = sub.add_parser("codegen", help="generate SwiftUI, React, or Rust Dioxus code from IR")
@@ -305,7 +336,9 @@ def build_parser() -> argparse.ArgumentParser:
     ci.add_argument("--json", action="store_true", help="print machine-readable JSON")
     ci.add_argument("pen")
     ci.add_argument("actual")
-    ci.add_argument("--threshold", type=float, default=0.9)
+    # Default None: distinguish an explicit threshold from the mode default.
+    ci.add_argument("--threshold", type=float, default=None)
+    _add_lenient(ci)
     ci.set_defaults(func=cmd_ci)
 
     review = sub.add_parser("review-report", help="explain a compare report in stable Markdown")
@@ -326,6 +359,7 @@ def build_parser() -> argparse.ArgumentParser:
     validate_report.add_argument("--json", action="store_true", help="print machine-readable JSON")
     validate_report.add_argument("--schema", action="store_true", help="run bundled JSON Schema")
     validate_report.add_argument("report")
+    _add_lenient(validate_report)
     validate_report.set_defaults(func=cmd_validate_report)
 
     demo = sub.add_parser("demo", help="write an end-to-end demo project")
@@ -342,7 +376,8 @@ def cmd_inspect(args: argparse.Namespace) -> int:
 
 
 def cmd_validate_pen(args: argparse.Namespace) -> int:
-    roots = parse_pen(args.pen)
+    raw = load_pen(args.pen)
+    roots = parse_pen(raw)
     if args.contract:
         contract = load_flow_contract_v2(args.contract)
         contract_issues = validate_flow_contract_v2(contract)
@@ -354,44 +389,57 @@ def cmd_validate_pen(args: argparse.Namespace) -> int:
             ]
     else:
         issues = [asdict(issue) for issue in validate_pen_context(roots)]
-    _print({"status": "PASS" if not _has_errors(issues) else "FAIL", "issues": issues}, args.json)
-    return 1 if _has_errors(issues) else 0
+    # Raw re-scan (feature 049): parse_pen coerces invalid bbox strings to 0,
+    # so the silent-coercion warning must come from the raw JSON values.
+    issues = issues + [asdict(issue) for issue in bbox_issues(raw)]
+    code = _exit_code(issues, _is_lenient(args))
+    _print({"status": _status(code), "issues": issues}, args.json)
+    return code
 
 
 def cmd_export_expected(args: argparse.Namespace) -> int:
     tree = write_expected_tree(args.pen, args.out)
+    code = _exit_code(tree["issues"], _is_lenient(args))
     _print(
         {"out": args.out, "screens": len(tree["screens"]), "issues": len(tree["issues"])}, args.json
     )
-    return 1 if _has_errors(tree["issues"]) else 0
+    return code
 
 
 def cmd_export_semantic_tree(args: argparse.Namespace) -> int:
+    # @spec FR-005: export-semantic-tree validates its output — .specs/features/049-strict-mode-default-blocking-drift/spec.md#fr-005
     tree = write_semantic_tree(args.specs_dir, args.out)
+    issues = validate_semantic_tree(tree)
+    code = _exit_code(issues, _is_lenient(args))
     _print(
         {
-            "status": "PASS",
+            "status": _status(code),
             "out": args.out,
             "flows": len(tree["flows"]),
             "screens": len(tree["screens"]),
+            "issues": issues,
         },
         args.json,
     )
-    return 0
+    return code
 
 
 def cmd_validate_flow_specs(args: argparse.Namespace) -> int:
     # @spec FR-006: Deprecated compatibility surface — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-006
     report = validate_flow_specs_dir(args.specs_dir)
-    _print(report, args.json)
-    return 0 if report["status"] == "PASS" else 1
+    code = _exit_code(report["issues"], _is_lenient(args))
+    if report["status"] == "FAIL":
+        code = 1
+    _print(report | {"status": _status(code)}, args.json)
+    return code
 
 
 def cmd_validate_flow_contract(args: argparse.Namespace) -> int:
     # @spec FR-004: Primary strict contract CLI — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-004
     issues = validate_flow_contract_v2(load_flow_contract_v2(args.contract))
-    _print({"status": "PASS" if not _has_errors(issues) else "FAIL", "issues": issues}, args.json)
-    return 1 if _has_errors(issues) else 0
+    code = _exit_code(issues, _is_lenient(args))
+    _print({"status": _status(code), "issues": issues}, args.json)
+    return code
 
 
 def cmd_migrate_flow_contract(args: argparse.Namespace) -> int:
@@ -401,9 +449,10 @@ def cmd_migrate_flow_contract(args: argparse.Namespace) -> int:
 
 
 def cmd_validate_semantic_tree(args: argparse.Namespace) -> int:
-    passed, issues = validate_semantic_tree_file(args.semantic_tree)
-    _print({"status": "PASS" if passed else "FAIL", "issues": issues}, args.json)
-    return 0 if passed else 1
+    _, issues = validate_semantic_tree_file(args.semantic_tree)
+    code = _exit_code(issues, _is_lenient(args))
+    _print({"status": _status(code), "issues": issues}, args.json)
+    return code
 
 
 def cmd_draft_pen_from_tree(args: argparse.Namespace) -> int:
@@ -455,12 +504,15 @@ def cmd_map_pencil_context(args: argparse.Namespace) -> int:
 
 
 def cmd_reverse_pen(args: argparse.Namespace) -> int:
+    # @spec FR-006: reverse-pen surfaces clarification issues — .specs/features/049-strict-mode-default-blocking-drift/spec.md#fr-006
     report = reverse_pen(args.pen, args.out, enrich=args.enrich)
-    _print(report, args.json)
-    return 0
+    code = _exit_code(report["issues"], _is_lenient(args))
+    _print(report | {"status": _status(code)}, args.json)
+    return code
 
 
 def cmd_detect_drift(args: argparse.Namespace) -> int:
+    # @spec FR-008: blocking drift exit policy — .specs/features/049-strict-mode-default-blocking-drift/spec.md#fr-008
     report = detect_drift(
         args.specs_dir,
         args.semantic_tree,
@@ -469,32 +521,43 @@ def cmd_detect_drift(args: argparse.Namespace) -> int:
         markdown_path=args.markdown,
     )
     _print(report | {"out": args.out, "markdown": args.markdown}, args.json)
-    return 0 if report["status"] == "PASS" else 1
+    # Blocking issues and errors fail in both modes; warning-only DRIFT is
+    # forgiven only with --lenient.
+    if report["status"] == "PASS":
+        return 0
+    if report["status"] == "BLOCKED" or report["summary"]["errors"] > 0:
+        return 1
+    return 0 if _is_lenient(args) else 1
 
 
 def cmd_validate_actual(args: argparse.Namespace) -> int:
     issues = validate_actual_tree(load_tree(args.actual), schema=args.schema)
-    _print({"status": "PASS" if not _has_errors(issues) else "FAIL", "issues": issues}, args.json)
-    return 1 if _has_errors(issues) else 0
+    code = _exit_code(issues, _is_lenient(args))
+    _print({"status": _status(code), "issues": issues}, args.json)
+    return code
 
 
 def cmd_compare_tree(args: argparse.Namespace) -> int:
+    # @spec FR-004: strict threshold default 0.98 — .specs/features/049-strict-mode-default-blocking-drift/spec.md#fr-004
+    threshold = _resolve_threshold(args.threshold, _is_lenient(args))
     report = compare_tree_files(
         args.expected,
         args.actual,
         json_out=args.out,
         markdown_out=None,
-        threshold=args.threshold,
+        threshold=threshold,
     )
+    code = 1 if report["status"] != "PASS" else _exit_code(report["issues"], _is_lenient(args))
     _print(
         {
-            "status": report["status"],
+            "status": _status(code),
             "score": report["score"],
+            "threshold": threshold,
             "out": args.out,
         },
         args.json,
     )
-    return 0 if report["status"] == "PASS" else 1
+    return code
 
 
 def cmd_check_consistency(args: argparse.Namespace) -> int:
@@ -510,27 +573,30 @@ def cmd_check_consistency(args: argparse.Namespace) -> int:
         raise PenflowError(str(error)) from error
     if args.out:
         write_consistency_report(report, args.out)
+    code = _exit_code(report["issues"], _is_lenient(args))
     _print(
         {
-            "status": report["status"],
+            "status": _status(code),
             "issues": len(report["issues"]),
             "out": args.out,
         },
         args.json,
     )
-    return 0 if report["status"] == "PASS" else 1
+    return code
 
 
 def cmd_validate_flow(args: argparse.Namespace) -> int:
     issues = validate_flow_contract(load_tree(args.flow))
-    _print({"status": "PASS" if not _has_errors(issues) else "FAIL", "issues": issues}, args.json)
-    return 1 if _has_errors(issues) else 0
+    code = _exit_code(issues, _is_lenient(args))
+    _print({"status": _status(code), "issues": issues}, args.json)
+    return code
 
 
 def cmd_validate_screen(args: argparse.Namespace) -> int:
     issues = validate_screen_contract(load_tree(args.screen))
-    _print({"status": "PASS" if not _has_errors(issues) else "FAIL", "issues": issues}, args.json)
-    return 1 if _has_errors(issues) else 0
+    code = _exit_code(issues, _is_lenient(args))
+    _print({"status": _status(code), "issues": issues}, args.json)
+    return code
 
 
 def cmd_flow_to_screens(args: argparse.Namespace) -> int:
@@ -563,13 +629,15 @@ def cmd_update_pen(args: argparse.Namespace) -> int:
 
 
 def cmd_extract_tokens(args: argparse.Namespace) -> int:
+    # @spec FR-007: extract-tokens surfaces unparsable values — .specs/features/049-strict-mode-default-blocking-drift/spec.md#fr-007
     tokens = extract_design_tokens(args.pen)
+    code = _exit_code(tokens["issues"], _is_lenient(args))
     if args.out:
         Path(args.out).write_text(
             json.dumps(tokens, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
-    _print(tokens | ({"out": args.out} if args.out else {}), args.json)
-    return 0
+    _print(tokens | {"status": _status(code)} | ({"out": args.out} if args.out else {}), args.json)
+    return code
 
 
 def cmd_lint_tokens(args: argparse.Namespace) -> int:
@@ -593,15 +661,16 @@ def cmd_lint_tokens(args: argparse.Namespace) -> int:
         Path(args.out).write_text(
             json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
         )
+    code = _exit_code(report["violations"], _is_lenient(args))
     _print(
         {
-            "status": report["status"],
+            "status": _status(code),
             "violations": len(report["violations"]),
             "out": args.out,
         },
         args.json,
     )
-    return 0 if report["status"] == "PASS" else 1
+    return code
 
 
 def _parse_scale(raw: str | None, flag: str) -> tuple[float, ...] | None:
@@ -653,8 +722,9 @@ def cmd_code_ir(args: argparse.Namespace) -> int:
 def cmd_validate_code_ir(args: argparse.Namespace) -> int:
     # @spec FR-008: Strict code IR validation CLI — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-008
     issues = validate_code_ir(load_tree(args.code_ir))
-    _print({"status": "PASS" if not _has_errors(issues) else "FAIL", "issues": issues}, args.json)
-    return 1 if _has_errors(issues) else 0
+    code = _exit_code(issues, _is_lenient(args))
+    _print({"status": _status(code), "issues": issues}, args.json)
+    return code
 
 
 def cmd_codegen(args: argparse.Namespace) -> int:
@@ -666,6 +736,8 @@ def cmd_codegen(args: argparse.Namespace) -> int:
 
 
 def cmd_ci(args: argparse.Namespace) -> int:
+    # @spec FR-004: strict threshold default 0.98 — .specs/features/049-strict-mode-default-blocking-drift/spec.md#fr-004
+    threshold = _resolve_threshold(args.threshold, _is_lenient(args))
     expected_path = Path("expected-ui-tree.json")
     write_expected_tree(args.pen, expected_path)
     report = compare_tree_files(
@@ -673,10 +745,11 @@ def cmd_ci(args: argparse.Namespace) -> int:
         args.actual,
         json_out="compare-report.json",
         markdown_out="compare-report.md",
-        threshold=args.threshold,
+        threshold=threshold,
     )
-    _print({"status": report["status"], "score": report["score"]}, args.json)
-    return 0 if report["status"] == "PASS" else 1
+    code = 1 if report["status"] != "PASS" else _exit_code(report["issues"], _is_lenient(args))
+    _print({"status": _status(code), "score": report["score"], "threshold": threshold}, args.json)
+    return code
 
 
 def cmd_review_report(args: argparse.Namespace) -> int:
@@ -705,14 +778,45 @@ def cmd_validate_report(args: argparse.Namespace) -> int:
     # @spec FR-009: Structured report schema validation — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-009
     report = load_tree(args.report)
     issues = _validate_report_schema(report, args.report) if args.schema else []
-    _print({"status": "PASS" if not _has_errors(issues) else "FAIL", "issues": issues}, args.json)
-    return 1 if _has_errors(issues) else 0
+    code = _exit_code(issues, _is_lenient(args))
+    _print({"status": _status(code), "issues": issues}, args.json)
+    return code
 
 
 def cmd_demo(args: argparse.Namespace) -> int:
     files = build_demo(args.out)
     _print({"status": "PASS", "files": files}, args.json)
     return 0
+
+
+def _add_lenient(sub_parser: argparse.ArgumentParser) -> None:
+    """Mirror the global --lenient flag so it works before or after the subcommand."""
+    sub_parser.add_argument(
+        "--lenient",
+        action="store_true",
+        help="do not fail on warning-severity issues (strict is the default)",
+    )
+
+
+def _is_lenient(args: argparse.Namespace) -> bool:
+    return bool(getattr(args, "lenient_global", False) or getattr(args, "lenient", False))
+
+
+def _exit_code(issues: list[dict[str, Any]], lenient: bool) -> int:
+    """Strict-by-default exit policy (feature 049).
+
+    Errors always fail; warnings fail unless ``lenient`` is set.
+    """
+    severities = {issue.get("severity") for issue in issues}
+    if "error" in severities:
+        return 1
+    if "warning" in severities and not lenient:
+        return 1
+    return 0
+
+
+def _status(exit_code: int) -> str:
+    return "PASS" if exit_code == 0 else "FAIL"
 
 
 def _print(data: dict[str, Any], as_json: bool) -> None:
@@ -729,6 +833,13 @@ def _print(data: dict[str, Any], as_json: bool) -> None:
 
 def _has_errors(issues: list[dict[str, Any]]) -> bool:
     return any(issue.get("severity") == "error" for issue in issues)
+
+
+def _resolve_threshold(explicit: float | None, lenient: bool) -> float:
+    """An explicit --threshold always wins; otherwise the mode picks the default."""
+    if explicit is not None:
+        return explicit
+    return LENIENT_THRESHOLD if lenient else STRICT_THRESHOLD
 
 
 _SUPPORTED_REPORT_SCHEMA_KEYWORDS = frozenset(

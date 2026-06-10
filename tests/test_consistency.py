@@ -124,7 +124,13 @@ def test_padding_deviation_within_tolerance_is_warning(tmp_path: Path) -> None:
         tmp_path, _two_screen_tree(_button("s1.pay"), _button("s2.pay", padding=[12, 18]))
     )
     report_path = tmp_path / "report.json"
-    assert main(["check-consistency", str(path), "--out", str(report_path), "--json"]) == 0
+    # Strict default (feature 049): warning-severity issues fail the gate.
+    assert main(["check-consistency", str(path), "--out", str(report_path), "--json"]) == 1
+    # --lenient restores the warnings-non-blocking behavior.
+    assert (
+        main(["check-consistency", str(path), "--out", str(report_path), "--lenient", "--json"])
+        == 0
+    )
     report = json.loads(report_path.read_text(encoding="utf-8"))
     assert report["status"] == "PASS"
     [issue] = report["issues"]

@@ -127,7 +127,7 @@ penflow validate-pen penflow/reverse-output/ui.enriched.pen --json
 
 `reverse-pen --out <dir>` creates a directory. The semantic tree is `<dir>/semantic-ui-tree.json`; recovered specs are under `<dir>/flow-ui-contract/`.
 
-Reverse/migration mode marks unknown business logic as `[NEEDS CLARIFICATION]`. Treat those markers as migration work. Do not let an agent invent validations, side effects, permissions, or state transitions that were not present in the source material.
+Reverse/migration mode marks unknown business logic as `[NEEDS CLARIFICATION]`. Treat those markers as migration work. Strict default (feature 049): `reverse-pen` exits 1 while markers remain (`reverse.clarification_needed`); add `--lenient` to keep bootstrap scripts green until the markers are resolved. Do not let an agent invent validations, side effects, permissions, or state transitions that were not present in the source material.
 
 Once reviewed, promote the recovered files into the project workspace:
 
@@ -158,7 +158,7 @@ After implementation, the app must export an `actual-ui-tree.json` through a run
 
 ```bash
 penflow validate-actual penflow/actual-ui-tree.json --schema --json
-penflow compare-tree penflow/expected-ui-tree.json penflow/actual-ui-tree.json --out penflow/compare-report.json --json
+penflow compare-tree penflow/expected-ui-tree.json penflow/actual-ui-tree.json --out penflow/compare-report.json --json  # strict default threshold 0.98; --lenient restores 0.9
 penflow review-report penflow/compare-report.json --out penflow/review-report.json --json
 penflow fix-report penflow/compare-report.json --out penflow/fix-report.json --json
 penflow validate-report penflow/compare-report.json --schema --json

@@ -44,7 +44,7 @@
         "role": {"type": "string"},
         "bbox": {"$ref": "#/$defs/bbox"},
         "pencil_id": {"type": "string"},
-        "semantic_id": {"type": "string"},
+        "semantic_id": {"type": ["string", "null"]},
         "name": {"type": ["string", "null"]},
         "text": {"type": ["string", "null"]},
         "visual": {"type": "object", "additionalProperties": true},

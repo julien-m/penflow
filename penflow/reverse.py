@@ -24,7 +24,11 @@ def reverse_pen(
         enrich: Whether to also write `ui.enriched.pen` with context metadata only.
 
     Returns:
-        Scriptable report containing generated file paths and screen count.
+        Scriptable report containing generated file paths, screen count, and
+        `reverse.clarification_needed` issues for every generated artifact that
+        still contains a `[NEEDS CLARIFICATION]` marker (feature 049). Outputs
+        are written even when issues exist — the issues signal "review
+        required", not "no artifact".
     """
     pen = json.loads(Path(pen_path).read_text(encoding="utf-8"))
     out = Path(out_dir)
@@ -56,7 +60,28 @@ def reverse_pen(
         )
         files.append(str(enriched_path))
 
-    return {"status": "PASS", "out": str(out), "screens": len(screen_specs), "files": files}
+    issues = _clarification_issues(files)
+    return {
+        "status": "PASS" if not issues else "FAIL",
+        "out": str(out),
+        "screens": len(screen_specs),
+        "files": files,
+        "issues": issues,
+    }
+
+
+def _clarification_issues(files: list[str]) -> list[dict[str, Any]]:
+    # @spec FR-006: reverse-pen surfaces clarification issues — .specs/features/049-strict-mode-default-blocking-drift/spec.md#fr-006
+    return [
+        {
+            "severity": "warning",
+            "code": "reverse.clarification_needed",
+            "path": file,
+            "message": "generated artifact contains [NEEDS CLARIFICATION] and requires review",
+        }
+        for file in files
+        if CLARIFICATION in Path(file).read_text(encoding="utf-8")
+    ]
 
 
 def _root_nodes(pen: dict[str, Any]) -> list[tuple[int, dict[str, Any]]]:
