@@ -22,7 +22,7 @@ Penflow does **not** run browsers, Xcode, simulators, Playwright, React Native, 
 
 ## Strict by Default (Feature 049 / C24)
 
-- Warning-severity issues exit 1 on every validating command (`validate-*`, `compare-tree`, `detect-drift`, `lint-tokens`, `check-consistency`, `export-expected`, `ci`); errors always exit 1. The global `--lenient` flag (before or after the subcommand) makes warnings non-blocking.
+- Warning-severity issues exit 1 on every validating command (`validate-*`, `compare-tree`, `detect-drift`, `lint-tokens`, `check-consistency`, `audit-visual`, `export-expected`, `ci`); errors always exit 1. The global `--lenient` flag (before or after the subcommand) makes warnings non-blocking. `info`-severity issues never affect exit codes.
 - `compare-tree`/`ci` default threshold is 0.98; `--lenient` restores 0.9; explicit `--threshold` always wins.
 - `export-semantic-tree`, `reverse-pen`, `extract-tokens` report issues and exit 1 on them: `reverse.clarification_needed` per generated artifact still containing `[NEEDS CLARIFICATION]`, `tokens.value.unparsed` for uninterpretable token values.
 - `detect-drift` issues carry `blocking: bool` (`BLOCKING_DRIFT_CODES`: `drift.semantic_tree_invalid`, `drift.semantic_node_missing_in_pen`, `drift.pencil_context_obsolete`, `drift.clarification_marker`); summary has a `blocking` count; status adds `BLOCKED`. Blocking issues exit 1 even with `--lenient` — gate on `summary.blocking == 0`.
@@ -86,11 +86,14 @@ penflow lint-tokens ui.pen --theme-css theme.css --out token-lint-report.json --
 penflow validate-pen ui.pen --json
 penflow export-expected ui.pen --out expected-ui-tree.json --json
 penflow check-consistency expected-ui-tree.json --out consistency-report.json --json
+penflow audit-visual expected-ui-tree.json --theme-css theme.css --out visual-metrics-report.json --json
 penflow code-ir --from-context ui.pen --semantic-tree semantic-ui-tree.json --contract examples/full/flow-ui-contract/contract.json --flow-id checkout --flow-name "Checkout flow" --out code-ir.json --json
 penflow validate-code-ir code-ir.json --json
 ```
 
 Legacy route phrase for old docs/tests: `penflow export-semantic-tree examples/full/flow-ui-contract --out semantic-ui-tree.json --json`.
+
+`audit-visual` (feature 050) computes deterministic visual metrics from the expected tree, zero vision: WCAG AA contrast via parent-walk backgrounds (`visual.contrast.below_aa` error; 3:1 for fontSize ≥ 24 or ≥ 18 bold, else 4.5:1), touch targets on interactive roles (`visual.touch_target.too_small` — error < 24px, warning 24–43px; ≥ 44px passes; zero-sized drafts emit `visual.bbox.unmeasured` info), sibling overlap / parent overflow beyond 1px (`visual.bbox.overlap`, `visual.bbox.overflow`, errors), heuristic text overflow (`visual.text.likely_overflow` warning), and unparseable fills (`visual.color.unparsed` info). `$pf-*` fills resolve via `--theme-css`.
 
 ## Pencil Enrichment Mode
 

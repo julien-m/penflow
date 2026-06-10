@@ -10,7 +10,7 @@ Penflow is a deterministic Python CLI for Pencil `.pen` design contracts. It par
 
 Penflow exits non-zero on **warning-severity issues by default**. Errors always fail; warnings fail unless you pass the global `--lenient` flag (accepted before or after the subcommand on every validating command):
 
-- Applies to `validate-pen`, `validate-flow-specs`, `validate-flow-contract`, `validate-semantic-tree`, `validate-actual`, `validate-flow`, `validate-screen`, `validate-code-ir`, `validate-report`, `compare-tree`, `detect-drift`, `lint-tokens`, `check-consistency`, `export-expected`, `ci`.
+- Applies to `validate-pen`, `validate-flow-specs`, `validate-flow-contract`, `validate-semantic-tree`, `validate-actual`, `validate-flow`, `validate-screen`, `validate-code-ir`, `validate-report`, `compare-tree`, `detect-drift`, `lint-tokens`, `check-consistency`, `audit-visual`, `export-expected`, `ci`.
 - `compare-tree` and `ci` default threshold is **0.98** (was 0.9). `--lenient` restores the 0.9 default; an explicit `--threshold` always wins.
 - `export-semantic-tree`, `reverse-pen`, and `extract-tokens` now report issues and exit 1 on them (previously always exit 0). `reverse-pen` flags every generated artifact still containing `[NEEDS CLARIFICATION]` as `reverse.clarification_needed`; `extract-tokens` flags uninterpretable values as `tokens.value.unparsed`.
 - `detect-drift` carries blocking data: each issue has a `blocking` boolean (`BLOCKING_DRIFT_CODES` = `drift.semantic_tree_invalid`, `drift.semantic_node_missing_in_pen`, `drift.pencil_context_obsolete`, `drift.clarification_marker`), the summary has a `blocking` count, and the report status gains `BLOCKED`. **Blocking issues exit 1 even with `--lenient`.**
@@ -32,6 +32,7 @@ penflow inspect examples/demo/ui.pen
 penflow validate-pen examples/demo/ui.pen
 penflow export-expected examples/demo/ui.pen -o expected-ui-tree.json
 penflow check-consistency expected-ui-tree.json --out consistency-report.json [--group-by role|role+intent]
+penflow audit-visual expected-ui-tree.json --theme-css theme.css --out visual-metrics-report.json
 penflow validate-actual examples/demo/actual-ui-tree.json [--schema]
 penflow validate-flow-contract examples/full/flow-ui-contract/contract.json --json
 penflow export-semantic-tree path/to/flow-ui-contract/contract.json --out semantic-ui-tree.json

@@ -56,6 +56,7 @@ from .token_lint import (
     lint_tokens,
 )
 from .tree import load_tree, validate_actual_tree, write_expected_tree
+from .visual_metrics import audit_visual, write_visual_metrics_report
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -233,6 +234,20 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_lenient(consistency)
     consistency.set_defaults(func=cmd_check_consistency)
+
+    visual_metrics = sub.add_parser(
+        "audit-visual",
+        help="audit deterministic visual metrics (contrast, touch targets, geometry)"
+        " in an expected UI tree",
+    )
+    visual_metrics.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    visual_metrics.add_argument("expected")
+    visual_metrics.add_argument(
+        "--theme-css", default=None, help="project theme.css resolving $pf-* fill references"
+    )
+    visual_metrics.add_argument("-o", "--out", default="visual-metrics-report.json")
+    _add_lenient(visual_metrics)
+    visual_metrics.set_defaults(func=cmd_audit_visual)
 
     flow = sub.add_parser("validate-flow", help="validate flow contract")
     flow.add_argument("--json", action="store_true", help="print machine-readable JSON")
@@ -573,6 +588,35 @@ def cmd_check_consistency(args: argparse.Namespace) -> int:
         raise PenflowError(str(error)) from error
     if args.out:
         write_consistency_report(report, args.out)
+    code = _exit_code(report["issues"], _is_lenient(args))
+    _print(
+        {
+            "status": _status(code),
+            "issues": len(report["issues"]),
+            "out": args.out,
+        },
+        args.json,
+    )
+    return code
+
+
+def cmd_audit_visual(args: argparse.Namespace) -> int:
+    # @spec FR-007: audit-visual CLI with exit codes 0/1/2 — .specs/features/050-deterministic-visual-metrics-audit/spec.md#fr-007
+    tree_path = Path(args.expected)
+    if not tree_path.exists():
+        raise PenflowError(f"expected tree not found: {tree_path}")
+    try:
+        theme = load_theme(args.theme_css) if args.theme_css else None
+    except FileNotFoundError as error:
+        raise PenflowError(str(error)) from error
+    try:
+        report = audit_visual(tree_path, theme=theme, theme_css=args.theme_css)
+    except json.JSONDecodeError as error:
+        raise PenflowError(f"expected tree is not valid JSON: {tree_path}: {error}") from error
+    except ValueError as error:
+        raise PenflowError(str(error)) from error
+    if args.out:
+        write_visual_metrics_report(report, args.out)
     code = _exit_code(report["issues"], _is_lenient(args))
     _print(
         {
@@ -969,6 +1013,11 @@ def _report_schema_name(report: dict[str, Any], filename: str) -> str:
     if kind == "penflow-consistency-report":
         # @spec FR-004: Strict consistency report schema registration — .specs/features/047-cross-screen-consistency-check/spec.md#fr-004
         return "consistency-report.schema.json"
+    if kind == "penflow-visual-metrics-report":
+        # @spec FR-007: Strict visual metrics report schema registration — .specs/features/050-deterministic-visual-metrics-audit/spec.md#fr-007
+        # Must match by kind: the filename heuristic below would route
+        # "visual-metrics-report.json" to the mockup visual-report schema.
+        return "visual-metrics-report.schema.json"
     if "compare" in filename or {"score", "summary", "issues"}.issubset(report):
         return "compare-report.schema.json"
     if "visual" in filename:
