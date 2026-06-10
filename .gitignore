@@ -23,6 +23,8 @@ build/
 .claude/skills/spec-*
 .codex/agents/livespec-*.toml
 .specs/.livespec-path
+.specs/.LOCK
+.specs/hooks/.commit-context.json
 .specs/.runs/
 .specs/.previews/
 .specs/preflight-report.md
