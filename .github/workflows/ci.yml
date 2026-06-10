@@ -54,7 +54,7 @@ jobs:
         id: changed-src
         uses: tj-actions/changed-files@48d8f15b2aaa3d255ca5af3eba4870f807ce6b3c
         with:
-          separator: "\n"
+          separator: " "
           files: |
             **/*.py
 
@@ -76,7 +76,7 @@ jobs:
           if [ "$CFG_CHANGED" = "true" ]; then
             ruff format --check .
           elif [ -n "$SRC_FILES" ]; then
-            mapfile -t files <<< "$SRC_FILES"
+            read -r -a files <<< "$SRC_FILES"
             ruff format --check "${files[@]}"
           else
             echo "No Python changes, skipping format check."
@@ -91,7 +91,7 @@ jobs:
           if [ "$CFG_CHANGED" = "true" ]; then
             ruff check .
           elif [ -n "$SRC_FILES" ]; then
-            mapfile -t files <<< "$SRC_FILES"
+            read -r -a files <<< "$SRC_FILES"
             ruff check "${files[@]}"
           else
             echo "No Python changes, skipping lint."
