@@ -8,6 +8,7 @@ from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any
 
+from .schema_cache import load_schema
 
 INTERACTIVE_ROLES = {"button", "link", "input", "select", "toggle", "form"}
 PASSIVE_STRUCTURE_ROLES = {"screen", "container", "component", "section", "shape"}
@@ -379,7 +380,7 @@ def _walk_node(
 
 
 def _allowed_roles() -> set[str]:
-    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    schema = load_schema(SCHEMA_PATH.name)
     return set(schema["$defs"]["semanticNode"]["properties"]["role"]["enum"])
 
 

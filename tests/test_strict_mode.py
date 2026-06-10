@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import penflow.contracts
+import penflow.schema_cache
 import penflow.tree
 from penflow.cli import main
 from penflow.compare import LENIENT_THRESHOLD, STRICT_THRESHOLD
@@ -148,8 +149,11 @@ def test_jsonschema_is_a_hard_dependency() -> None:
     assert not hasattr(penflow.tree, "_validate_actual_tree_schema_minimal")
     assert not hasattr(penflow.tree, "_validate_node_schema_minimal")
     assert not hasattr(penflow.contracts, "_validate_code_ir_minimal")
-    assert hasattr(penflow.tree, "Draft202012Validator")
-    assert hasattr(penflow.contracts, "Draft202012Validator")
+    # Feature 054 moved validator construction into the shared schema cache;
+    # tree/contracts route through it, so the hard-dependency anchor lives there.
+    assert hasattr(penflow.schema_cache, "Draft202012Validator")
+    assert hasattr(penflow.tree, "validator_for")
+    assert hasattr(penflow.contracts, "validator_for")
 
 
 def test_validate_pen_warning_only_fails_strict_passes_lenient(tmp_path: Path) -> None:

@@ -49,6 +49,7 @@ from .semantic_draft import write_pen_draft_from_semantic_tree
 from .semantic_enrichment import enrich_pen_from_semantic_tree
 from .semantic_mapping import write_pencil_context_map
 from .semantic_validation import validate_semantic_tree, validate_semantic_tree_file
+from .schema_cache import load_schema
 from .theme import load_theme
 from .token_lint import (
     DEFAULT_FONTSIZE_SCALE,
@@ -950,8 +951,7 @@ def _validate_report_schema(report: Any, report_path: str | Path) -> list[dict[s
     if not isinstance(report, dict):
         return [{"severity": "error", "path": "$", "message": "report must be an object"}]
     schema_name = _report_schema_name(report, Path(report_path).name)
-    schema_path = Path(__file__).parent / "schemas" / schema_name
-    schema = load_tree(schema_path)
+    schema = load_schema(schema_name)
     return _validate_json_schema_subset(report, schema, "$")
 
 

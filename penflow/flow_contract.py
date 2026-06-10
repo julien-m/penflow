@@ -7,6 +7,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from .schema_cache import load_schema
+
 ID_RE = re.compile(r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$")
 BINDING_RE = re.compile(r"^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$")
 INTERACTIVE_ROLES = {"button", "link", "input", "select", "toggle", "form", "component"}
@@ -69,7 +71,7 @@ def contract_registries(contract: dict[str, Any]) -> dict[str, Any]:
 
 
 def _validate_schema(contract: dict[str, Any], issues: list[dict[str, Any]]) -> None:
-    schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    schema = load_schema(SCHEMA_PATH.name)
     _validate_schema_subset(contract, schema, "$", schema.get("$defs", {}), issues)
 
 

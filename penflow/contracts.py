@@ -6,8 +6,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from jsonschema import Draft202012Validator
-
 from .context import Context, format_context_string, infer_role
 from .flow_contract import (
     FlowContractValidationError,
@@ -16,6 +14,7 @@ from .flow_contract import (
 )
 from .models import PenNode
 from .pen import load_pen, parse_pen, update_pen_by_semantic_id
+from .schema_cache import validator_for
 
 
 def validate_flow_contract(flow: dict[str, Any]) -> list[dict[str, Any]]:
@@ -394,9 +393,7 @@ def validate_code_ir(ir: dict[str, Any]) -> list[dict[str, Any]]:
     means the IR is valid. ``jsonschema`` is a hard dependency (feature 049);
     the full draft 2020-12 validator is the only validation path.
     """
-    schema_path = Path(__file__).parent / "schemas" / "code-ir.schema.json"
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    validator = Draft202012Validator(schema)
+    validator = validator_for("code-ir.schema.json")
     issues: list[dict[str, Any]] = []
     for error in sorted(validator.iter_errors(ir), key=lambda err: list(err.absolute_path)):
         issues.append(
