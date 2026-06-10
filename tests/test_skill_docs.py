@@ -226,8 +226,8 @@ def test_mockup_factory_skill_is_penflow_local_and_tree_aware() -> None:
         "screen_id",
         "semantic_id",
         "pencil_node_id",
-        "Contract gate",
-        "UX/UI gate",
+        "Quality Gate",
+        "gate table",
     ):
         assert phrase in combined
 
@@ -362,6 +362,84 @@ def test_mockup_factory_rubric_covers_guided_optimizer_gate() -> None:
         "critical UX/UI issues",
     ):
         assert phrase in combined
+
+
+# @spec AC-001, AC-002: prescriptive gate table + single Critical definition — .specs/features/052-prescriptive-rubric-bounded-fix-loop/spec.md
+def test_mockup_factory_rubric_maps_every_category_to_a_scripted_gate() -> None:
+    rubric = MOCKUP_RUBRIC.read_text(encoding="utf-8")
+
+    for phrase in (
+        "penflow lint-tokens",
+        "penflow check-consistency",
+        "penflow audit-visual",
+        "penflow detect-drift",
+        "penflow compare-tree",
+        "penflow validate-visual-evidence",
+        "exit 0",
+        "summary.blocking == 0",
+        "0.98",
+        "`blocking: true`",
+        "error severity",
+        "error-severity",
+        "Critical — Single Definition",
+        "Advisory UX Notes — Never Decide PASS/FAIL",
+        "penflow-mockup-audit",
+        "penflow validate-report",
+        "no `--lenient` in the canonical chain",
+        "BLOCKED_VISUAL_NOT_RUN",
+    ):
+        assert phrase in rubric
+
+    for gate in (
+        "`tokens`",
+        "`consistency`",
+        "`accessibility_alignment`",
+        "`contract`",
+        "`structural_fidelity`",
+        "`balance_readability`",
+    ):
+        assert gate in rubric
+
+
+# @spec AC-003: bounded fix-re-audit loop — .specs/features/052-prescriptive-rubric-bounded-fix-loop/spec.md#ac-003
+def test_mockup_factory_workflow_bounds_the_fix_loop() -> None:
+    workflow = MOCKUP_WORKFLOW.read_text(encoding="utf-8")
+
+    for phrase in (
+        "iteration <= 3",
+        "after iteration 3",
+        "No PASS without a final clean run",
+        "Rerun the full command chain",
+        "ESCALATED",
+        "residual_issues",
+        "state.json",
+        "penflow lint-tokens",
+        "penflow check-consistency",
+        "penflow audit-visual",
+        "penflow validate-report",
+        "penflow-mockup-audit",
+        "penflow-mockup-checklist",
+        "BLOCKED_VISUAL_NOT_RUN",
+    ):
+        assert phrase in workflow
+
+
+# @spec AC-010: SKILL.md preconditions + quality gate — .specs/features/052-prescriptive-rubric-bounded-fix-loop/spec.md#ac-010
+def test_mockup_factory_skill_preconditions_include_the_three_gate_commands() -> None:
+    skill = MOCKUP_SKILL.read_text(encoding="utf-8")
+
+    for phrase in (
+        "penflow lint-tokens",
+        "penflow check-consistency",
+        "penflow audit-visual",
+        "no `--lenient` in the canonical chain",
+        "iteration <= 3",
+        "no PASS without a final clean run",
+        "penflow-mockup-audit",
+        "penflow validate-report .mockup-validation/audit-report.json --schema",
+        "single CI-able final check",
+    ):
+        assert phrase in skill
 
 
 def test_penflow_python_core_has_no_mockup_factory_runtime_dependencies() -> None:

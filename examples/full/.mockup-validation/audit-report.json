@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "kind": "penflow-mockup-audit",
+  "status": "PASSED_WITH_WARNINGS",
+  "iterations": 1,
+  "sourceFile": "examples/full/ui.pen",
+  "group": "checkout",
+  "validatedAt": "2026-06-10",
+  "gates": [
+    {
+      "gate": "tokens",
+      "command": "penflow lint-tokens ui.pen --theme-css theme.css -o token-lint-report.json --json",
+      "exit_code": 0,
+      "report_path": "token-lint-report.json",
+      "result": "pass"
+    },
+    {
+      "gate": "consistency",
+      "command": "penflow check-consistency expected-ui-tree.json -o consistency-report.json --json",
+      "exit_code": 0,
+      "report_path": "consistency-report.json",
+      "result": "pass"
+    },
+    {
+      "gate": "accessibility_alignment",
+      "command": "penflow audit-visual expected-ui-tree.json --theme-css theme.css -o visual-metrics-report.json --json",
+      "exit_code": 0,
+      "report_path": "visual-metrics-report.json",
+      "result": "pass"
+    },
+    {
+      "gate": "contract",
+      "command": "penflow detect-drift flow-ui-contract/contract.json semantic-ui-tree.json ui.pen --out drift-report.json --json",
+      "exit_code": 0,
+      "report_path": "drift-report.json",
+      "result": "pass"
+    },
+    {
+      "gate": "structural_fidelity",
+      "command": "penflow compare-tree expected-ui-tree.json actual-ui-tree.json --out compare-report.json --json",
+      "exit_code": 0,
+      "report_path": "compare-report.json",
+      "result": "pass"
+    },
+    {
+      "gate": "balance_readability",
+      "command": "penflow validate-visual-evidence .mockup-validation/visual-evidence --expected expected-ui-tree.json --json",
+      "exit_code": 0,
+      "report_path": ".mockup-validation/visual-evidence/vision-report.json",
+      "result": "pass"
+    }
+  ],
+  "residual_issues": [
+    {
+      "gate": "balance_readability",
+      "code": "vision.visual_balance.sparse",
+      "severity": "warning",
+      "blocking": false,
+      "message": "Lower half of the checkout screen is intentionally sparse in this minimal fixture.",
+      "screen_id": "checkout",
+      "semantic_id": "checkout",
+      "pencil_node_id": "checkoutScreen",
+      "report_path": ".mockup-validation/visual-evidence/vision-report.json"
+    }
+  ]
+}

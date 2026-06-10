@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "kind": "penflow-mockup-checklist",
+  "status": "PASSED_WITH_WARNINGS",
+  "sourceFile": "examples/full/ui.pen",
+  "group": "checkout",
+  "validatedAt": "2026-06-10",
+  "items": [
+    {
+      "id": "checkout-001",
+      "title": "Sparse lower half on the checkout screen",
+      "screen_id": "checkout",
+      "semantic_id": "checkout",
+      "pencil_node_id": "checkoutScreen",
+      "gate": "balance_readability",
+      "severity": "warning",
+      "blocking": false,
+      "status": "waived",
+      "evidence": "Vision pass: lower half is intentionally sparse in this minimal fixture; non-blocking.",
+      "iteration": 1
+    }
+  ]
+}
