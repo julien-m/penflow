@@ -39,6 +39,59 @@ def test_compare_tree_command_writes_reports(tmp_path: Path) -> None:
     assert json.loads(report.read_text())["status"] == "PASS"
 
 
+# @spec FR-003: spacing warnings follow strict/lenient exit policy — .specs/features/048-compare-layout-spacing-properties/spec.md#fr-003
+def test_compare_tree_command_reports_gap_drift(tmp_path: Path) -> None:
+    def screen(gap: int) -> dict:
+        return {
+            "screen_id": "checkout",
+            "viewport": {"width": 390, "height": 844},
+            "root": {
+                "id": "checkout",
+                "semantic_id": "checkout",
+                "role": "screen",
+                "bbox": {"x": 0, "y": 0, "width": 390, "height": 844},
+                "children": [
+                    {
+                        "id": "checkout.box",
+                        "semantic_id": "checkout.box",
+                        "role": "container",
+                        "bbox": {"x": 0, "y": 0, "width": 320, "height": 120},
+                        "visual": {"layout": "vertical", "gap": gap, "padding": 16},
+                    }
+                ],
+            },
+        }
+
+    expected = tmp_path / "expected.json"
+    actual = tmp_path / "actual.json"
+    report = tmp_path / "report.json"
+    expected.write_text(json.dumps({"version": 1, "screens": [screen(16)]}), encoding="utf-8")
+    actual.write_text(json.dumps({"version": 1, "screens": [screen(19)]}), encoding="utf-8")
+
+    # Strict default (feature 049): the spacing warning blocks.
+    assert main(["compare-tree", str(expected), str(actual), "--out", str(report)]) == 1
+    issues = json.loads(report.read_text())["issues"]
+    assert [issue["code"] for issue in issues] == ["node.visual.gap"]
+    assert issues[0]["severity"] == "warning"
+
+    # Lenient mode with an explicit threshold keeps the warning non-blocking.
+    assert (
+        main(
+            [
+                "compare-tree",
+                str(expected),
+                str(actual),
+                "--out",
+                str(report),
+                "--lenient",
+                "--threshold",
+                "0.4",
+            ]
+        )
+        == 0
+    )
+
+
 def test_review_and_fix_report_commands_write_json(tmp_path: Path) -> None:
     assert main(["demo", "--out", str(tmp_path)]) == 0
     expected = tmp_path / "expected-ui-tree.json"

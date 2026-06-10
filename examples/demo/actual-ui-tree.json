@@ -104,6 +104,7 @@
         "semantic_id": "checkout.pay-now",
         "text": null,
         "visual": {
+          "alignItems": "center",
           "cornerRadius": 8,
           "fill": "#0057FF",
           "gap": 8,
@@ -126,6 +127,7 @@
     "semantic_id": "checkout",
     "text": null,
     "visual": {
+      "alignItems": "stretch",
       "fill": "#FFFFFF",
       "gap": 16,
       "layout": "vertical",

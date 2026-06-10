@@ -82,9 +82,11 @@ def test_semantic_schema_does_not_add_feature_036_or_later_runtime_pipeline() ->
     # runtime adapter). Feature 047 is in scope — it ships the deterministic
     # cross-screen consistency checker (local files only, no runtime adapter).
     # Feature 049 is in scope — strict-by-default exit policy + blocking drift
-    # (shipped before 048 for dependency reasons); feature 048 remains guarded.
+    # (shipped before 048 for dependency reasons). Feature 048 is in scope —
+    # it ships layout/spacing comparison in the existing compare engine;
+    # feature 050 (visual metrics audit) remains guarded.
     future_feature_dirs: list[Path] = []
-    for feature_number in range(48, 49):
+    for feature_number in range(50, 51):
         future_feature_dirs.extend((ROOT / ".specs" / "features").glob(f"{feature_number:03d}-*"))
     assert future_feature_dirs == []
     assert not (ROOT / "penflow" / "semantic_validator.py").exists()

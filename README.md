@@ -139,6 +139,8 @@ Strict default: `reverse-pen` exits 1 while clarification markers remain (`rever
 
 After implementation, an external runtime adapter writes `actual-ui-tree.json`. Penflow validates and compares that file; it does not launch or inspect the running app.
 
+`compare-tree` checks presence, role, text, hierarchy, order, bbox (±`bbox_px`), colors, radius (±`radius_px`), typography (±`font_px`), and — feature 048 — layout properties: `layout` and `alignItems` exact-match (`node.visual.layout`, `node.visual.alignItems`), `gap` and `padding` within ±`spacing_px` (default 2; `node.visual.gap`, `node.visual.padding`). Padding forms are normalized (`16` ≡ `[16, 16]` ≡ `[16, 16, 16, 16]`). Tolerances are overridable per node via `context.tolerance` (e.g. `tolerance: {spacing_px: 4}`); absent keys are never compared, so pre-048 trees stay green.
+
 ```bash
 penflow validate-actual actual-ui-tree.json --schema --json
 penflow compare-tree expected-ui-tree.json actual-ui-tree.json --out compare-report.json --json

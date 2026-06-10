@@ -13,6 +13,6 @@ Allowed keys:
 - `test_id`: optional external test handle.
 - `mask`: skip a volatile node during structural comparison.
 - `mask_text`: ignore text drift while still comparing role, hierarchy, bbox, and visual properties.
-- `tolerance`: object with comparison tolerances such as `bbox_px`, `radius_px`, `font_px`, `order`.
+- `tolerance`: object with comparison tolerances such as `bbox_px`, `radius_px`, `font_px`, `spacing_px`, `order`.
 
 Forbidden: runtime/platform terms such as SwiftUI, React, Xcode, Playwright, Android, Dioxus, or CSS in context values.
