@@ -11,6 +11,7 @@ from typing import Any
 
 from .codegen import react, rust_dioxus, swiftui
 from .compare import compare_tree_files
+from .consistency import check_consistency, write_consistency_report
 from .contracts import (
     _raise_if_no_context,
     code_ir_from_contract,
@@ -191,6 +192,21 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument("--out", default="compare-report.json")
     compare.add_argument("--threshold", type=float, default=0.9)
     compare.set_defaults(func=cmd_compare_tree)
+
+    consistency = sub.add_parser(
+        "check-consistency",
+        help="check cross-screen component consistency in an expected UI tree",
+    )
+    consistency.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    consistency.add_argument("expected")
+    consistency.add_argument("-o", "--out", default="consistency-report.json")
+    consistency.add_argument(
+        "--group-by",
+        choices=["role", "role+intent"],
+        default=None,
+        help="coarsen the component signature (default: role+intent+variant)",
+    )
+    consistency.set_defaults(func=cmd_check_consistency)
 
     flow = sub.add_parser("validate-flow", help="validate flow contract")
     flow.add_argument("--json", action="store_true", help="print machine-readable JSON")
@@ -474,6 +490,30 @@ def cmd_compare_tree(args: argparse.Namespace) -> int:
         {
             "status": report["status"],
             "score": report["score"],
+            "out": args.out,
+        },
+        args.json,
+    )
+    return 0 if report["status"] == "PASS" else 1
+
+
+def cmd_check_consistency(args: argparse.Namespace) -> int:
+    # @spec FR-003: check-consistency CLI with exit codes 0/1/2 — .specs/features/047-cross-screen-consistency-check/spec.md#fr-003
+    tree_path = Path(args.expected)
+    if not tree_path.exists():
+        raise PenflowError(f"expected tree not found: {tree_path}")
+    try:
+        report = check_consistency(tree_path, group_by=args.group_by)
+    except json.JSONDecodeError as error:
+        raise PenflowError(f"expected tree is not valid JSON: {tree_path}: {error}") from error
+    except ValueError as error:
+        raise PenflowError(str(error)) from error
+    if args.out:
+        write_consistency_report(report, args.out)
+    _print(
+        {
+            "status": report["status"],
+            "issues": len(report["issues"]),
             "out": args.out,
         },
         args.json,
@@ -815,6 +855,9 @@ def _report_schema_name(report: dict[str, Any], filename: str) -> str:
     if kind == "penflow-token-lint-report":
         # @spec FR-005: Strict report schema registration — .specs/features/046-lint-design-tokens/spec.md#fr-005
         return "token-lint-report.schema.json"
+    if kind == "penflow-consistency-report":
+        # @spec FR-004: Strict consistency report schema registration — .specs/features/047-cross-screen-consistency-check/spec.md#fr-004
+        return "consistency-report.schema.json"
     if "compare" in filename or {"score", "summary", "issues"}.issubset(report):
         return "compare-report.schema.json"
     if "visual" in filename:

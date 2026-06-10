@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.dev/schemas/consistency-report.schema.json",
+  "title": "Penflow Consistency Report",
+  "type": "object",
+  "required": ["version", "kind", "status", "summary", "inputs", "issues"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "integer"},
+    "kind": {"const": "penflow-consistency-report"},
+    "status": {"enum": ["PASS", "FAIL"]},
+    "summary": {
+      "type": "object",
+      "required": ["errors", "warnings", "groups_checked", "nodes_checked"],
+      "additionalProperties": false,
+      "properties": {
+        "errors": {"type": "integer"},
+        "warnings": {"type": "integer"},
+        "groups_checked": {"type": "integer"},
+        "nodes_checked": {"type": "integer"}
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "required": ["expected_tree", "group_by"],
+      "additionalProperties": false,
+      "properties": {
+        "expected_tree": {"type": "string"},
+        "group_by": {"enum": ["role", "role+intent", "role+intent+variant"]}
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "code",
+          "severity",
+          "property",
+          "signature",
+          "screen_id",
+          "semantic_id",
+          "value",
+          "baseline",
+          "group_size",
+          "message"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "consistency.padding.divergent",
+              "consistency.gap.divergent",
+              "consistency.fontSize.divergent",
+              "consistency.fontWeight.divergent",
+              "consistency.fontFamily.divergent",
+              "consistency.fill.divergent",
+              "consistency.cornerRadius.divergent",
+              "consistency.bbox.height.divergent"
+            ]
+          },
+          "severity": {"enum": ["error", "warning"]},
+          "property": {
+            "enum": [
+              "padding",
+              "gap",
+              "fontSize",
+              "fontWeight",
+              "fontFamily",
+              "fill",
+              "cornerRadius",
+              "bbox.height"
+            ]
+          },
+          "signature": {"type": "string"},
+          "screen_id": {"type": "string"},
+          "semantic_id": {"type": ["string", "null"]},
+          "value": {"type": ["number", "string", "array"], "items": {"type": ["number", "string"]}},
+          "baseline": {
+            "type": ["number", "string", "array"],
+            "items": {"type": ["number", "string"]}
+          },
+          "group_size": {"type": "integer"},
+          "message": {"type": "string"}
+        }
+      }
+    }
+  }
+}

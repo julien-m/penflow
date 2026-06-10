@@ -18,6 +18,7 @@ python3 -m pip install -e ".[dev]"
 penflow inspect examples/demo/ui.pen
 penflow validate-pen examples/demo/ui.pen
 penflow export-expected examples/demo/ui.pen -o expected-ui-tree.json
+penflow check-consistency expected-ui-tree.json --out consistency-report.json [--group-by role|role+intent]
 penflow validate-actual examples/demo/actual-ui-tree.json [--schema]
 penflow validate-flow-contract examples/full/flow-ui-contract/contract.json --json
 penflow export-semantic-tree path/to/flow-ui-contract/contract.json --out semantic-ui-tree.json
