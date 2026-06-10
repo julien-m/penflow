@@ -16,11 +16,15 @@ build/
 !.conventions/index.md
 !.conventions/manifest.yaml
 
+.agent-sync.local/skills/spec-*
+.agent-sync.local/skills/source-command-cli
 .agents/skills/spec-*
+.agents/skills/source-command-cli
 .claude/agents/livespec-*.md
 .claude/rules/*.md
 .claude/rules/livespec/
 .claude/skills/spec-*
+.claude/skills/source-command-cli
 .codex/agents/livespec-*.toml
 .specs/.livespec-path
 .specs/.LOCK
