@@ -85,10 +85,12 @@ def test_semantic_schema_does_not_add_feature_036_or_later_runtime_pipeline() ->
     # (shipped before 048 for dependency reasons). Feature 048 is in scope —
     # it ships layout/spacing comparison in the existing compare engine.
     # Feature 050 is in scope — it ships the deterministic visual metrics
-    # audit (local files only, zero vision, no runtime adapter); feature 051
-    # (vision report contract) remains guarded.
+    # audit (local files only, zero vision, no runtime adapter). Feature 051
+    # is in scope — it ships the locked vision-report contract and the
+    # deterministic evidence validator (Penflow never runs vision); feature
+    # 052 (prescriptive rubric + bounded fix loop) remains guarded.
     future_feature_dirs: list[Path] = []
-    for feature_number in range(51, 52):
+    for feature_number in range(52, 53):
         future_feature_dirs.extend((ROOT / ".specs" / "features").glob(f"{feature_number:03d}-*"))
     assert future_feature_dirs == []
     assert not (ROOT / "penflow" / "semantic_validator.py").exists()

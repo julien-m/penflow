@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "kind": "penflow-vision-report",
+  "status": "PASS",
+  "renderer": "pencil-mcp",
+  "sourceFile": "examples/full/ui.pen",
+  "model": "claude-fable-5",
+  "validatedAt": "2026-06-10",
+  "screens": [
+    {
+      "screen_id": "checkout",
+      "semantic_id": "checkout",
+      "pencil_node_id": "checkoutScreen",
+      "png": "checkoutScreen.png",
+      "criteria": [
+        {
+          "category": "visual_balance",
+          "result": "pass",
+          "evidence": "Content sits in a single left-aligned column with even vertical rhythm; the sparse lower half is intentional for this minimal fixture.",
+          "blocking": false
+        },
+        {
+          "category": "rendering_artifacts",
+          "result": "pass",
+          "evidence": "The exported PNG shows no clipping, missing glyphs, broken images, or stray frame borders.",
+          "blocking": false
+        },
+        {
+          "category": "readability",
+          "result": "pass",
+          "evidence": "Title, order summary, and payment label are legible at 1x scale with clear separation from the background.",
+          "blocking": false
+        },
+        {
+          "category": "perceived_hierarchy",
+          "result": "pass",
+          "evidence": "The eye lands on the checkout title, then the order summary, then the primary pay button, matching the intended task order.",
+          "blocking": false
+        },
+        {
+          "category": "imagery_quality",
+          "result": "pass",
+          "evidence": "No raster imagery is used on this screen; vector shapes and text render crisply in the export.",
+          "blocking": false
+        }
+      ]
+    }
+  ]
+}

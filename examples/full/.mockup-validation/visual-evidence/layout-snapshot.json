@@ -1,0 +1,10 @@
+{
+  "screens": [
+    {
+      "screen_id": "checkout",
+      "pencil_node_id": "checkoutScreen",
+      "width": 390,
+      "height": 844
+    }
+  ]
+}

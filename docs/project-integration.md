@@ -193,8 +193,16 @@ When Pencil rendering is available, store proof next to the workspace:
 penflow/.mockup-validation/
   visual-evidence/
     manifest.json
-    visual-report.json
+    vision-report.json
+    layout-snapshot.json
+    visual-report.json   # legacy 044 artifact, deprecated
     checkout.png
+```
+
+Gate the packet deterministically — the gate is the exit code, not prose:
+
+```bash
+penflow validate-visual-evidence penflow/.mockup-validation/visual-evidence --expected penflow/expected-ui-tree.json --json
 ```
 
 If the renderer is unavailable, record `BLOCKED_VISUAL_NOT_RUN` or escalate; do not call the mockup visually validated from tree checks alone.

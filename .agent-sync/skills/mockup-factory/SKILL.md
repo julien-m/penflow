@@ -63,7 +63,7 @@ A themed but structurally generic output is a failure. Reject screens that ignor
 4. **Audit UX + contract:** use the rubric to identify semantic contract gaps and critical UX/UI issues. A critical issue in either category blocks PASS.
 5. **Apply guided fixes:** change only audited checklist items. No broad redesign, no unanchored "polish pass", no invented product behavior.
 6. **Revalidate anchors:** rerun the Penflow commands from Preconditions after fixes.
-7. **Run Visual Evidence Gate:** open/render the `.pen`, capture `snapshot_layout`, inspect `get_screenshot`, export PNGs, and write `.mockup-validation/visual-evidence/manifest.json` plus `visual-report.json`.
+7. **Run Visual Evidence Gate:** open/render the `.pen`, export PNGs via `export_nodes`, dump `snapshot_layout` to `layout-snapshot.json`, inspect `get_screenshot` and answer ONLY the five locked vision categories (`visual_balance`, `rendering_artifacts`, `readability`, `perceived_hierarchy`, `imagery_quality`), write `.mockup-validation/visual-evidence/manifest.json` plus `vision-report.json` (legacy `visual-report.json` is deprecated), then gate on `penflow validate-visual-evidence .mockup-validation/visual-evidence --expected expected-ui-tree.json --json` — the gate is the exit code, not prose.
 8. **Decide final state:** PASS requires valid anchors, no blocking drift, no critical UX/UI checklist items, and complete visual evidence when a renderer is available.
 
 ## Quality Gate
@@ -72,7 +72,7 @@ PASS is allowed only when both gates pass:
 
 - **Contract gate:** flow specs, semantic tree, Pencil context, expected tree, context map, and drift report validate without blocking issues.
 - **UX/UI gate:** visual alignment, hierarchy, CTA placement, density, accessibility, responsive behavior, modernity, and polish have no critical findings.
-- **Visual Evidence Gate:** every audited screen has inspected screenshot evidence, exported PNG, manifest entry, and a visual report anchored by `screen_id`, `semantic_id`, and `pencil_node_id` when available.
+- **Visual Evidence Gate:** every audited screen has inspected screenshot evidence, exported PNG, manifest entry, and a locked `vision-report.json` anchored by `screen_id`, `semantic_id`, and `pencil_node_id` when available — proven by `penflow validate-visual-evidence` exiting 0, never by prose.
 
 WARNING/PASSED_WITH_WARNINGS is allowed only for non-critical, explicitly listed UX or contract items. ESCALATED is required when a blocking contract drift or critical UX issue remains after the bounded fix loop.
 `BLOCKED_VISUAL_NOT_RUN` is required when a Pencil renderer is expected but unavailable, unless the user explicitly accepts structural-only validation.
@@ -91,7 +91,9 @@ Forbidden in Penflow Python core: importing or depending on Pencil MCP, cc-hub, 
     audit-report.json
     visual-evidence/
       manifest.json
-      visual-report.json
+      vision-report.json
+      layout-snapshot.json
+      visual-report.json   # legacy 044 artifact, deprecated
       *.png
     <group>/
       checklist.json

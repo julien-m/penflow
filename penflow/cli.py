@@ -26,6 +26,7 @@ from .contracts import (
 )
 from .demo import build_demo
 from .drift import detect_drift
+from .evidence import validate_visual_evidence
 from .flow_contract import (
     FlowContractValidationError,
     load_flow_contract_v2,
@@ -248,6 +249,21 @@ def build_parser() -> argparse.ArgumentParser:
     visual_metrics.add_argument("-o", "--out", default="visual-metrics-report.json")
     _add_lenient(visual_metrics)
     visual_metrics.set_defaults(func=cmd_audit_visual)
+
+    visual_evidence = sub.add_parser(
+        "validate-visual-evidence",
+        help="validate a Pencil visual-evidence packet"
+        " (manifest, screen PNGs, locked vision report, optional layout snapshot)",
+    )
+    visual_evidence.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    visual_evidence.add_argument("evidence_dir")
+    visual_evidence.add_argument(
+        "--expected",
+        default=None,
+        help="expected-ui-tree.json enabling screen coverage and snapshot bbox cross-checks",
+    )
+    _add_lenient(visual_evidence)
+    visual_evidence.set_defaults(func=cmd_validate_visual_evidence)
 
     flow = sub.add_parser("validate-flow", help="validate flow contract")
     flow.add_argument("--json", action="store_true", help="print machine-readable JSON")
@@ -629,6 +645,32 @@ def cmd_audit_visual(args: argparse.Namespace) -> int:
     return code
 
 
+def cmd_validate_visual_evidence(args: argparse.Namespace) -> int:
+    # @spec FR-004: validate-visual-evidence CLI with exit codes 0/1/2 — .specs/features/051-vision-report-contract-evidence-validator/spec.md#fr-004
+    directory = Path(args.evidence_dir)
+    if not directory.is_dir():
+        raise PenflowError(f"evidence directory not found: {directory}")
+    if args.expected is not None and not Path(args.expected).exists():
+        raise PenflowError(f"expected tree not found: {args.expected}")
+    try:
+        issues = validate_visual_evidence(directory, expected_tree_path=args.expected)
+    except json.JSONDecodeError as error:
+        raise PenflowError(f"expected tree is not valid JSON: {args.expected}: {error}") from error
+    except ValueError as error:
+        raise PenflowError(str(error)) from error
+    code = _exit_code(issues, _is_lenient(args))
+    _print(
+        {
+            "status": _status(code),
+            "dir": str(directory),
+            "expected": args.expected,
+            "issues": issues,
+        },
+        args.json,
+    )
+    return code
+
+
 def cmd_validate_flow(args: argparse.Namespace) -> int:
     issues = validate_flow_contract(load_tree(args.flow))
     code = _exit_code(issues, _is_lenient(args))
@@ -895,6 +937,7 @@ _SUPPORTED_REPORT_SCHEMA_KEYWORDS = frozenset(
         "description",
         "enum",
         "items",
+        "minLength",
         "properties",
         "required",
         "title",
@@ -930,6 +973,14 @@ def _validate_json_schema_subset(
     if "enum" in schema and value not in schema["enum"]:
         issues.append(
             {"severity": "error", "path": path, "message": f"expected one of {schema['enum']}"}
+        )
+    if "minLength" in schema and isinstance(value, str) and len(value) < schema["minLength"]:
+        issues.append(
+            {
+                "severity": "error",
+                "path": path,
+                "message": f"expected at least {schema['minLength']} characters",
+            }
         )
     if isinstance(value, dict):
         for key in schema.get("required", []) or []:
@@ -1018,6 +1069,9 @@ def _report_schema_name(report: dict[str, Any], filename: str) -> str:
         # Must match by kind: the filename heuristic below would route
         # "visual-metrics-report.json" to the mockup visual-report schema.
         return "visual-metrics-report.schema.json"
+    if kind == "penflow-vision-report":
+        # @spec FR-005: Strict vision report schema registration — .specs/features/051-vision-report-contract-evidence-validator/spec.md#fr-005
+        return "vision-report.schema.json"
     if "compare" in filename or {"score", "summary", "issues"}.issubset(report):
         return "compare-report.schema.json"
     if "visual" in filename:

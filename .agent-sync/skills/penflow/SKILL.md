@@ -22,7 +22,7 @@ Penflow does **not** run browsers, Xcode, simulators, Playwright, React Native, 
 
 ## Strict by Default (Feature 049 / C24)
 
-- Warning-severity issues exit 1 on every validating command (`validate-*`, `compare-tree`, `detect-drift`, `lint-tokens`, `check-consistency`, `audit-visual`, `export-expected`, `ci`); errors always exit 1. The global `--lenient` flag (before or after the subcommand) makes warnings non-blocking. `info`-severity issues never affect exit codes.
+- Warning-severity issues exit 1 on every validating command (`validate-*` including `validate-visual-evidence`, `compare-tree`, `detect-drift`, `lint-tokens`, `check-consistency`, `audit-visual`, `export-expected`, `ci`); errors always exit 1. The global `--lenient` flag (before or after the subcommand) makes warnings non-blocking. `info`-severity issues never affect exit codes.
 - `compare-tree`/`ci` default threshold is 0.98; `--lenient` restores 0.9; explicit `--threshold` always wins.
 - `export-semantic-tree`, `reverse-pen`, `extract-tokens` report issues and exit 1 on them: `reverse.clarification_needed` per generated artifact still containing `[NEEDS CLARIFICATION]`, `tokens.value.unparsed` for uninterpretable token values.
 - `detect-drift` issues carry `blocking: bool` (`BLOCKING_DRIFT_CODES`: `drift.semantic_tree_invalid`, `drift.semantic_node_missing_in_pen`, `drift.pencil_context_obsolete`, `drift.clarification_marker`); summary has a `blocking` count; status adds `BLOCKED`. Blocking issues exit 1 even with `--lenient` — gate on `summary.blocking == 0`.
@@ -71,7 +71,7 @@ Use when a user already has an application repository and asks how to adopt Penf
 
 Use when a user asks for mockup generation, audit, optimization, or `/mockup-factory` on Pencil `.pen` files.
 
-**Read** [`../mockup-factory/SKILL.md`](../mockup-factory/SKILL.md). It is the Penflow-local canonical workflow for guided UX/UI optimization. It requires `flow-ui-contract`, `semantic-ui-tree.json`, `theme.css`, `.pen`, `pencil-context-map.json`, `expected-ui-tree.json`, and `detect-drift` as deterministic anchors before any Pencil/Codex audit loop. **Read** [`../mockup-factory/references/visual-validation.md`](../mockup-factory/references/visual-validation.md) before applying the Visual Evidence Gate: layout snapshot, screenshot inspection, PNG export, manifest, and visual report when a renderer is available. UX/UI improvements must be tied to audited checklist items and `screen_id` / `semantic_id` / `pencil_node_id` when available.
+**Read** [`../mockup-factory/SKILL.md`](../mockup-factory/SKILL.md). It is the Penflow-local canonical workflow for guided UX/UI optimization. It requires `flow-ui-contract`, `semantic-ui-tree.json`, `theme.css`, `.pen`, `pencil-context-map.json`, `expected-ui-tree.json`, and `detect-drift` as deterministic anchors before any Pencil/Codex audit loop. **Read** [`../mockup-factory/references/visual-validation.md`](../mockup-factory/references/visual-validation.md) before applying the Visual Evidence Gate: layout snapshot dump, screenshot inspection over the five locked vision categories, PNG export, manifest, and `vision-report.json` when a renderer is available — gated by `penflow validate-visual-evidence` exit 0, not prose. UX/UI improvements must be tied to audited checklist items and `screen_id` / `semantic_id` / `pencil_node_id` when available.
 
 ## Forward Mode
 
@@ -94,6 +94,14 @@ penflow validate-code-ir code-ir.json --json
 Legacy route phrase for old docs/tests: `penflow export-semantic-tree examples/full/flow-ui-contract --out semantic-ui-tree.json --json`.
 
 `audit-visual` (feature 050) computes deterministic visual metrics from the expected tree, zero vision: WCAG AA contrast via parent-walk backgrounds (`visual.contrast.below_aa` error; 3:1 for fontSize ≥ 24 or ≥ 18 bold, else 4.5:1), touch targets on interactive roles (`visual.touch_target.too_small` — error < 24px, warning 24–43px; ≥ 44px passes; zero-sized drafts emit `visual.bbox.unmeasured` info), sibling overlap / parent overflow beyond 1px (`visual.bbox.overlap`, `visual.bbox.overflow`, errors), heuristic text overflow (`visual.text.likely_overflow` warning), and unparseable fills (`visual.color.unparsed` info). `$pf-*` fills resolve via `--theme-css`.
+
+`validate-visual-evidence` (feature 051) deterministically gates the skill-layer visual evidence packet — Penflow never runs vision, it validates that vision happened:
+
+```bash
+penflow validate-visual-evidence .mockup-validation/visual-evidence --expected expected-ui-tree.json --json
+```
+
+Checks: `manifest.json` validates, every manifest screen PNG exists non-empty, `vision-report.json` (`kind: penflow-vision-report`) validates against the locked category enum (`visual_balance`, `rendering_artifacts`, `readability`, `perceived_hierarchy`, `imagery_quality` — deterministic categories like contrast/touch targets/overflow are rejected by schema), every screen answers all five categories, every expected-tree screen is covered (`evidence.screen.uncovered`), and an optional `layout-snapshot.json` matches expected root bboxes within ±4px (`evidence.snapshot.bbox_mismatch`). All issues are errors; exit 0 is the only PASS. The vision report also validates standalone via `penflow validate-report vision-report.json --schema --json`.
 
 ## Pencil Enrichment Mode
 
