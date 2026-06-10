@@ -17,8 +17,7 @@ import json
 from pathlib import Path
 from typing import Any, TypeGuard
 
-from jsonschema import Draft202012Validator
-
+from .schema_cache import validator_for
 from .tree import load_tree
 
 VISION_REPORT_KIND = "penflow-vision-report"
@@ -156,9 +155,7 @@ def _schema_issues(
     value: dict[str, Any], schema_name: str, code: str, artifact: str
 ) -> list[dict[str, Any]]:
     # @spec FR-001: Locked vision-report schema enforcement — .specs/features/051-vision-report-contract-evidence-validator/spec.md#fr-001
-    schema_path = Path(__file__).parent / "schemas" / schema_name
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    validator = Draft202012Validator(schema)
+    validator = validator_for(schema_name)
     formatted = [
         _issue(code, _json_path(error.absolute_path), f"{artifact}: {error.message}")
         for error in validator.iter_errors(value)

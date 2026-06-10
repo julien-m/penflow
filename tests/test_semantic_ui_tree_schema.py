@@ -93,10 +93,12 @@ def test_semantic_schema_does_not_add_feature_036_or_later_runtime_pipeline() ->
     # loop, no new runtime). Feature 053 is in scope — it ships the
     # cross-mockup coherence contact sheet (optional strict coherence section
     # in the vision report, multi-screen requirement in the evidence
-    # validator; the contact sheet renders at the skill layer); feature 054
-    # remains guarded.
+    # validator; the contact sheet renders at the skill layer). Feature 054 is
+    # in scope — it ships direct unit coverage for codegen/context/llm/models/
+    # demo plus the bundled-schema cache (no new CLI surface, no runtime
+    # adapter); feature 055 remains guarded.
     future_feature_dirs: list[Path] = []
-    for feature_number in range(54, 55):
+    for feature_number in range(55, 56):
         future_feature_dirs.extend((ROOT / ".specs" / "features").glob(f"{feature_number:03d}-*"))
     assert future_feature_dirs == []
     assert not (ROOT / "penflow" / "semantic_validator.py").exists()

@@ -7,10 +7,9 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from jsonschema import Draft202012Validator
-
 from .models import PenNode
 from .pen import parse_pen, validate_pen_context
+from .schema_cache import validator_for
 
 REQUIRED_ACTUAL_NODE_KEYS = {"id", "role", "bbox"}
 REQUIRED_BBOX_KEYS = {"x", "y", "width", "height"}
@@ -101,11 +100,9 @@ def _validate_actual_tree_schema(tree: Any) -> list[dict[str, Any]]:
     by ``(absolute_path, message)`` so the merged list is reproducible across
     runs.
     """
-    schema_path = Path(__file__).parent / "schemas" / "actual-ui-tree.schema.json"
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
     if not isinstance(tree, dict):
         return [_issue("error", "$", "actual tree must be an object")]
-    validator = Draft202012Validator(schema)
+    validator = validator_for("actual-ui-tree.schema.json")
     raw_errors = list(validator.iter_errors(tree))
     formatted: list[dict[str, Any]] = []
     for error in raw_errors:
