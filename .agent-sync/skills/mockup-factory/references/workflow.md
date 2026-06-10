@@ -11,7 +11,7 @@
 7. Freeze a checklist whose items reference `screen_id` plus `semantic_id` or `pencil_node_id` when available.
 8. Fix only checklist items; no broad redesign and no invented product behavior.
 9. Re-run the full Penflow command chain before PASS.
-10. Run the Visual Evidence Gate from **Read** [`visual-validation.md`](visual-validation.md): capture layout snapshot, screenshot, exported PNGs, manifest, and visual report.
+10. Run the Visual Evidence Gate from **Read** [`visual-validation.md`](visual-validation.md): export PNGs, dump the layout snapshot, run the vision pass over the five locked categories, write manifest plus `vision-report.json`, then require `penflow validate-visual-evidence <dir> --expected expected-ui-tree.json` to exit 0 — the gate is the exit code, not prose.
 
 ## Anchor Rules
 

@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://penflow.dev/schemas/mockup-validation-visual-report.schema.json",
   "title": "Penflow Mockup Validation Visual Report",
+  "description": "Legacy feature 044 visual report. Deprecated in favor of the C26 vision report (vision-report.schema.json) whose categories are locked to vision-only questions; kept for existing evidence packets.",
   "type": "object",
   "required": ["status", "renderer", "sourceFile", "screens"],
   "additionalProperties": false,
@@ -39,7 +40,7 @@
               "additionalProperties": false,
               "properties": {
                 "category": {"type": "string"},
-                "result": {"type": "string"},
+                "result": {"enum": ["PASS", "WARNING", "FAIL"]},
                 "finding": {"type": "string"}
               }
             }

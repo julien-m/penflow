@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.dev/schemas/vision-report.schema.json",
+  "title": "Penflow Vision Report",
+  "description": "Skill-layer vision pass results locked to vision-only categories. Deterministic categories (contrast, touch targets, overlap/overflow, tokens, consistency) belong to penflow audit-visual / lint-tokens / check-consistency and are rejected here.",
+  "type": "object",
+  "required": ["version", "kind", "status", "renderer", "sourceFile", "model", "screens"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "integer"},
+    "kind": {"const": "penflow-vision-report"},
+    "status": {"enum": ["PASS", "PASSED_WITH_WARNINGS", "FAIL", "BLOCKED_VISUAL_NOT_RUN"]},
+    "renderer": {"type": "string"},
+    "sourceFile": {"type": "string"},
+    "model": {"type": "string"},
+    "validatedAt": {"type": "string"},
+    "screens": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["screen_id", "png", "criteria"],
+        "additionalProperties": false,
+        "properties": {
+          "screen_id": {"type": "string"},
+          "semantic_id": {"type": "string"},
+          "pencil_node_id": {"type": "string"},
+          "png": {"type": "string"},
+          "criteria": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["category", "result", "evidence", "blocking"],
+              "additionalProperties": false,
+              "properties": {
+                "category": {
+                  "enum": [
+                    "visual_balance",
+                    "rendering_artifacts",
+                    "readability",
+                    "perceived_hierarchy",
+                    "imagery_quality"
+                  ]
+                },
+                "result": {"enum": ["pass", "fail", "warning"]},
+                "evidence": {"type": "string", "minLength": 10},
+                "blocking": {"type": "boolean"}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

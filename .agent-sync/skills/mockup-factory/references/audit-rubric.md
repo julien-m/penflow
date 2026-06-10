@@ -31,8 +31,8 @@ Critical failures in any category block PASS. Cosmetic issues may remain only as
 Final PASS must be backed by **Read** [`visual-validation.md`](visual-validation.md). The reviewer must inspect the actual Pencil-rendered screen and record:
 
 - screenshot/PNG path for each screen;
-- layout snapshot result, including overlap and overflow status;
-- whether text fits, CTA placement is visible, and target sizes are acceptable;
+- layout snapshot dump (`layout-snapshot.json`) for the deterministic bbox cross-check;
+- a `vision-report.json` answering only the five locked vision categories (`visual_balance`, `rendering_artifacts`, `readability`, `perceived_hierarchy`, `imagery_quality`) with one evidence sentence each;
 - warnings for sparse density, missing responsive variants, or non-critical polish gaps.
 
-If no screenshot/export exists, the audit is incomplete even when tree validation passes.
+Deterministic facts (contrast, target sizes, overlap/overflow, text fit) come from `penflow audit-visual`, not from the vision pass. The visual evidence verdict is the `penflow validate-visual-evidence` exit code; if no screenshot/export exists, the audit is incomplete even when tree validation passes.

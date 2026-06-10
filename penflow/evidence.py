@@ -1,0 +1,358 @@
+"""Deterministic visual-evidence packet validator.
+
+Penflow NEVER runs vision, Pencil, or any renderer. The vision pass lives at
+the skill layer (mockup-factory); this module only proves — from local files —
+that the pass happened in a structured, complete, non-overlapping way:
+the manifest validates, every screen PNG exists non-empty, the vision report
+validates against the locked vision-only category enum, every expected-tree
+screen is covered, and an optional layout snapshot matches the expected
+root bboxes within tolerance.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any, TypeGuard
+
+from jsonschema import Draft202012Validator
+
+from .tree import load_tree
+
+VISION_REPORT_KIND = "penflow-vision-report"
+VISION_REPORT_VERSION = 1
+
+# The locked vision-only categories (C26). Deterministic ground — contrast,
+# touch targets, overlap/overflow, tokens, consistency — belongs to
+# audit-visual / lint-tokens / check-consistency (features 046/047/050) and is
+# rejected by the vision-report schema enum.
+VISION_CATEGORIES = (
+    "visual_balance",
+    "rendering_artifacts",
+    "readability",
+    "perceived_hierarchy",
+    "imagery_quality",
+)
+
+# Rendering-evidence tolerance for the layout snapshot cross-check; looser
+# than compare-tree runtime tolerances because Pencil export rounding is not
+# runtime drift.
+SNAPSHOT_TOLERANCE_PX = 4.0
+
+MANIFEST_FILENAME = "manifest.json"
+VISION_REPORT_FILENAME = "vision-report.json"
+LAYOUT_SNAPSHOT_FILENAME = "layout-snapshot.json"
+
+_MANIFEST_SCHEMA = "mockup-validation-manifest.schema.json"
+_VISION_REPORT_SCHEMA = "vision-report.schema.json"
+
+
+def validate_visual_evidence(
+    evidence_dir: str | Path,
+    *,
+    expected_tree_path: str | Path | None = None,
+) -> list[dict[str, Any]]:
+    # @spec FR-002: Deterministic evidence packet validation — .specs/features/051-vision-report-contract-evidence-validator/spec.md#fr-002
+    """Validate a `.mockup-validation/visual-evidence/` packet deterministically.
+
+    Args:
+        evidence_dir: Directory containing `manifest.json`, screen PNGs,
+            `vision-report.json`, and optionally `layout-snapshot.json`.
+        expected_tree_path: Optional `expected-ui-tree.json` (feature 006
+            shape) enabling screen-coverage and snapshot bbox cross-checks.
+
+    Returns:
+        A deterministically sorted list of issues, each
+        ``{code, severity, path, message}``. All evidence issues are
+        ``error`` severity: a packet is either provably complete or it fails.
+
+    Raises:
+        FileNotFoundError: If ``evidence_dir`` is not a directory.
+        ValueError: If the expected tree is malformed (fail closed, exit 2 at
+            the CLI layer).
+    """
+    directory = Path(evidence_dir)
+    if not directory.is_dir():
+        raise FileNotFoundError(f"evidence directory not found: {directory}")
+    expected_screens: list[dict[str, Any]] = []
+    if expected_tree_path is not None:
+        expected_screens = _load_expected_screens(expected_tree_path)
+
+    issues: list[dict[str, Any]] = []
+    manifest = _load_artifact(
+        directory / MANIFEST_FILENAME, "evidence.manifest", _MANIFEST_SCHEMA, issues
+    )
+    vision_report = _load_artifact(
+        directory / VISION_REPORT_FILENAME, "evidence.vision_report", _VISION_REPORT_SCHEMA, issues
+    )
+    issues.extend(_png_issues(directory, manifest))
+    issues.extend(_category_issues(vision_report))
+    if expected_tree_path is not None:
+        issues.extend(_coverage_issues(expected_screens, manifest, MANIFEST_FILENAME))
+        issues.extend(_coverage_issues(expected_screens, vision_report, VISION_REPORT_FILENAME))
+    issues.extend(_snapshot_issues(directory, expected_screens))
+    issues.sort(key=_issue_sort_key)
+    return issues
+
+
+def _load_expected_screens(expected_tree_path: str | Path) -> list[dict[str, Any]]:
+    tree = load_tree(expected_tree_path)
+    if not isinstance(tree, dict) or not isinstance(tree.get("screens"), list):
+        raise ValueError(
+            f"expected tree must be an object with a screens list: {expected_tree_path}"
+        )
+    screens: list[dict[str, Any]] = []
+    for index, screen in enumerate(tree["screens"]):
+        if not isinstance(screen, dict):
+            raise ValueError(f"screens[{index}] must be an object: {expected_tree_path}")
+        screens.append(screen)
+    return screens
+
+
+def _load_artifact(
+    path: Path,
+    code_prefix: str,
+    schema_name: str,
+    issues: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Load and schema-validate one JSON artifact, appending issues in place.
+
+    Returns the parsed object when it is a JSON object (even if schema
+    violations were recorded), so downstream structural checks can still run.
+    """
+    if not path.is_file():
+        issues.append(
+            _issue(f"{code_prefix}.missing", "$", f"{path.name} not found in evidence directory")
+        )
+        return None
+    try:
+        parsed = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        issues.append(
+            _issue(f"{code_prefix}.invalid", "$", f"{path.name} is not valid JSON: {error}")
+        )
+        return None
+    if not isinstance(parsed, dict):
+        issues.append(_issue(f"{code_prefix}.invalid", "$", f"{path.name} must be a JSON object"))
+        return None
+    issues.extend(_schema_issues(parsed, schema_name, f"{code_prefix}.invalid", path.name))
+    return parsed
+
+
+def _schema_issues(
+    value: dict[str, Any], schema_name: str, code: str, artifact: str
+) -> list[dict[str, Any]]:
+    # @spec FR-001: Locked vision-report schema enforcement — .specs/features/051-vision-report-contract-evidence-validator/spec.md#fr-001
+    schema_path = Path(__file__).parent / "schemas" / schema_name
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    validator = Draft202012Validator(schema)
+    formatted = [
+        _issue(code, _json_path(error.absolute_path), f"{artifact}: {error.message}")
+        for error in validator.iter_errors(value)
+    ]
+    formatted.sort(key=lambda item: (item["path"], item["message"]))
+    return formatted
+
+
+def _json_path(absolute_path: Any) -> str:
+    return "$" + "".join(
+        f".{part}" if isinstance(part, str) else f"[{part}]" for part in absolute_path
+    )
+
+
+def _png_issues(directory: Path, manifest: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Every manifest screen PNG must exist and be non-empty on disk."""
+    if manifest is None or not isinstance(manifest.get("screens"), list):
+        return []
+    issues: list[dict[str, Any]] = []
+    for index, screen in enumerate(manifest["screens"]):
+        if not isinstance(screen, dict):
+            continue
+        png = screen.get("png")
+        if not isinstance(png, str) or not png:
+            continue  # the manifest schema already flags the malformed entry
+        path = directory / png
+        json_path = f"$.screens[{index}].png"
+        if not path.is_file():
+            issues.append(
+                _issue("evidence.png.missing", json_path, f"exported PNG not found: {png}")
+            )
+        elif path.stat().st_size == 0:
+            issues.append(_issue("evidence.png.empty", json_path, f"exported PNG is empty: {png}"))
+    return issues
+
+
+def _category_issues(vision_report: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """A vision pass must answer all five locked categories per screen."""
+    if vision_report is None or not isinstance(vision_report.get("screens"), list):
+        return []
+    issues: list[dict[str, Any]] = []
+    for index, screen in enumerate(vision_report["screens"]):
+        if not isinstance(screen, dict) or not isinstance(screen.get("criteria"), list):
+            continue
+        answered = {
+            criterion.get("category")
+            for criterion in screen["criteria"]
+            if isinstance(criterion, dict)
+        }
+        screen_id = screen.get("screen_id")
+        for category in VISION_CATEGORIES:
+            if category not in answered:
+                issues.append(
+                    _issue(
+                        "evidence.vision.category_missing",
+                        f"$.screens[{index}].criteria",
+                        f"screen {screen_id!r} does not answer vision category {category!r}",
+                    )
+                )
+    return issues
+
+
+def _coverage_issues(
+    expected_screens: list[dict[str, Any]],
+    artifact: dict[str, Any] | None,
+    artifact_name: str,
+) -> list[dict[str, Any]]:
+    """Every expected-tree screen must appear in the evidence artifact."""
+    if artifact is None or not isinstance(artifact.get("screens"), list):
+        return []  # missing/unparseable artifacts already surfaced their own error
+    covered: set[str] = set()
+    for screen in artifact["screens"]:
+        if isinstance(screen, dict):
+            covered.update(_evidence_screen_ids(screen))
+    issues: list[dict[str, Any]] = []
+    for index, screen in enumerate(expected_screens):
+        ids = _expected_screen_ids(screen)
+        if ids and not (set(ids) & covered):
+            issues.append(
+                _issue(
+                    "evidence.screen.uncovered",
+                    f"$.screens[{index}]",
+                    f"expected screen {ids[0]!r} is not covered by {artifact_name}",
+                )
+            )
+    return issues
+
+
+def _snapshot_issues(
+    directory: Path, expected_screens: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    # @spec FR-003: Optional layout snapshot cross-check ±4px — .specs/features/051-vision-report-contract-evidence-validator/spec.md#fr-003
+    path = directory / LAYOUT_SNAPSHOT_FILENAME
+    if not path.is_file():
+        return []
+    try:
+        snapshot = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        return [_issue("evidence.snapshot.invalid", "$", f"{path.name} is not valid JSON: {error}")]
+    if not isinstance(snapshot, dict) or not isinstance(snapshot.get("screens"), list):
+        return [
+            _issue(
+                "evidence.snapshot.invalid",
+                "$",
+                f"{path.name} must be an object with a screens list",
+            )
+        ]
+    issues: list[dict[str, Any]] = []
+    for index, screen in enumerate(snapshot["screens"]):
+        json_path = f"$.screens[{index}]"
+        if not isinstance(screen, dict):
+            issues.append(
+                _issue("evidence.snapshot.invalid", json_path, "snapshot screen must be an object")
+            )
+            continue
+        screen_id = screen.get("screen_id")
+        width = screen.get("width")
+        height = screen.get("height")
+        if (
+            not isinstance(screen_id, str)
+            or not _is_finite_number(width)
+            or not _is_finite_number(height)
+        ):
+            issues.append(
+                _issue(
+                    "evidence.snapshot.invalid",
+                    json_path,
+                    "snapshot screen requires screen_id (string), width and height (numbers)",
+                )
+            )
+            continue
+        snapshot_width = float(width)
+        snapshot_height = float(height)
+        snapshot_ids = {screen_id}
+        pencil_node_id = screen.get("pencil_node_id")
+        if isinstance(pencil_node_id, str):
+            snapshot_ids.add(pencil_node_id)
+        expected_bbox = _matching_expected_bbox(expected_screens, snapshot_ids)
+        if expected_bbox is None:
+            continue  # unmatched snapshot screens are ignored; coverage is checked elsewhere
+        expected_width, expected_height = expected_bbox
+        if (
+            abs(snapshot_width - expected_width) > SNAPSHOT_TOLERANCE_PX
+            or abs(snapshot_height - expected_height) > SNAPSHOT_TOLERANCE_PX
+        ):
+            issues.append(
+                _issue(
+                    "evidence.snapshot.bbox_mismatch",
+                    json_path,
+                    f"snapshot {screen_id!r} is {_fmt(snapshot_width)}x{_fmt(snapshot_height)} but the"
+                    f" expected root bbox is {_fmt(expected_width)}x{_fmt(expected_height)}"
+                    f" (tolerance {_fmt(SNAPSHOT_TOLERANCE_PX)}px)",
+                )
+            )
+    return issues
+
+
+def _matching_expected_bbox(
+    expected_screens: list[dict[str, Any]], snapshot_ids: set[str]
+) -> tuple[float, float] | None:
+    """First expected screen (document order) matching the snapshot ids wins."""
+    for screen in expected_screens:
+        if not (set(_expected_screen_ids(screen)) & snapshot_ids):
+            continue
+        root = screen.get("root")
+        bbox = root.get("bbox") if isinstance(root, dict) else None
+        if not isinstance(bbox, dict):
+            return None
+        width = bbox.get("width")
+        height = bbox.get("height")
+        if not _is_finite_number(width) or not _is_finite_number(height):
+            return None
+        if float(width) == 0.0 and float(height) == 0.0:
+            return None  # unmeasured drafted screen: nothing to cross-check
+        return float(width), float(height)
+    return None
+
+
+def _expected_screen_ids(screen: dict[str, Any]) -> list[str]:
+    """Identifier union for a feature 006 expected screen, in stable order."""
+    ids: list[str] = []
+    for key in ("screen_id", "name", "pencil_id"):
+        value = screen.get(key)
+        if isinstance(value, str) and value and value not in ids:
+            ids.append(value)
+    return ids
+
+
+def _evidence_screen_ids(screen: dict[str, Any]) -> set[str]:
+    return {
+        value
+        for key in ("screen_id", "semantic_id", "pencil_node_id")
+        if isinstance(value := screen.get(key), str) and value
+    }
+
+
+def _is_finite_number(value: Any) -> TypeGuard[int | float]:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _fmt(value: float) -> str:
+    return str(int(value)) if value == int(value) else str(value)
+
+
+def _issue(code: str, path: str, message: str) -> dict[str, Any]:
+    return {"code": code, "severity": "error", "path": path, "message": message}
+
+
+def _issue_sort_key(issue: dict[str, Any]) -> tuple[str, str, str]:
+    return (issue["code"], issue["path"], issue["message"])

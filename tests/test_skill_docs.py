@@ -270,6 +270,41 @@ def test_mockup_factory_visual_evidence_gate_is_documented() -> None:
         assert phrase in combined
 
 
+def test_visual_evidence_gate_is_the_exit_code_not_prose() -> None:
+    visual = MOCKUP_VISUAL.read_text(encoding="utf-8")
+
+    for phrase in (
+        "export_nodes",
+        "snapshot_layout",
+        "layout-snapshot.json",
+        "vision-report.json",
+        "penflow validate-visual-evidence",
+        "visual_balance",
+        "rendering_artifacts",
+        "readability",
+        "perceived_hierarchy",
+        "imagery_quality",
+        "exit code, not prose",
+        "BLOCKED_VISUAL_NOT_RUN",
+        "penflow-vision-report",
+        "evidence.screen.uncovered",
+        "evidence.snapshot.bbox_mismatch",
+    ):
+        assert phrase in visual
+
+    # Deterministic categories stay with audit-visual; vision must not absorb them.
+    assert "audit-visual" in visual
+
+    skill = MOCKUP_SKILL.read_text(encoding="utf-8")
+    workflow = MOCKUP_WORKFLOW.read_text(encoding="utf-8")
+    rubric = MOCKUP_RUBRIC.read_text(encoding="utf-8")
+    penflow_skill = PENFLOW_SKILL.read_text(encoding="utf-8")
+    root_readme = README.read_text(encoding="utf-8")
+    project_guide = PROJECT_INTEGRATION.read_text(encoding="utf-8")
+    for doc in (skill, workflow, rubric, penflow_skill, root_readme, project_guide):
+        assert "validate-visual-evidence" in doc
+
+
 def test_examples_full_visual_evidence_packet_is_real_and_anchored() -> None:
     manifest_path = EXAMPLE_VISUAL_DIR / "manifest.json"
     report_path = EXAMPLE_VISUAL_DIR / "visual-report.json"
