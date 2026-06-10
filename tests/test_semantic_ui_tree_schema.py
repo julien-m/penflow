@@ -80,8 +80,9 @@ def test_semantic_schema_does_not_add_feature_036_or_later_runtime_pipeline() ->
     # Feature 045 is in scope — strict JSON contract v2. Feature 046 is in
     # scope — it ships the deterministic token lint (local files only, no
     # runtime adapter). Feature 047 is in scope — it ships the deterministic
-    # cross-screen consistency checker (local files only, no runtime adapter);
-    # feature 048 remains guarded.
+    # cross-screen consistency checker (local files only, no runtime adapter).
+    # Feature 049 is in scope — strict-by-default exit policy + blocking drift
+    # (shipped before 048 for dependency reasons); feature 048 remains guarded.
     future_feature_dirs: list[Path] = []
     for feature_number in range(48, 49):
         future_feature_dirs.extend((ROOT / ".specs" / "features").glob(f"{feature_number:03d}-*"))

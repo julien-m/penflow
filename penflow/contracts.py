@@ -6,12 +6,15 @@ import json
 from pathlib import Path
 from typing import Any
 
+from jsonschema import Draft202012Validator
+
 from .context import Context, format_context_string, infer_role
 from .flow_contract import (
     FlowContractValidationError,
     contract_registries,
     validate_flow_contract_v2,
 )
+from .models import PenNode
 from .pen import load_pen, parse_pen, update_pen_by_semantic_id
 
 
@@ -105,7 +108,9 @@ def extract_design_tokens(
 
     Returns:
         Token summary with `colors`, `spacing`, `radius`, `typography`,
-        `proposals`, and (with `theme`) `violations`.
+        `proposals`, `issues` (`tokens.value.unparsed` warnings for values the
+        extractor cannot interpret, feature 049), and (with `theme`)
+        `violations`.
     """
     nodes = [node for root in parse_pen(pen_path) for node in root.walk()]
     tokens: dict[str, Any] = {
@@ -145,6 +150,7 @@ def extract_design_tokens(
         else (tokens["spacing"][0] if tokens["spacing"] else None),
         "base_radius": tokens["radius"][0] if tokens["radius"] else None,
     }
+    tokens["issues"] = _unparsed_token_issues(nodes)
     if theme is not None:
         # Local import to keep module load order stable (token_lint imports pen).
         from .token_lint import lint_tokens
@@ -167,6 +173,43 @@ def _spacing_values(value: Any) -> list[int | float]:
     if isinstance(value, list):
         return [item for item in value if isinstance(item, (int, float))]
     return []
+
+
+def _unparsed_token_issues(nodes: list[PenNode]) -> list[dict[str, Any]]:
+    # @spec FR-007: surface dropped token values — .specs/features/049-strict-mode-default-blocking-drift/spec.md#fr-007
+    """Report visual token values that the extractor silently drops.
+
+    `_color_values`/`_spacing_values` discard anything they cannot interpret;
+    this scan turns each dropped value into a `tokens.value.unparsed` warning
+    so `extract-tokens` can exit non-zero instead of laundering bad data.
+    """
+    issues: list[dict[str, Any]] = []
+    for node in nodes:
+        for key in ("fill", "stroke"):
+            value = node.visual.get(key)
+            if value is None:
+                continue
+            if not _color_values(value):
+                issues.append(_unparsed_token_issue(node.id, key, value))
+        for key in ("gap", "padding"):
+            value = node.visual.get(key)
+            if value is None:
+                continue
+            parsed = _spacing_values(value)
+            expected = len(value) if isinstance(value, list) else 1
+            if len(parsed) != expected:
+                issues.append(_unparsed_token_issue(node.id, key, value))
+    issues.sort(key=lambda issue: (issue["path"], issue["message"]))
+    return issues
+
+
+def _unparsed_token_issue(node_id: str, key: str, value: Any) -> dict[str, Any]:
+    return {
+        "severity": "warning",
+        "code": "tokens.value.unparsed",
+        "path": f"{node_id}.{key}",
+        "message": f"token value cannot be interpreted: {value!r}",
+    }
 
 
 def code_ir_from_contract(
@@ -348,15 +391,11 @@ def validate_code_ir(ir: dict[str, Any]) -> list[dict[str, Any]]:
     """Validate a code IR against the bundled JSON Schema.
 
     Returns a list of structured issues `{severity, path, message}`. Empty list
-    means the IR is valid. Falls back to a minimal structural check when the
-    `jsonschema` library is unavailable.
+    means the IR is valid. ``jsonschema`` is a hard dependency (feature 049);
+    the full draft 2020-12 validator is the only validation path.
     """
     schema_path = Path(__file__).parent / "schemas" / "code-ir.schema.json"
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
-    try:
-        from jsonschema import Draft202012Validator  # type: ignore[import-not-found]
-    except ImportError:
-        return _validate_code_ir_minimal(ir, schema)
     validator = Draft202012Validator(schema)
     issues: list[dict[str, Any]] = []
     for error in sorted(validator.iter_errors(ir), key=lambda err: list(err.absolute_path)):
@@ -371,31 +410,6 @@ def validate_code_ir(ir: dict[str, Any]) -> list[dict[str, Any]]:
                 error.message,
             )
         )
-    return issues
-
-
-def _validate_code_ir_minimal(ir: dict[str, Any], schema: dict[str, Any]) -> list[dict[str, Any]]:
-    issues: list[dict[str, Any]] = []
-    for key in schema.get("required", []):
-        if key not in ir:
-            issues.append(_issue("error", f"$.{key}", f"{key} is required"))
-    properties = schema.get("properties", {})
-    if "kind" in properties and ir.get("kind") != properties["kind"].get("const"):
-        issues.append(_issue("error", "$.kind", "kind must be penflow-code-ir"))
-    if "source" in properties and ir.get("source") != properties["source"].get("const"):
-        issues.append(_issue("error", "$.source", "source must be pencil-context"))
-    allowed_state_kinds = {"empty", "error", "loading"}
-    for screen in ir.get("screens", []) or []:
-        for node in _walk_ir_nodes(screen.get("root", {})):
-            for kind in node.get("state_kinds", []) or []:
-                if kind not in allowed_state_kinds:
-                    issues.append(
-                        _issue(
-                            "error",
-                            f"$.screens[].state_kinds.{kind}",
-                            f"state_kinds must be one of {sorted(allowed_state_kinds)}",
-                        )
-                    )
     return issues
 
 

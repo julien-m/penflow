@@ -84,7 +84,7 @@
         },
         "states": {"type": "array"},
         "errors": {"type": "array"},
-        "test_id": {"type": "string"},
+        "test_id": {"type": ["string", "null"]},
         "source_map": {"$ref": "#/$defs/source_map"},
         "root": {"$ref": "#/$defs/node"}
       }

@@ -215,7 +215,8 @@ def test_detect_drift_reports_missing_stale_obsolete_uncovered_and_clarification
     report = detect_drift(specs_dir, tree_path, pen_path, report_path, markdown_path=markdown_path)
     codes = {issue["code"] for issue in report["issues"]}
 
-    assert report["status"] == "DRIFT"
+    # Feature 049: blocking codes are present, so the report status is BLOCKED.
+    assert report["status"] == "BLOCKED"
     assert {
         "drift.semantic_node_missing_in_pen",
         "drift.spec_screen_not_in_tree",
@@ -226,7 +227,18 @@ def test_detect_drift_reports_missing_stale_obsolete_uncovered_and_clarification
     } <= codes
     assert any(issue.get("semantic_id") == "checkout.help" for issue in report["issues"])
     assert any(issue.get("pencil_node_id") == "legacyContext" for issue in report["issues"])
-    assert "drift.semantic_node_missing_in_pen" in markdown_path.read_text(encoding="utf-8")
+    blocking_by_code = {issue["code"]: issue["blocking"] for issue in report["issues"]}
+    assert blocking_by_code["drift.semantic_node_missing_in_pen"] is True
+    assert blocking_by_code["drift.pencil_context_obsolete"] is True
+    assert blocking_by_code["drift.clarification_marker"] is True
+    assert blocking_by_code["drift.mockup_node_uncovered"] is False
+    assert report["summary"]["blocking"] == sum(
+        1 for issue in report["issues"] if issue["blocking"]
+    )
+    assert report["summary"]["blocking"] > 0
+    markdown = markdown_path.read_text(encoding="utf-8")
+    assert "drift.semantic_node_missing_in_pen" in markdown
+    assert "| Blocking |" in markdown
 
 
 def test_detect_drift_cli_writes_json_and_markdown(tmp_path: Path) -> None:

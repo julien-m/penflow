@@ -63,7 +63,7 @@ def lint_tokens(
         # Themed drafts must never flag their own radius token (round-trip rule).
         radius = (*radius, theme_radius)
 
-    violations: list[dict[str, Any]] = []
+    violations: list[dict[str, Any]] = _theme_violations(theme)
     for node in nodes:
         violations.extend(
             _node_violations(
@@ -96,6 +96,41 @@ def lint_tokens(
         },
         "violations": violations,
     }
+
+
+def _theme_violations(theme: dict[str, Any] | None) -> list[dict[str, Any]]:
+    # @spec FR-011: surface unparsable theme dimensions — .specs/features/049-strict-mode-default-blocking-drift/spec.md#fr-011
+    """Warn when a numeric theme variable kept a raw string value.
+
+    ``theme.theme_number`` falls back to the raw string when a CSS dimension
+    cannot be parsed; that silent fallback surfaces here as a
+    ``theme.value.unparsed`` warning violation.
+    """
+    if theme is None:
+        return []
+    raw_variables = theme.get("variables")
+    variables: dict[str, Any] = raw_variables if isinstance(raw_variables, dict) else {}
+    violations: list[dict[str, Any]] = []
+    for name in sorted(variables):
+        definition = variables[name]
+        if (
+            isinstance(definition, dict)
+            and definition.get("type") == "number"
+            and isinstance(definition.get("value"), str)
+        ):
+            violations.append(
+                {
+                    "code": "theme.value.unparsed",
+                    "severity": "warning",
+                    "node_id": "theme",
+                    "semantic_id": None,
+                    "property": name,
+                    "value": definition["value"],
+                    "message": f"theme variable {name} has an unparsable numeric value:"
+                    f" {definition['value']!r}",
+                }
+            )
+    return violations
 
 
 def _resolve_theme(

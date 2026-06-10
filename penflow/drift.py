@@ -18,6 +18,17 @@ REPORT_VERSION = 1
 PRESENTATIONAL_LEAF_TYPES = frozenset(
     {"text", "icon_font", "line", "path", "rectangle", "ellipse", "polygon"}
 )
+# @spec FR-008: blocking drift codes — .specs/features/049-strict-mode-default-blocking-drift/spec.md#fr-008
+# Codes whose presence forces status BLOCKED and a non-zero exit in both
+# strict and lenient modes: they invalidate the contract chain itself.
+BLOCKING_DRIFT_CODES = frozenset(
+    {
+        "drift.semantic_tree_invalid",
+        "drift.semantic_node_missing_in_pen",
+        "drift.pencil_context_obsolete",
+        "drift.clarification_marker",
+    }
+)
 
 
 def detect_drift(
@@ -47,7 +58,7 @@ def detect_drift(
     report = {
         "version": REPORT_VERSION,
         "kind": "penflow-drift-report",
-        "status": "DRIFT" if issues else "PASS",
+        "status": _report_status(issues),
         "summary": _summary(issues),
         "inputs": {
             "flow_ui_contract": str(specs_root),
@@ -329,10 +340,18 @@ def _tree_semantic_ids(tree: dict[str, Any]) -> set[str]:
     return {str(node["semantic_id"]) for _, node in _walk_semantic_nodes_with_paths(tree)}
 
 
+def _report_status(issues: list[dict[str, Any]]) -> str:
+    """BLOCKED if any blocking issue, DRIFT if any issue, else PASS."""
+    if any(issue["blocking"] for issue in issues):
+        return "BLOCKED"
+    return "DRIFT" if issues else "PASS"
+
+
 def _summary(issues: list[dict[str, Any]]) -> dict[str, int]:
     return {
         "errors": sum(1 for issue in issues if issue["severity"] == "error"),
         "warnings": sum(1 for issue in issues if issue["severity"] == "warning"),
+        "blocking": sum(1 for issue in issues if issue["blocking"]),
         "total": len(issues),
     }
 
@@ -343,16 +362,20 @@ def _markdown_report(report: dict[str, Any]) -> str:
         lines.append("No drift detected.")
     else:
         lines.extend(
-            ["| Severity | Code | Path | Semantic ID | Pencil Node |", "|---|---|---|---|---|"]
+            [
+                "| Severity | Code | Path | Semantic ID | Pencil Node | Blocking |",
+                "|---|---|---|---|---|---|",
+            ]
         )
         for issue in report["issues"]:
             lines.append(
-                "| {severity} | {code} | {path} | {semantic_id} | {pencil_node_id} |".format(
+                "| {severity} | {code} | {path} | {semantic_id} | {pencil_node_id} | {blocking} |".format(
                     severity=issue["severity"],
                     code=issue["code"],
                     path=issue["path"],
                     semantic_id=issue.get("semantic_id", ""),
                     pencil_node_id=issue.get("pencil_node_id", ""),
+                    blocking="true" if issue["blocking"] else "false",
                 )
             )
     return "\n".join(lines) + "\n"
@@ -367,7 +390,13 @@ def _issue(
     semantic_id: str | None = None,
     pencil_node_id: str | None = None,
 ) -> dict[str, Any]:
-    issue = {"severity": severity, "code": code, "path": path, "message": message}
+    issue = {
+        "severity": severity,
+        "code": code,
+        "path": path,
+        "message": message,
+        "blocking": code in BLOCKING_DRIFT_CODES,
+    }
     if semantic_id is not None:
         issue["semantic_id"] = semantic_id
     if pencil_node_id is not None:

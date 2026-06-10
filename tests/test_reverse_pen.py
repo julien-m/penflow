@@ -106,8 +106,14 @@ def test_reverse_pen_writes_specs_tree_and_clarification_markers(tmp_path: Path)
         encoding="utf-8"
     )
 
-    assert report["status"] == "PASS"
+    # Feature 049: clarification markers surface as reverse.clarification_needed.
+    assert report["status"] == "FAIL"
     assert report["screens"] == 1
+    assert report["issues"]
+    assert {issue["code"] for issue in report["issues"]} == {"reverse.clarification_needed"}
+    assert all(issue["severity"] == "warning" for issue in report["issues"])
+    flagged = {Path(issue["path"]).name for issue in report["issues"]}
+    assert {"semantic-ui-tree.json", "checkout.md"} <= flagged
     assert validate_semantic_tree(tree) == []
     assert tree["screens"][0]["root"]["source_map"]["pencil_node_id"] == "checkoutScreen"
     assert tree["screens"][0]["root"]["children"][1]["semantic_id"] == "checkout.pay"
@@ -155,5 +161,8 @@ def test_reverse_pen_cli_outputs_json_and_valid_semantic_tree(tmp_path: Path) ->
     pen_path = write_json(tmp_path / "ui.pen", legacy_pen_without_business_logic())
     out_dir = tmp_path / "reverse"
 
-    assert main(["reverse-pen", str(pen_path), "--out", str(out_dir), "--json"]) == 0
+    # Strict default (feature 049): unresolved clarification markers exit 1.
+    assert main(["reverse-pen", str(pen_path), "--out", str(out_dir), "--json"]) == 1
+    # --lenient restores the warnings-non-blocking behavior.
+    assert main(["reverse-pen", str(pen_path), "--out", str(out_dir), "--lenient", "--json"]) == 0
     assert main(["validate-semantic-tree", str(out_dir / "semantic-ui-tree.json"), "--json"]) == 0

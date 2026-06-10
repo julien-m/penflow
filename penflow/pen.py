@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -69,14 +70,17 @@ def all_nodes(roots: list[PenNode]) -> list[PenNode]:
 
 
 def inspect_pen(path: str | Path) -> dict[str, Any]:
-    roots = parse_pen(path)
+    raw = load_pen(path)
+    roots = parse_pen(raw)
     nodes = all_nodes(roots)
     contextual = [node for node in nodes if node.context.to_dict()]
     buttons = [node for node in nodes if node.role == "button"]
     lists = [node for node in nodes if node.role in {"list", "list_item"}]
     dynamic_text = [node for node in nodes if node.context.binding and node.type == "text"]
-    warnings = [issue for issue in validate_pen_context(roots) if issue.severity == "warning"]
-    errors = [issue for issue in validate_pen_context(roots) if issue.severity == "error"]
+    issues = validate_pen_context(roots)
+    # Raw re-scan (feature 049): coerced bbox strings are only visible in raw JSON.
+    warnings = [issue for issue in issues if issue.severity == "warning"] + bbox_issues(raw)
+    errors = [issue for issue in issues if issue.severity == "error"]
     return {
         "screens": [
             {
@@ -95,6 +99,54 @@ def inspect_pen(path: str | Path) -> dict[str, Any]:
         "warnings": [asdict(issue) for issue in warnings],
         "errors": [asdict(issue) for issue in errors],
     }
+
+
+# Matches Pencil sizing keywords: "fill_container", "fit_content", and
+# "fit_content(<number>)" — legitimate string dimensions, not corruption.
+_PEN_SIZING_KEYWORD_RE = re.compile(r"^(?:fill_container|fit_content(?:\(\d+(?:\.\d+)?\))?)$")
+
+
+def bbox_issues(data: dict[str, Any]) -> list[ContextIssue]:
+    # @spec FR-010: surface coerced bbox values — .specs/features/049-strict-mode-default-blocking-drift/spec.md#fr-010
+    """Warn about raw bbox string values that ``BBox.from_node`` coerces to 0.
+
+    Args:
+        data: Raw `.pen` JSON object (before ``parse_pen`` loses raw values).
+
+    Returns:
+        One ``pen.bbox.invalid`` warning per non-empty string ``x``/``y``/
+        ``width``/``height`` value that is not a recognized Pencil sizing
+        keyword. Coercion behavior itself is unchanged.
+    """
+    issues: list[ContextIssue] = []
+
+    def visit(node: dict[str, Any], order: int) -> None:
+        node_id = str(node.get("id") or node.get("name") or f"node-{order}")
+        semantic_id = Context.from_raw(node.get("context")).semantic_id
+        for key in ("x", "y", "width", "height"):
+            value = node.get(key)
+            if (
+                isinstance(value, str)
+                and value.strip()
+                and not _PEN_SIZING_KEYWORD_RE.match(value.strip())
+            ):
+                issues.append(
+                    ContextIssue(
+                        "warning",
+                        "pen.bbox.invalid",
+                        f"bbox {key} is a string coerced to 0: {value!r}",
+                        node_id,
+                        semantic_id,
+                    )
+                )
+        for child_order, child in enumerate(node.get("children", []) or []):
+            if isinstance(child, dict):
+                visit(child, child_order)
+
+    for order, child in enumerate(data.get("children", []) or []):
+        if isinstance(child, dict):
+            visit(child, order)
+    return issues
 
 
 def validate_pen_context(roots: list[PenNode]) -> list[ContextIssue]:

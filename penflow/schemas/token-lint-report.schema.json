@@ -45,7 +45,8 @@
               "token.radius.offscale",
               "token.fontsize.offscale",
               "token.fontfamily.mismatch",
-              "token.variable.unresolved"
+              "token.variable.unresolved",
+              "theme.value.unparsed"
             ]
           },
           "severity": {"enum": ["error", "warning"]},
