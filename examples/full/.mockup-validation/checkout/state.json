@@ -1,0 +1,13 @@
+{
+  "group": "checkout",
+  "iteration": 1,
+  "gates": {
+    "tokens": "pass",
+    "consistency": "pass",
+    "accessibility_alignment": "pass",
+    "contract": "pass",
+    "structural_fidelity": "pass",
+    "balance_readability": "pass"
+  },
+  "open_issues": []
+}

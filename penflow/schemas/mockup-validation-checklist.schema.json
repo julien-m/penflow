@@ -2,8 +2,48 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://penflow.dev/schemas/mockup-validation-checklist.schema.json",
   "title": "Penflow Mockup Validation Checklist",
+  "description": "Frozen Mockup Factory checklist (feature 052). Every item is anchored by screen_id (plus semantic_id / pencil_node_id when available) and carries severity, blocking, and a lifecycle status, so fixes stay scoped to audited issues. Validated by `penflow validate-report checklist.json --schema`.",
   "type": "object",
-  "required": ["status"],
-  "additionalProperties": true,
-  "properties": {"status": {"type": "string"}}
+  "required": ["version", "kind", "status", "items"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "integer"},
+    "kind": {"const": "penflow-mockup-checklist"},
+    "status": {
+      "enum": ["OPEN", "PASS", "PASSED_WITH_WARNINGS", "ESCALATED", "BLOCKED", "BLOCKED_VISUAL_NOT_RUN"]
+    },
+    "sourceFile": {"type": "string"},
+    "group": {"type": "string"},
+    "validatedAt": {"type": "string"},
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "screen_id", "severity", "blocking", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "title": {"type": "string", "minLength": 1},
+          "screen_id": {"type": "string", "minLength": 1},
+          "semantic_id": {"type": "string"},
+          "pencil_node_id": {"type": "string"},
+          "gate": {
+            "enum": [
+              "tokens",
+              "consistency",
+              "accessibility_alignment",
+              "contract",
+              "structural_fidelity",
+              "balance_readability"
+            ]
+          },
+          "severity": {"enum": ["error", "warning", "info"]},
+          "blocking": {"type": "boolean"},
+          "status": {"enum": ["open", "fixed", "waived"]},
+          "evidence": {"type": "string"},
+          "iteration": {"type": "integer"}
+        }
+      }
+    }
+  }
 }

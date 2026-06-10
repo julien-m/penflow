@@ -87,10 +87,13 @@ def test_semantic_schema_does_not_add_feature_036_or_later_runtime_pipeline() ->
     # Feature 050 is in scope — it ships the deterministic visual metrics
     # audit (local files only, zero vision, no runtime adapter). Feature 051
     # is in scope — it ships the locked vision-report contract and the
-    # deterministic evidence validator (Penflow never runs vision); feature
-    # 052 (prescriptive rubric + bounded fix loop) remains guarded.
+    # deterministic evidence validator (Penflow never runs vision). Feature
+    # 052 is in scope — it ships the prescriptive gate rubric, the bounded
+    # fix-re-audit loop, and the hardened audit/checklist schemas (skill-layer
+    # loop, no new runtime); feature 053 (cross-mockup coherence contact
+    # sheet) remains guarded.
     future_feature_dirs: list[Path] = []
-    for feature_number in range(52, 53):
+    for feature_number in range(53, 54):
         future_feature_dirs.extend((ROOT / ".specs" / "features").glob(f"{feature_number:03d}-*"))
     assert future_feature_dirs == []
     assert not (ROOT / "penflow" / "semantic_validator.py").exists()

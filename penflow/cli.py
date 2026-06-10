@@ -1072,6 +1072,12 @@ def _report_schema_name(report: dict[str, Any], filename: str) -> str:
     if kind == "penflow-vision-report":
         # @spec FR-005: Strict vision report schema registration — .specs/features/051-vision-report-contract-evidence-validator/spec.md#fr-005
         return "vision-report.schema.json"
+    if kind == "penflow-mockup-audit":
+        # @spec FR-003: Hardened audit report schema registration — .specs/features/052-prescriptive-rubric-bounded-fix-loop/spec.md#fr-003
+        return "mockup-validation-audit.schema.json"
+    if kind == "penflow-mockup-checklist":
+        # @spec FR-003: Hardened checklist schema registration — .specs/features/052-prescriptive-rubric-bounded-fix-loop/spec.md#fr-003
+        return "mockup-validation-checklist.schema.json"
     if "compare" in filename or {"score", "summary", "issues"}.issubset(report):
         return "compare-report.schema.json"
     if "visual" in filename:

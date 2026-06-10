@@ -39,10 +39,13 @@ penflow draft-pen-from-tree <target>/semantic-ui-tree.json --out <target>/ui.pen
 penflow validate-pen <target>/ui.pen --json
 penflow map-pencil-context <target>/ui.pen <target>/semantic-ui-tree.json --out <target>/pencil-context-map.json --json
 penflow export-expected <target>/ui.pen --out <target>/expected-ui-tree.json --json
+penflow lint-tokens <target>/ui.pen --theme-css <target>/theme.css -o <target>/token-lint-report.json --json
+penflow check-consistency <target>/expected-ui-tree.json -o <target>/consistency-report.json --json
+penflow audit-visual <target>/expected-ui-tree.json --theme-css <target>/theme.css -o <target>/visual-metrics-report.json --json
 penflow detect-drift <target>/flow-ui-contract/contract.json <target>/semantic-ui-tree.json <target>/ui.pen --out <target>/drift-report.json --json
 ```
 
-If any command fails, stop and report the failing artifact. Do not optimize a mockup whose semantic anchors are invalid.
+All commands run with the strict default exit policy — no `--lenient` in the canonical chain. If any command fails, stop and report the failing artifact. Do not optimize a mockup whose semantic anchors are invalid.
 
 ## Design Convention Gate
 
@@ -60,21 +63,17 @@ A themed but structurally generic output is a failure. Reject screens that ignor
 1. **Load anchors and conventions:** **Read** [`references/workflow.md`](references/workflow.md), **Read** [`references/audit-rubric.md`](references/audit-rubric.md), **Read** [`references/visual-validation.md`](references/visual-validation.md), then apply the Design Convention Gate above.
 2. **Build an anchor table:** for every screen, list `screen_id`, `semantic_id`, `pencil_node_id` when available, source flow/screen file, and drift severity.
 3. **Freeze checklist:** write or update only the orchestrator-owned checklist under `.mockup-validation/<group>/checklist.json`; each item must reference `screen_id` plus `semantic_id` or `pencil_node_id` when available.
-4. **Audit UX + contract:** use the rubric to identify semantic contract gaps and critical UX/UI issues. A critical issue in either category blocks PASS.
-5. **Apply guided fixes:** change only audited checklist items. No broad redesign, no unanchored "polish pass", no invented product behavior.
-6. **Revalidate anchors:** rerun the Penflow commands from Preconditions after fixes.
+4. **Run the gates:** use the rubric gate table — every category maps to a scripted command with an exit-code/report-field pass condition. Critical = any error-severity gate issue or any `blocking: true` item; critical UX/UI issues block PASS.
+5. **Apply guided fixes (bounded loop, `iteration <= 3`):** change only audited checklist items that are open gate issues. No broad redesign, no unanchored "polish pass", no invented product behavior.
+6. **Revalidate anchors:** rerun the full Penflow command chain from Preconditions after every fix iteration and recompute all gates — no PASS without a final clean run.
 7. **Run Visual Evidence Gate:** open/render the `.pen`, export PNGs via `export_nodes`, dump `snapshot_layout` to `layout-snapshot.json`, inspect `get_screenshot` and answer ONLY the five locked vision categories (`visual_balance`, `rendering_artifacts`, `readability`, `perceived_hierarchy`, `imagery_quality`), write `.mockup-validation/visual-evidence/manifest.json` plus `vision-report.json` (legacy `visual-report.json` is deprecated), then gate on `penflow validate-visual-evidence .mockup-validation/visual-evidence --expected expected-ui-tree.json --json` — the gate is the exit code, not prose.
-8. **Decide final state:** PASS requires valid anchors, no blocking drift, no critical UX/UI checklist items, and complete visual evidence when a renderer is available.
+8. **Decide final state and prove it:** PASS requires valid anchors, every rubric gate clean on the final run, and complete visual evidence when a renderer is available. Write `audit-report.json` (`kind: penflow-mockup-audit`) recording `iterations`, per-gate `{gate, command, exit_code, report_path, result}`, and `residual_issues[]`, then validate it with `penflow validate-report .mockup-validation/audit-report.json --schema --json` — the single CI-able final check.
 
 ## Quality Gate
 
-PASS is allowed only when both gates pass:
+PASS/FAIL comes only from the rubric gate table (**Read** [`references/audit-rubric.md`](references/audit-rubric.md)) — six scripted gates: `tokens` (`penflow lint-tokens` exit 0), `consistency` (`penflow check-consistency` exit 0), `accessibility_alignment` (`penflow audit-visual` zero errors), `contract` (`penflow detect-drift` `summary.blocking == 0`), `structural_fidelity` (`penflow compare-tree` threshold 0.98, when an actual tree exists), and `balance_readability` (Visual Evidence Gate: `penflow validate-visual-evidence` exit 0 plus zero blocking vision criteria — every audited screen has inspected screenshot evidence, exported PNG, manifest entry, and a locked `vision-report.json` anchored by `screen_id`, `semantic_id`, and `pencil_node_id` when available; proven by exit code, never by prose).
 
-- **Contract gate:** flow specs, semantic tree, Pencil context, expected tree, context map, and drift report validate without blocking issues.
-- **UX/UI gate:** visual alignment, hierarchy, CTA placement, density, accessibility, responsive behavior, modernity, and polish have no critical findings.
-- **Visual Evidence Gate:** every audited screen has inspected screenshot evidence, exported PNG, manifest entry, and a locked `vision-report.json` anchored by `screen_id`, `semantic_id`, and `pencil_node_id` when available — proven by `penflow validate-visual-evidence` exiting 0, never by prose.
-
-WARNING/PASSED_WITH_WARNINGS is allowed only for non-critical, explicitly listed UX or contract items. ESCALATED is required when a blocking contract drift or critical UX issue remains after the bounded fix loop.
+Critical = any error-severity gate issue or any `blocking: true` item (drift or vision). PASS requires a final clean run of all gates and a schema-valid `audit-report.json`. PASSED_WITH_WARNINGS is allowed only for non-critical, explicitly listed residual warnings. ESCALATED is required when a critical issue remains after the bounded fix loop (max 3 iterations), with the residual issue list attached.
 `BLOCKED_VISUAL_NOT_RUN` is required when a Pencil renderer is expected but unavailable, unless the user explicitly accepts structural-only validation.
 
 ## Runtime Boundary

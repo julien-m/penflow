@@ -185,18 +185,26 @@ Mockup Factory requires these project-local artifacts before UX/UI work starts:
 - `penflow/expected-ui-tree.json`
 - `penflow/drift-report.json`
 
-The skill is a guided optimizer, not a freeform redesign tool. Every UX/UI fix must reference an audited checklist item and the best available anchor: `screen_id`, `semantic_id`, or `pencil_node_id`. PASS requires semantic contract coherence, no critical UX/UI issues in visual alignment, hierarchy, CTA placement, density, accessibility, responsive behavior, modernity, or polish, and the Visual Evidence Gate from **Read** [`../.agent-sync/skills/mockup-factory/references/visual-validation.md`](../.agent-sync/skills/mockup-factory/references/visual-validation.md).
+The skill is a guided optimizer, not a freeform redesign tool. Every UX/UI fix must reference an audited checklist item and the best available anchor: `screen_id`, `semantic_id`, or `pencil_node_id`. PASS requires semantic contract coherence, no critical UX/UI issues in visual alignment, hierarchy, CTA placement, density, accessibility, responsive behavior, modernity, or polish, and the Visual Evidence Gate from **Read** [`../.agent-sync/skills/mockup-factory/references/visual-validation.md`](../.agent-sync/skills/mockup-factory/references/visual-validation.md). Since feature 052, every rubric category is a scripted gate, fixes run in a bounded fix-re-audit loop (max 3 iterations, no PASS without a final clean run), and the final proof is a strict `audit-report.json` (`kind: penflow-mockup-audit`) checked by one command:
+
+```bash
+penflow validate-report penflow/.mockup-validation/audit-report.json --schema --json
+```
 
 When Pencil rendering is available, store proof next to the workspace:
 
 ```text
 penflow/.mockup-validation/
+  audit-report.json
   visual-evidence/
     manifest.json
     vision-report.json
     layout-snapshot.json
     visual-report.json   # legacy 044 artifact, deprecated
     checkout.png
+  <group>/
+    checklist.json
+    state.json
 ```
 
 Gate the packet deterministically — the gate is the exit code, not prose:

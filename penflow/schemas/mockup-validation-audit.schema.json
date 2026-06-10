@@ -2,8 +2,71 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://penflow.dev/schemas/mockup-validation-audit.schema.json",
   "title": "Penflow Mockup Validation Audit",
+  "description": "Final Mockup Factory audit report. Proves prescriptive gate execution (feature 052): one entry per gate with the exact command, exit code, report artifact, and result, plus the bounded fix-loop iteration count and the residual issues that justify a non-PASS status. Validated by `penflow validate-report audit-report.json --schema` as the single CI-able final check.",
   "type": "object",
-  "required": ["status"],
-  "additionalProperties": true,
-  "properties": {"status": {"type": "string"}}
+  "required": ["version", "kind", "status", "iterations", "gates", "residual_issues"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "integer"},
+    "kind": {"const": "penflow-mockup-audit"},
+    "status": {
+      "enum": ["PASS", "PASSED_WITH_WARNINGS", "ESCALATED", "BLOCKED", "BLOCKED_VISUAL_NOT_RUN"]
+    },
+    "iterations": {"type": "integer"},
+    "sourceFile": {"type": "string"},
+    "group": {"type": "string"},
+    "validatedAt": {"type": "string"},
+    "gates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["gate", "command", "exit_code", "report_path", "result"],
+        "additionalProperties": false,
+        "properties": {
+          "gate": {
+            "enum": [
+              "tokens",
+              "consistency",
+              "accessibility_alignment",
+              "contract",
+              "structural_fidelity",
+              "balance_readability"
+            ]
+          },
+          "command": {"type": "string", "minLength": 1},
+          "exit_code": {"type": ["integer", "null"]},
+          "report_path": {"type": ["string", "null"]},
+          "result": {"enum": ["pass", "fail", "not_run"]}
+        }
+      }
+    },
+    "residual_issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["gate", "code", "severity", "blocking", "message"],
+        "additionalProperties": false,
+        "properties": {
+          "gate": {
+            "enum": [
+              "tokens",
+              "consistency",
+              "accessibility_alignment",
+              "contract",
+              "structural_fidelity",
+              "balance_readability"
+            ]
+          },
+          "code": {"type": "string", "minLength": 1},
+          "severity": {"enum": ["error", "warning"]},
+          "blocking": {"type": "boolean"},
+          "message": {"type": "string", "minLength": 1},
+          "screen_id": {"type": "string"},
+          "semantic_id": {"type": "string"},
+          "pencil_node_id": {"type": "string"},
+          "report_path": {"type": "string"}
+        }
+      }
+    }
+  }
 }
