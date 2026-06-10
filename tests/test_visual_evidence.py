@@ -7,6 +7,7 @@ import pytest
 
 from penflow.cli import main
 from penflow.evidence import (
+    COHERENCE_CATEGORIES,
     VISION_CATEGORIES,
     validate_visual_evidence,
 )
@@ -43,6 +44,29 @@ def _criteria() -> list[dict[str, object]]:
         }
         for category in VISION_CATEGORIES
     ]
+
+
+def _coherence_criteria() -> list[dict[str, object]]:
+    return [
+        {
+            "category": category,
+            "result": "pass",
+            "evidence": f"Coherence evidence sentence for {category} across the contact sheet.",
+            "blocking": False,
+        }
+        for category in COHERENCE_CATEGORIES
+    ]
+
+
+def _add_coherence(evidence: Path, png: str = "contact-sheet.png") -> None:
+    """Inject a valid coherence section and a non-empty contact-sheet PNG."""
+    (evidence / png).write_bytes(b"\x89PNG\r\n\x1a\nfake-but-non-empty-sheet")
+    _mutate_vision_report(
+        evidence,
+        lambda report: report.update(
+            {"coherence": {"contact_sheet_png": png, "criteria": _coherence_criteria()}}
+        ),
+    )
 
 
 def _packet(tmp_path: Path, screen_ids: tuple[str, ...] = ("checkout",)) -> tuple[Path, Path]:
@@ -450,6 +474,173 @@ def test_examples_full_packet_passes_end_to_end() -> None:
         )
         == 0
     )
+
+
+# @spec AC-003: multi-screen tree without coherence fails — .specs/features/053-cross-mockup-coherence-contact-sheet/spec.md#ac-003
+def test_multi_screen_packet_without_coherence_fails(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path, ("checkout", "settings"))
+
+    codes = _codes(evidence, expected)
+
+    assert "evidence.coherence.missing" in codes
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 1
+    )
+
+
+# @spec AC-001: valid coherence section passes both validators — .specs/features/053-cross-mockup-coherence-contact-sheet/spec.md#ac-001
+def test_multi_screen_packet_with_coherence_passes(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path, ("checkout", "settings"))
+    _add_coherence(evidence)
+
+    assert validate_visual_evidence(evidence, expected_tree_path=expected) == []
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 0
+    )
+
+
+# @spec AC-004: single-screen tree passes without coherence — .specs/features/053-cross-mockup-coherence-contact-sheet/spec.md#ac-004
+def test_single_screen_packet_passes_without_coherence(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+
+    assert "evidence.coherence.missing" not in _codes(evidence, expected)
+    assert validate_visual_evidence(evidence, expected_tree_path=expected) == []
+
+
+def test_no_expected_tree_does_not_require_coherence(tmp_path: Path) -> None:
+    # Without --expected the screen count is unknowable, mirroring coverage checks.
+    evidence, _ = _packet(tmp_path, ("checkout", "settings"))
+
+    assert validate_visual_evidence(evidence) == []
+    assert main(["validate-visual-evidence", str(evidence), "--json"]) == 0
+
+
+# @spec AC-002: category smuggling fails in both directions — .specs/features/053-cross-mockup-coherence-contact-sheet/spec.md#ac-002
+def test_per_screen_category_smuggled_into_coherence_fails_schema(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path, ("checkout", "settings"))
+    _add_coherence(evidence)
+    _mutate_vision_report(
+        evidence,
+        lambda report: report["coherence"]["criteria"][0].update({"category": "readability"}),
+    )
+
+    codes = _codes(evidence, expected)
+
+    assert "evidence.vision_report.invalid" in codes
+    # The replaced criterion no longer answers its locked coherence category either.
+    assert "evidence.coherence.category_missing" in codes
+    assert (
+        main(["validate-report", str(evidence / "vision-report.json"), "--schema", "--json"]) == 1
+    )
+
+
+def test_coherence_category_smuggled_into_screen_fails_schema(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    _mutate_vision_report(
+        evidence,
+        lambda report: report["screens"][0]["criteria"][0].update(
+            {"category": "palette_coherence"}
+        ),
+    )
+
+    assert "evidence.vision_report.invalid" in _codes(evidence, expected)
+    assert (
+        main(["validate-report", str(evidence / "vision-report.json"), "--schema", "--json"]) == 1
+    )
+
+
+@pytest.mark.parametrize("category", ["contrast", "consistency", "alignment"])
+def test_deterministic_category_in_coherence_fails_validate_report(
+    tmp_path: Path, category: str
+) -> None:
+    evidence, _ = _packet(tmp_path)
+    _add_coherence(evidence)
+    _mutate_vision_report(
+        evidence,
+        lambda report: report["coherence"]["criteria"][0].update({"category": category}),
+    )
+
+    assert (
+        main(["validate-report", str(evidence / "vision-report.json"), "--schema", "--json"]) == 1
+    )
+
+
+# @spec AC-005: contact sheet PNG must exist non-empty — .specs/features/053-cross-mockup-coherence-contact-sheet/spec.md#ac-005
+def test_missing_contact_sheet_png_fails(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path, ("checkout", "settings"))
+    _add_coherence(evidence)
+    (evidence / "contact-sheet.png").unlink()
+
+    assert "evidence.contact_sheet.missing" in _codes(evidence, expected)
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 1
+    )
+
+
+def test_empty_contact_sheet_png_fails(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path, ("checkout", "settings"))
+    _add_coherence(evidence)
+    (evidence / "contact-sheet.png").write_bytes(b"")
+
+    assert "evidence.contact_sheet.empty" in _codes(evidence, expected)
+
+
+# @spec AC-006: incomplete coherence categories fail — .specs/features/053-cross-mockup-coherence-contact-sheet/spec.md#ac-006
+def test_incomplete_coherence_categories_fail(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path, ("checkout", "settings"))
+    _add_coherence(evidence)
+    _mutate_vision_report(
+        evidence,
+        lambda report: report["coherence"].update({"criteria": _coherence_criteria()[:3]}),
+    )
+
+    issues = validate_visual_evidence(evidence, expected_tree_path=expected)
+    missing = [issue for issue in issues if issue["code"] == "evidence.coherence.category_missing"]
+
+    assert len(missing) == 1
+    assert "component_recognition" in missing[0]["message"]
+
+
+def test_coherence_section_on_single_screen_is_still_validated(tmp_path: Path) -> None:
+    # Optional section, but once present its contact sheet must be provable.
+    evidence, expected = _packet(tmp_path)
+    _add_coherence(evidence)
+    (evidence / "contact-sheet.png").unlink()
+
+    assert "evidence.contact_sheet.missing" in _codes(evidence, expected)
+
+
+# @spec AC-007: byte-identical reruns on a failing coherence packet — .specs/features/053-cross-mockup-coherence-contact-sheet/spec.md#ac-007
+def test_coherence_validator_output_is_byte_identical_on_reruns(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path, ("checkout", "settings"))
+    _add_coherence(evidence)
+    (evidence / "contact-sheet.png").write_bytes(b"")
+    _mutate_vision_report(
+        evidence,
+        lambda report: report["coherence"]["criteria"].pop(),
+    )
+
+    first = json.dumps(validate_visual_evidence(evidence, expected_tree_path=expected))
+    second = json.dumps(validate_visual_evidence(evidence, expected_tree_path=expected))
+
+    assert first == second
+    assert first != "[]"
+
+
+# @spec AC-009: examples/full packet carries a valid coherence section — .specs/features/053-cross-mockup-coherence-contact-sheet/spec.md#ac-009
+def test_examples_full_coherence_section_is_valid() -> None:
+    report = json.loads((EXAMPLES_EVIDENCE / "vision-report.json").read_text(encoding="utf-8"))
+
+    assert report["coherence"]["contact_sheet_png"] == "contact-sheet.png"
+    assert {item["category"] for item in report["coherence"]["criteria"]} == set(
+        COHERENCE_CATEGORIES
+    )
+    sheet = EXAMPLES_EVIDENCE / "contact-sheet.png"
+    assert sheet.exists()
+    assert sheet.stat().st_size > 0
 
 
 def test_legacy_visual_report_result_enum_is_tightened(tmp_path: Path) -> None:

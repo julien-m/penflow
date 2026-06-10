@@ -14,6 +14,36 @@
     "sourceFile": {"type": "string"},
     "model": {"type": "string"},
     "validatedAt": {"type": "string"},
+    "coherence": {
+      "type": "object",
+      "description": "Optional cross-mockup coherence pass over one uniform-scale contact sheet. Required by validate-visual-evidence when the expected tree has >= 2 screens. Numeric cross-screen facts belong to penflow check-consistency and are rejected here.",
+      "required": ["contact_sheet_png", "criteria"],
+      "additionalProperties": false,
+      "properties": {
+        "contact_sheet_png": {"type": "string"},
+        "criteria": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["category", "result", "evidence", "blocking"],
+            "additionalProperties": false,
+            "properties": {
+              "category": {
+                "enum": [
+                  "cross_screen_rhythm",
+                  "palette_coherence",
+                  "typography_coherence",
+                  "component_recognition"
+                ]
+              },
+              "result": {"enum": ["pass", "fail", "warning"]},
+              "evidence": {"type": "string", "minLength": 10},
+              "blocking": {"type": "boolean"}
+            }
+          }
+        }
+      }
+    },
     "screens": {
       "type": "array",
       "items": {
