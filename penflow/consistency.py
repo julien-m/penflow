@@ -6,7 +6,15 @@ import json
 from pathlib import Path
 from typing import Any
 
-from .compare import _bbox_is_measurable, _is_masked
+# Padding canonicalization is shared with the compare engine (feature 048)
+# so compare-tree and check-consistency can never disagree on spacing forms.
+from .compare import (
+    _bbox_is_measurable,
+    _canonical_number,
+    _canonical_padding,
+    _is_masked,
+    _is_number,
+)
 from .tree import flatten_nodes, load_tree
 
 REPORT_KIND = "penflow-consistency-report"
@@ -247,37 +255,12 @@ def _schema_safe(value: Any) -> Any:
     return _canonical_key(value)
 
 
-def _canonical_padding(value: Any) -> list[int | float] | None:
-    """Expand CSS-style padding to `[top, right, bottom, left]` when numeric."""
-    if _is_number(value):
-        side = _canonical_number(value)
-        return [side, side, side, side]
-    if isinstance(value, list) and value and all(_is_number(item) for item in value):
-        items = [_canonical_number(item) for item in value]
-        if len(items) == 1:
-            return [items[0], items[0], items[0], items[0]]
-        if len(items) == 2:
-            return [items[0], items[1], items[0], items[1]]
-        if len(items) == 4:
-            return items
-    return None
-
-
 def _canonical_scalar(value: Any) -> Any:
     if _is_number(value):
         return _canonical_number(value)
     if isinstance(value, list):
         return [_canonical_scalar(item) for item in value]
     return value
-
-
-def _canonical_number(value: Any) -> int | float:
-    number = float(value)
-    return int(number) if number.is_integer() else number
-
-
-def _is_number(value: Any) -> bool:
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _canonical_key(value: Any) -> str:

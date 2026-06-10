@@ -24,6 +24,8 @@ VISUAL_KEYS = {
     "layout",
     "gap",
     "padding",
+    # @spec FR-001: alignItems reaches expected trees — .specs/features/048-compare-layout-spacing-properties/spec.md#fr-001
+    "alignItems",
 }
 
 

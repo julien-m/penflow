@@ -14,6 +14,8 @@ DEFAULT_TOLERANCE = {
     "radius_px": 2,
     "font_px": 2,
     "order": 0,
+    # @spec FR-003: spacing tolerance for gap/padding — .specs/features/048-compare-layout-spacing-properties/spec.md#fr-003
+    "spacing_px": 2,
 }
 
 # Historical lenient threshold (pre-049) vs the strict default (feature 049).
@@ -234,7 +236,8 @@ def _compare_visual(
     tolerance: dict[str, Any],
 ) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
-    for key in ("fill", "stroke", "fontFamily", "fontWeight"):
+    # @spec FR-002: exact-match layout/alignItems comparison — .specs/features/048-compare-layout-spacing-properties/spec.md#fr-002
+    for key in ("fill", "stroke", "fontFamily", "fontWeight", "layout", "alignItems"):
         if expected.get(key) and actual.get(key) and expected[key] != actual[key]:
             issues.append(_issue("warning", f"node.visual.{key}", semantic_id, f"{key} differs"))
     for key, limit_name in (("cornerRadius", "radius_px"), ("fontSize", "font_px")):
@@ -244,7 +247,76 @@ def _compare_visual(
                 issues.append(
                     _issue("warning", f"node.visual.{key}", semantic_id, f"{key} differs")
                 )
+    issues.extend(_compare_spacing(semantic_id, expected, actual, tolerance))
     return issues
+
+
+def _compare_spacing(
+    semantic_id: str | None,
+    expected: dict[str, Any],
+    actual: dict[str, Any],
+    tolerance: dict[str, Any],
+) -> list[dict[str, Any]]:
+    # @spec FR-003: tolerance-based gap/padding comparison — .specs/features/048-compare-layout-spacing-properties/spec.md#fr-003
+    """Compare ``gap`` and ``padding`` with the ``spacing_px`` tolerance.
+
+    Absent keys (on either side) emit no issues — pre-048 trees stay green.
+    Padding is canonicalized to ``[top, right, bottom, left]`` (feature 047
+    semantics: ``16`` ≡ ``[16, 16]`` ≡ ``[16, 16, 16, 16]``); the deviation is
+    the max element-wise absolute difference. Values that cannot be
+    canonicalized compare as opaque values (differing forms emit a warning).
+    """
+    issues: list[dict[str, Any]] = []
+    limit = float(tolerance.get("spacing_px", DEFAULT_TOLERANCE["spacing_px"]))
+    if "gap" in expected and "gap" in actual:
+        if _spacing_differs(expected["gap"], actual["gap"], limit):
+            issues.append(_issue("warning", "node.visual.gap", semantic_id, "gap differs"))
+    if "padding" in expected and "padding" in actual:
+        expected_padding = _canonical_padding(expected["padding"])
+        actual_padding = _canonical_padding(actual["padding"])
+        if expected_padding is not None and actual_padding is not None:
+            deviation = max(
+                abs(float(left) - float(right))
+                for left, right in zip(expected_padding, actual_padding)
+            )
+            if deviation > limit:
+                issues.append(
+                    _issue("warning", "node.visual.padding", semantic_id, "padding differs")
+                )
+        elif expected["padding"] != actual["padding"]:
+            issues.append(_issue("warning", "node.visual.padding", semantic_id, "padding differs"))
+    return issues
+
+
+def _spacing_differs(expected: Any, actual: Any, limit: float) -> bool:
+    if _is_number(expected) and _is_number(actual):
+        return abs(float(expected) - float(actual)) > limit
+    return bool(expected != actual)
+
+
+def _canonical_padding(value: Any) -> list[int | float] | None:
+    """Expand CSS-style padding to `[top, right, bottom, left]` when numeric."""
+    if _is_number(value):
+        side = _canonical_number(value)
+        return [side, side, side, side]
+    if isinstance(value, list) and value and all(_is_number(item) for item in value):
+        items = [_canonical_number(item) for item in value]
+        if len(items) == 1:
+            return [items[0], items[0], items[0], items[0]]
+        if len(items) == 2:
+            return [items[0], items[1], items[0], items[1]]
+        if len(items) == 4:
+            return items
+    return None
+
+
+def _canonical_number(value: Any) -> int | float:
+    number = float(value)
+    return int(number) if number.is_integer() else number
+
+
+def _is_number(value: Any) -> bool:
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
 def _issue(severity: str, code: str, semantic_id: str | None, message: str) -> dict[str, Any]:

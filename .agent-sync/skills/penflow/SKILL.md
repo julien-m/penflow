@@ -137,6 +137,8 @@ penflow validate-report compare-report.json --schema --json
 
 If `validate-actual` fails, fix the external adapter output first. Penflow does not inspect the running app.
 
+`compare-tree` also checks layout properties (feature 048): `layout`/`alignItems` exact-match (`node.visual.layout`, `node.visual.alignItems`), `gap`/`padding` within ±2px (`spacing_px`, override via `context.tolerance.spacing_px`; `node.visual.gap`, `node.visual.padding`). Padding `16` ≡ `[16, 16]` ≡ `[16, 16, 16, 16]`. Absent keys emit no issues.
+
 ## Regression Mode
 
 Use for CI/regression coverage of contract C16. The proof is pytest-first, with the final CLI chain reproducible on `examples/full` and `examples/legacy`.
