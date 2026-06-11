@@ -1,5 +1,5 @@
 {
-  "$comment": "LiveSpec traceability anchors: @spec(FR-002)",
+  "$comment": "LiveSpec traceability anchors: @spec(FR-002), @spec(FR-008)",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://penflow.dev/schemas/mockup-validation-checklist.schema.json",
   "title": "Penflow Mockup Validation Checklist",
@@ -14,6 +14,7 @@
       "enum": ["OPEN", "PASS", "PASSED_WITH_WARNINGS", "ESCALATED", "BLOCKED", "BLOCKED_VISUAL_NOT_RUN"]
     },
     "sourceFile": {"type": "string"},
+    "sourceReport": {"type": "string"},
     "group": {"type": "string"},
     "validatedAt": {"type": "string"},
     "items": {
@@ -38,6 +39,7 @@
               "balance_readability"
             ]
           },
+          "code": {"type": "string"},
           "severity": {"enum": ["error", "warning", "info"]},
           "blocking": {"type": "boolean"},
           "status": {"enum": ["open", "fixed", "waived"]},

@@ -32,6 +32,7 @@ build/
 .specs/.runs/
 .specs/.previews/
 .specs/preflight-report.md
+.specs/features/*/preflight-report.md
 test-results/
 playwright-report/
 reports/

@@ -5,11 +5,15 @@
 # @spec(FR-003)
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
+import pytest
+
 from penflow.cli import _validate_json_schema_subset
 from penflow.cli import main
+from penflow.theme import theme_fingerprint
 from tests.test_flow_contract_v2 import valid_contract, write_json
 
 
@@ -182,17 +186,19 @@ def test_validate_report_rejects_non_object_reports(tmp_path: Path) -> None:
 
 
 def test_report_schema_subset_fails_closed_on_unsupported_keywords() -> None:
+    # `pattern` became supported in feature 056; `format` stays a genuinely
+    # unsupported keyword pinning the fail-closed contract.
     issues = _validate_json_schema_subset(
         {"status": "PASS"},
-        {"type": "object", "properties": {"status": {"type": "string", "pattern": "^PASS$"}}},
+        {"type": "object", "properties": {"status": {"type": "string", "format": "uri"}}},
         "$",
     )
 
     assert issues == [
         {
             "severity": "error",
-            "path": "$.status.__schema__.pattern",
-            "message": "unsupported schema keyword: pattern",
+            "path": "$.status.__schema__.format",
+            "message": "unsupported schema keyword: format",
         }
     ]
 
@@ -247,3 +253,148 @@ def _contextualized_pen() -> dict:
             }
         ],
     }
+
+
+# Published SHA-256 of the empty byte string — pins `shasum -a 256` parity by
+# algorithm identity without spawning a subprocess.
+EMPTY_BYTES_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+
+# @spec AC-001: Fingerprint payload shape and digest parity — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#ac-001
+def test_theme_fingerprint_helper_hashes_raw_bytes(tmp_path: Path) -> None:
+    theme = tmp_path / "theme.css"
+    theme.write_bytes(b":root { --primary: #0057FF; }\n")
+
+    payload = theme_fingerprint(theme)
+
+    assert payload == {
+        "path": str(theme),
+        "sha256": hashlib.sha256(theme.read_bytes()).hexdigest(),
+    }
+    assert len(payload["sha256"]) == 64
+    assert payload["sha256"] == payload["sha256"].lower()
+
+
+def test_theme_fingerprint_helper_empty_file_matches_published_vector(tmp_path: Path) -> None:
+    theme = tmp_path / "theme.css"
+    theme.write_bytes(b"")
+
+    assert theme_fingerprint(theme)["sha256"] == EMPTY_BYTES_SHA256
+
+
+# @spec AC-002: Byte sensitivity including CRLF/comment edits — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#ac-002
+def test_theme_fingerprint_helper_is_byte_sensitive(tmp_path: Path) -> None:
+    lf = tmp_path / "lf.css"
+    crlf = tmp_path / "crlf.css"
+    comment = tmp_path / "comment.css"
+    lf.write_bytes(b"--radius: 8px;\n")
+    crlf.write_bytes(b"--radius: 8px;\r\n")
+    comment.write_bytes(b"--radius: 8px;\n/* note */\n")
+
+    digests = {theme_fingerprint(path)["sha256"] for path in (lf, crlf, comment)}
+
+    assert len(digests) == 3
+
+
+def test_theme_fingerprint_helper_fails_closed_on_missing_file(tmp_path: Path) -> None:
+    with pytest.raises(FileNotFoundError):
+        theme_fingerprint(tmp_path / "missing.css")
+
+
+# @spec AC-001: theme-fingerprint exits 0 with exact {path, sha256} JSON — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#ac-001
+def test_theme_fingerprint_command_emits_path_and_sha256(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    theme = tmp_path / "theme.css"
+    theme.write_bytes(b":root { --primary: #0057FF; }\n")
+
+    assert main(["theme-fingerprint", str(theme), "--json"]) == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == {
+        "path": str(theme),
+        "sha256": hashlib.sha256(theme.read_bytes()).hexdigest(),
+    }
+
+
+# @spec AC-002: Reruns are byte-identical — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#ac-002
+def test_theme_fingerprint_command_reruns_are_byte_identical(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    theme = tmp_path / "theme.css"
+    theme.write_bytes(b"--radius: 8px;\n")
+
+    assert main(["theme-fingerprint", str(theme), "--json"]) == 0
+    first = capsys.readouterr().out
+    assert main(["theme-fingerprint", str(theme), "--json"]) == 0
+    second = capsys.readouterr().out
+
+    assert first == second
+
+
+def test_theme_fingerprint_command_human_mode_prints_lines_without_status(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    theme = tmp_path / "theme.css"
+    theme.write_bytes(b"--radius: 8px;\n")
+
+    assert main(["theme-fingerprint", str(theme)]) == 0
+
+    out = capsys.readouterr().out
+    assert f"path: {theme}" in out
+    assert "sha256: " in out
+    assert "Status:" not in out
+
+
+# @spec AC-003: Missing file is a usage boundary, exit 2 — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#ac-003
+def test_theme_fingerprint_command_missing_file_exits_2(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["theme-fingerprint", str(tmp_path / "missing.css")]) == 2
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.startswith("ERROR:")
+
+
+def test_theme_fingerprint_command_directory_exits_2(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main(["theme-fingerprint", str(tmp_path)]) == 2
+
+    assert capsys.readouterr().err.startswith("ERROR:")
+
+
+# @spec FR-001: pattern keyword supported by the report subset validator — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#fr-001
+def test_report_schema_subset_validates_pattern_keyword() -> None:
+    schema = {
+        "type": "object",
+        "properties": {"sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+    }
+
+    assert _validate_json_schema_subset({"sha256": EMPTY_BYTES_SHA256}, schema, "$") == []
+    assert _validate_json_schema_subset({"sha256": "ABC"}, schema, "$") == [
+        {
+            "severity": "error",
+            "path": "$.sha256",
+            "message": "expected string matching ^[0-9a-f]{64}$",
+        }
+    ]
+
+
+def test_schema_subset_pattern_keyword_fails_closed_on_malformed_schema() -> None:
+    # Invariant: a malformed bundled schema (non-string or invalid-regex
+    # `pattern`) must surface as a deterministic validation issue, never crash.
+    non_string = {"type": "string", "pattern": 42}
+    assert _validate_json_schema_subset("abc", non_string, "$") == [
+        {
+            "severity": "error",
+            "path": "$.__schema__.pattern",
+            "message": "schema pattern must be a string",
+        }
+    ]
+    bad_regex = {"type": "string", "pattern": "["}
+    issues = _validate_json_schema_subset("abc", bad_regex, "$")
+    assert len(issues) == 1
+    assert issues[0]["path"] == "$.__schema__.pattern"
+    assert issues[0]["message"].startswith("schema pattern is not a valid regex:")

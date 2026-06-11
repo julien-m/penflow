@@ -99,9 +99,14 @@ def test_semantic_schema_does_not_add_feature_036_or_later_runtime_pipeline() ->
     # validator; the contact sheet renders at the skill layer). Feature 054 is
     # in scope — it ships direct unit coverage for codegen/context/llm/models/
     # demo plus the bundled-schema cache (no new CLI surface, no runtime
-    # adapter); feature 055 remains guarded.
+    # adapter). Feature 055 is in scope — it ships the deterministic checklist
+    # seeder (`penflow checklist-from-drift`, local JSON-to-JSON only, no
+    # runtime adapter). Feature 056 is in scope — it ships the theme
+    # fingerprint binding (`penflow theme-fingerprint` + the
+    # `validate-visual-evidence --theme-css` gate, stdlib hashing of local
+    # bytes only, no runtime adapter); feature 057 remains guarded.
     future_feature_dirs: list[Path] = []
-    for feature_number in range(55, 56):
+    for feature_number in range(57, 58):
         future_feature_dirs.extend((ROOT / ".specs" / "features").glob(f"{feature_number:03d}-*"))
     assert future_feature_dirs == []
     assert not (ROOT / "penflow" / "semantic_validator.py").exists()

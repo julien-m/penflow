@@ -111,6 +111,41 @@ def test_write_pen_draft_from_semantic_tree_applies_theme_tokens(tmp_path: Path)
     assert "semantic_id=checkout.pay-now" in button["context"]
 
 
+def test_draft_propagates_light_root_values_when_dark_block_present(tmp_path: Path) -> None:
+    # Invariant: drafted pens carry the light `:root` palette — a `.dark`
+    # override block in theme.css must never leak into draft variables
+    # (GAP-046-01: the last-declared dark values used to win).
+    tree_path = tmp_path / "semantic-ui-tree.json"
+    tree_path.write_text(json.dumps(load_example_without_mockup()), encoding="utf-8")
+    theme_path = tmp_path / "theme.css"
+    theme_path.write_text(
+        """:root {
+  --background: #f6f4ef;
+  --foreground: #25302a;
+  --card: #ffffff;
+  --primary: #0f5132;
+  --primary-foreground: #fffaf0;
+  --border: #d7d2c8;
+}
+.dark {
+  --background: #0b1120;
+  --foreground: #e2e8f0;
+  --primary: #3b82f6;
+}
+""",
+        encoding="utf-8",
+    )
+    out_path = tmp_path / "ui.pen"
+
+    draft = write_pen_draft_from_semantic_tree(tree_path, out_path, theme_css_path=theme_path)
+
+    assert draft["variables"]["pf-primary"] == {"type": "color", "value": "#0f5132"}
+    assert draft["variables"]["pf-background"] == {"type": "color", "value": "#f6f4ef"}
+    raw = out_path.read_text(encoding="utf-8")
+    assert "#3b82f6" not in raw
+    assert "#0b1120" not in raw
+
+
 def test_draft_pen_from_tree_cli_accepts_theme_css(tmp_path: Path) -> None:
     tree_path = tmp_path / "semantic-ui-tree.json"
     tree_path.write_text(json.dumps(load_example_without_mockup()), encoding="utf-8")

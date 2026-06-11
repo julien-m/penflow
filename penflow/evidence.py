@@ -8,9 +8,11 @@ that the pass happened in a structured, complete, non-overlapping way:
 the manifest validates, every screen PNG exists non-empty, the vision report
 validates against the locked vision-only category enum, every expected-tree
 screen is covered, an optional layout snapshot matches the expected
-root bboxes within tolerance, and — for multi-screen expected trees — a
+root bboxes within tolerance, — for multi-screen expected trees — a
 cross-mockup coherence pass over one contact sheet answered the four locked
-coherence categories with a non-empty contact-sheet PNG on disk.
+coherence categories with a non-empty contact-sheet PNG on disk, and — when
+the gate is armed with a current theme fingerprint — the manifest theme
+stamp matches the theme.css bytes the mockups were rendered against.
 """
 
 from __future__ import annotations
@@ -64,6 +66,7 @@ def validate_visual_evidence(
     evidence_dir: str | Path,
     *,
     expected_tree_path: str | Path | None = None,
+    theme_fingerprint: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     # @spec FR-002: Deterministic evidence packet validation — .specs/features/051-vision-report-contract-evidence-validator/spec.md#fr-002
     """Validate a `.mockup-validation/visual-evidence/` packet deterministically.
@@ -73,6 +76,12 @@ def validate_visual_evidence(
             `vision-report.json`, and optionally `layout-snapshot.json`.
         expected_tree_path: Optional `expected-ui-tree.json` (feature 006
             shape) enabling screen-coverage and snapshot bbox cross-checks.
+        theme_fingerprint: Optional current `{path, sha256}` fingerprint of
+            the project theme.css (`penflow.theme.theme_fingerprint`). When
+            provided, the manifest must carry a matching `theme.sha256` stamp
+            (`evidence.theme.missing` / `evidence.theme.stale` otherwise);
+            when ``None`` the theme check never runs and output is identical
+            to pre-056 behavior.
 
     Returns:
         A deterministically sorted list of issues, each
@@ -99,6 +108,7 @@ def validate_visual_evidence(
         directory / VISION_REPORT_FILENAME, "evidence.vision_report", _VISION_REPORT_SCHEMA, issues
     )
     issues.extend(_png_issues(directory, manifest))
+    issues.extend(_theme_issues(manifest, theme_fingerprint))
     issues.extend(_category_issues(vision_report))
     issues.extend(_coherence_issues(directory, vision_report, expected_screens))
     if expected_tree_path is not None:
@@ -192,6 +202,42 @@ def _png_issues(directory: Path, manifest: dict[str, Any] | None) -> list[dict[s
         elif path.stat().st_size == 0:
             issues.append(_issue("evidence.png.empty", json_path, f"exported PNG is empty: {png}"))
     return issues
+
+
+def _theme_issues(
+    manifest: dict[str, Any] | None, fingerprint: dict[str, str] | None
+) -> list[dict[str, Any]]:
+    # @spec FR-004: evidence.theme.missing / evidence.theme.stale checks — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#fr-004
+    """Bind the evidence packet to the theme bytes it was rendered against."""
+    if fingerprint is None:
+        return []  # gate not armed: zero behavior change (AC-008)
+    if manifest is None:
+        return []  # missing/unparseable manifest already surfaced its own error
+    theme = manifest.get("theme")
+    stamped = theme.get("sha256") if isinstance(theme, dict) else None
+    if not isinstance(stamped, str):
+        # Absent or schema-malformed block: the schema diagnostic (if any)
+        # already flags the shape; degrade to one missing-stamp error without
+        # duplicating it (the _png_issues no-double-report precedent).
+        return [
+            _issue(
+                "evidence.theme.missing",
+                "$.theme",
+                "manifest.json has no theme block but the gate is armed with"
+                f" --theme-css {fingerprint['path']}",
+            )
+        ]
+    if stamped != fingerprint["sha256"]:
+        # Only sha256 binds — theme.path is recording-time traceability metadata.
+        return [
+            _issue(
+                "evidence.theme.stale",
+                "$.theme",
+                f"manifest theme sha256 {stamped} does not match current"
+                f" theme.css sha256 {fingerprint['sha256']}",
+            )
+        ]
+    return []
 
 
 def _category_issues(vision_report: dict[str, Any] | None) -> list[dict[str, Any]]:

@@ -12,7 +12,7 @@ import pytest
 from penflow.cli import main
 from penflow.color import parse_color, resolve_variable
 from penflow.contracts import extract_design_tokens
-from penflow.theme import load_theme
+from penflow.theme import load_theme, parse_css_custom_properties
 from penflow.token_lint import (
     DEFAULT_FONTSIZE_SCALE,
     DEFAULT_RADIUS_SCALE,
@@ -108,6 +108,86 @@ def test_load_theme_matches_legacy_shapes(tmp_path: Path) -> None:
     assert themed["style"]["primary"] == "$pf-primary"
     with pytest.raises(FileNotFoundError):
         load_theme(tmp_path / "missing.css")
+
+
+DARK_AUGMENTED_THEME_CSS = (
+    THEME_CSS
+    + """
+.dark {
+  --background: #0b1120;
+  --foreground: #e2e8f0;
+  --primary: #3b82f6;
+}
+"""
+)
+
+
+def test_dark_block_never_overrides_root_light_values(tmp_path: Path) -> None:
+    # Invariant: `:root` (light mode) is the canonical palette propagated to
+    # drafted pens and lint; a shadcn-style `.dark { ... }` override block must
+    # never replace it — otherwise every themed mockup ships the dark palette.
+    path = tmp_path / "theme.css"
+    path.write_text(DARK_AUGMENTED_THEME_CSS, encoding="utf-8")
+    themed = load_theme(path)
+    assert themed["variables"]["pf-primary"] == {"type": "color", "value": "#0f5132"}
+    assert themed["variables"]["pf-background"] == {"type": "color", "value": "#f6f4ef"}
+    assert themed["variables"]["pf-foreground"] == {"type": "color", "value": "#25302a"}
+
+
+def test_parse_css_custom_properties_without_root_scans_whole_text() -> None:
+    # Invariant: token fragments without any `:root` block must keep parsing
+    # (backward compatibility with non-shadcn theme files).
+    tokens = parse_css_custom_properties("--primary: #123456;\n--radius: 0.5rem;")
+    assert tokens == {"primary": "#123456", "radius": "0.5rem"}
+
+
+def test_parse_css_custom_properties_ignores_commented_root_block() -> None:
+    # Invariant: a `:root` block inside a /* comment */ must never open a
+    # scope — only the live `:root` declarations feed the draft palette.
+    css = """
+/* :root { --primary: #DEAD00; } */
+:root { --primary: #123456; }
+.dark { --primary: #3b82f6; }
+"""
+    assert parse_css_custom_properties(css) == {"primary": "#123456"}
+
+
+def test_lint_accepts_root_palette_color_despite_dark_block(tmp_path: Path) -> None:
+    # Invariant: a pen legitimately using a light `:root` color must lint clean
+    # even when the theme file also declares `.dark` overrides (GAP-046-01:
+    # the dark palette used to win and flag `:root` colors as unknown).
+    theme_path = tmp_path / "theme.css"
+    theme_path.write_text(DARK_AUGMENTED_THEME_CSS, encoding="utf-8")
+    pen_path = tmp_path / "ui.pen"
+    pen_path.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "children": [
+                    {"id": "btn", "type": "frame", "fill": "#0f5132"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    report_path = tmp_path / "report.json"
+    assert (
+        main(
+            [
+                "lint-tokens",
+                str(pen_path),
+                "--theme-css",
+                str(theme_path),
+                "--out",
+                str(report_path),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["status"] == "PASS"
+    assert report["violations"] == []
 
 
 def test_round_trip_drafted_pen_with_theme_passes(tmp_path: Path) -> None:

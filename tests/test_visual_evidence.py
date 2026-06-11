@@ -655,3 +655,319 @@ def test_legacy_visual_report_result_enum_is_tightened(tmp_path: Path) -> None:
     path.write_text(json.dumps(legacy), encoding="utf-8")
 
     assert main(["validate-report", str(path), "--schema", "--json"]) == 1
+
+
+def _write_theme(tmp_path: Path, body: bytes = b":root { --primary: #0057FF; }\n") -> Path:
+    theme = tmp_path / "theme.css"
+    theme.write_bytes(body)
+    return theme
+
+
+def _stamp_manifest(evidence: Path, theme: Path, run_id: str | None = None) -> None:
+    """Stamp the packet manifest with the current theme fingerprint (and runId)."""
+    from penflow.theme import theme_fingerprint
+
+    path = evidence / "manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    manifest["theme"] = theme_fingerprint(theme)
+    if run_id is not None:
+        manifest["runId"] = run_id
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+
+
+# @spec AC-005: Fresh theme fingerprint passes the armed gate — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#ac-005
+def test_theme_gate_fresh_stamp_passes(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    theme = _write_theme(tmp_path)
+    _stamp_manifest(evidence, theme, run_id="2026-06-11T08:52:00Z-checkout")
+
+    assert (
+        main(
+            [
+                "validate-visual-evidence",
+                str(evidence),
+                "--expected",
+                str(expected),
+                "--theme-css",
+                str(theme),
+                "--json",
+            ]
+        )
+        == 0
+    )
+
+
+# @spec AC-006: Missing theme block fails when the gate is armed — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#ac-006
+def test_theme_gate_missing_block_fails(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    theme = _write_theme(tmp_path)
+
+    assert (
+        main(
+            [
+                "validate-visual-evidence",
+                str(evidence),
+                "--expected",
+                str(expected),
+                "--theme-css",
+                str(theme),
+                "--json",
+            ]
+        )
+        == 1
+    )
+    from penflow.theme import theme_fingerprint
+
+    issues = validate_visual_evidence(
+        evidence, expected_tree_path=expected, theme_fingerprint=theme_fingerprint(theme)
+    )
+    themed = [issue for issue in issues if issue["code"].startswith("evidence.theme.")]
+    assert [issue["code"] for issue in themed] == ["evidence.theme.missing"]
+    assert themed[0]["severity"] == "error"
+    assert themed[0]["path"] == "$.theme"
+
+
+# @spec AC-007: Stale theme fingerprint fails with both digests — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#ac-007
+def test_theme_gate_stale_stamp_fails_with_both_digests(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    theme = _write_theme(tmp_path)
+    _stamp_manifest(evidence, theme)
+    stamped = json.loads((evidence / "manifest.json").read_text(encoding="utf-8"))["theme"][
+        "sha256"
+    ]
+    # One-byte theme edit after the stamp: the packet must go stale.
+    theme.write_bytes(theme.read_bytes() + b"\n")
+
+    from penflow.theme import theme_fingerprint
+
+    current = theme_fingerprint(theme)
+    issues = validate_visual_evidence(
+        evidence, expected_tree_path=expected, theme_fingerprint=current
+    )
+    themed = [issue for issue in issues if issue["code"].startswith("evidence.theme.")]
+    assert [issue["code"] for issue in themed] == ["evidence.theme.stale"]
+    assert themed[0]["severity"] == "error"
+    assert themed[0]["path"] == "$.theme"
+    assert stamped in themed[0]["message"]
+    assert current["sha256"] in themed[0]["message"]
+    assert (
+        main(
+            [
+                "validate-visual-evidence",
+                str(evidence),
+                "--expected",
+                str(expected),
+                "--theme-css",
+                str(theme),
+                "--json",
+            ]
+        )
+        == 1
+    )
+
+
+def test_theme_gate_runs_standalone_without_expected(tmp_path: Path) -> None:
+    evidence, _ = _packet(tmp_path)
+    theme = _write_theme(tmp_path)
+
+    assert main(["validate-visual-evidence", str(evidence), "--theme-css", str(theme)]) == 1
+    _stamp_manifest(evidence, theme)
+    assert main(["validate-visual-evidence", str(evidence), "--theme-css", str(theme)]) == 0
+
+
+def test_theme_gate_only_sha256_binds_not_path(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    theme = _write_theme(tmp_path)
+    _stamp_manifest(evidence, theme)
+    path = evidence / "manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    # Recording-time path differs across machines: only sha256 binds.
+    manifest["theme"]["path"] = "/somewhere/else/theme.css"
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    assert (
+        main(
+            [
+                "validate-visual-evidence",
+                str(evidence),
+                "--expected",
+                str(expected),
+                "--theme-css",
+                str(theme),
+                "--json",
+            ]
+        )
+        == 0
+    )
+
+
+# @spec AC-008: Without the flag, behavior is byte-identical — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#ac-008
+def test_no_flag_output_is_byte_identical_on_examples_full(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert (
+        main(
+            [
+                "validate-visual-evidence",
+                str(EXAMPLES_EVIDENCE),
+                "--expected",
+                str(EXAMPLES_EXPECTED),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    baseline = capsys.readouterr().out
+    assert "evidence.theme" not in baseline
+
+    # A stamped copy of the packet must produce the same no-flag output.
+    stamped_dir = tmp_path / "visual-evidence"
+    stamped_dir.mkdir()
+    for entry in EXAMPLES_EVIDENCE.iterdir():
+        (stamped_dir / entry.name).write_bytes(entry.read_bytes())
+    theme = _write_theme(tmp_path)
+    _stamp_manifest(stamped_dir, theme, run_id="2026-06-11T08:52:00Z-checkout")
+    assert (
+        main(
+            [
+                "validate-visual-evidence",
+                str(stamped_dir),
+                "--expected",
+                str(EXAMPLES_EXPECTED),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    stamped_output = capsys.readouterr().out
+
+    assert stamped_output.replace(str(stamped_dir), str(EXAMPLES_EVIDENCE)) == baseline
+
+
+# @spec AC-009: Missing --theme-css file is a boundary error, exit 2 — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#ac-009
+def test_theme_gate_missing_theme_file_exits_2(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    evidence, expected = _packet(tmp_path)
+
+    assert (
+        main(
+            [
+                "validate-visual-evidence",
+                str(evidence),
+                "--expected",
+                str(expected),
+                "--theme-css",
+                str(tmp_path / "missing.css"),
+                "--json",
+            ]
+        )
+        == 2
+    )
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.startswith("ERROR:")
+
+
+def test_theme_gate_directory_theme_exits_2(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+
+    assert (
+        main(
+            [
+                "validate-visual-evidence",
+                str(evidence),
+                "--expected",
+                str(expected),
+                "--theme-css",
+                str(tmp_path),
+            ]
+        )
+        == 2
+    )
+
+
+def test_theme_gate_malformed_block_degrades_to_missing_without_duplicate(
+    tmp_path: Path,
+) -> None:
+    evidence, expected = _packet(tmp_path)
+    theme = _write_theme(tmp_path)
+    path = evidence / "manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    # Schema-invalid block (sha256 is not a string): the schema diagnostic
+    # flags it; the theme check degrades to a single evidence.theme.missing.
+    manifest["theme"] = {"path": "theme.css", "sha256": 42}
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    from penflow.theme import theme_fingerprint
+
+    issues = validate_visual_evidence(
+        evidence, expected_tree_path=expected, theme_fingerprint=theme_fingerprint(theme)
+    )
+    codes = [issue["code"] for issue in issues]
+    assert codes.count("evidence.theme.missing") == 1
+    assert "evidence.theme.stale" not in codes
+    assert "evidence.manifest.invalid" in codes
+
+
+def test_theme_gate_missing_manifest_skips_theme_check(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    theme = _write_theme(tmp_path)
+    (evidence / "manifest.json").unlink()
+
+    from penflow.theme import theme_fingerprint
+
+    issues = validate_visual_evidence(
+        evidence, expected_tree_path=expected, theme_fingerprint=theme_fingerprint(theme)
+    )
+    codes = [issue["code"] for issue in issues]
+    assert "evidence.manifest.missing" in codes
+    assert not [code for code in codes if code.startswith("evidence.theme.")]
+
+
+# @spec AC-004: Schema round-trips for runId and theme — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#ac-004
+def test_manifest_schema_round_trips_runid_and_theme(tmp_path: Path) -> None:
+    legacy = EXAMPLES_EVIDENCE / "manifest.json"
+    assert main(["validate-report", str(legacy), "--schema", "--json"]) == 0
+
+    base = json.loads(legacy.read_text(encoding="utf-8"))
+    valid_sha = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+    stamped = tmp_path / "stamped-manifest.json"
+    stamped.write_text(
+        json.dumps(
+            base
+            | {
+                "runId": "2026-06-11T08:52:00Z-checkout",
+                "theme": {"path": "theme.css", "sha256": valid_sha},
+            }
+        ),
+        encoding="utf-8",
+    )
+    assert main(["validate-report", str(stamped), "--schema", "--json"]) == 0
+
+    cases = {
+        "undeclared-manifest.json": base | {"unexpected": True},
+        "blockless-sha-manifest.json": base | {"theme": {"path": "theme.css"}},
+        "uppercase-manifest.json": base | {"theme": {"path": "t.css", "sha256": valid_sha.upper()}},
+        "extra-key-manifest.json": base
+        | {"theme": {"path": "t.css", "sha256": valid_sha, "extra": 1}},
+    }
+    for filename, payload in cases.items():
+        path = tmp_path / filename
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        assert main(["validate-report", str(path), "--schema", "--json"]) == 1, filename
+
+
+def test_manifest_with_only_runid_validates_and_stays_inert(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    path = evidence / "manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    manifest["runId"] = "run-001"
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    assert main(["validate-report", str(path), "--schema", "--json"]) == 0
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 0
+    )

@@ -13,11 +13,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from .checklist import ChecklistSeedError, seed_checklist_from_drift
 from .codegen import react, rust_dioxus, swiftui
 from .compare import LENIENT_THRESHOLD, STRICT_THRESHOLD, compare_tree_files
 from .consistency import check_consistency, write_consistency_report
@@ -59,7 +61,7 @@ from .semantic_enrichment import enrich_pen_from_semantic_tree
 from .semantic_mapping import write_pencil_context_map
 from .semantic_validation import validate_semantic_tree, validate_semantic_tree_file
 from .schema_cache import load_schema
-from .theme import load_theme
+from .theme import load_theme, theme_fingerprint
 from .token_lint import (
     DEFAULT_FONTSIZE_SCALE,
     DEFAULT_RADIUS_SCALE,
@@ -209,6 +211,18 @@ def build_parser() -> argparse.ArgumentParser:
     _add_lenient(drift)
     drift.set_defaults(func=cmd_detect_drift)
 
+    # @spec FR-001: checklist-from-drift subcommand — .specs/features/055-checklist-from-drift-seeding/spec.md#fr-001
+    # No _add_lenient: generation command with a fail-closed input contract,
+    # not a validating command governed by the 049 exit policy.
+    checklist_seed = sub.add_parser(
+        "checklist-from-drift", help="seed a Mockup Factory checklist from a drift report"
+    )
+    checklist_seed.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    checklist_seed.add_argument("drift_report")
+    checklist_seed.add_argument("--out", required=True)
+    checklist_seed.add_argument("--group", default=None)
+    checklist_seed.set_defaults(func=cmd_checklist_from_drift)
+
     actual = sub.add_parser("validate-actual", help="validate actual runtime UI tree")
     actual.add_argument("--json", action="store_true", help="print machine-readable JSON")
     actual.add_argument(
@@ -271,6 +285,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--expected",
         default=None,
         help="expected-ui-tree.json enabling screen coverage and snapshot bbox cross-checks",
+    )
+    visual_evidence.add_argument(
+        "--theme-css",
+        default=None,
+        help="theme.css whose sha256 must match the manifest theme stamp",
     )
     _add_lenient(visual_evidence)
     visual_evidence.set_defaults(func=cmd_validate_visual_evidence)
@@ -337,6 +356,16 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_lenient(lint)
     lint.set_defaults(func=cmd_lint_tokens)
+
+    # @spec FR-003: theme-fingerprint subcommand — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#fr-003
+    # No _add_lenient: the command emits no issues, so there is nothing for
+    # the 049 exit policy to relax.
+    fingerprint_cmd = sub.add_parser(
+        "theme-fingerprint", help="fingerprint a theme CSS file (sha256 of raw bytes)"
+    )
+    fingerprint_cmd.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    fingerprint_cmd.add_argument("theme_css")
+    fingerprint_cmd.set_defaults(func=cmd_theme_fingerprint)
 
     ir = sub.add_parser("export-ir", help="export code IR from screen contract")
     ir.add_argument("--json", action="store_true", help="print machine-readable JSON")
@@ -571,6 +600,22 @@ def cmd_detect_drift(args: argparse.Namespace) -> int:
     return 0 if _is_lenient(args) else 1
 
 
+def cmd_checklist_from_drift(args: argparse.Namespace) -> int:
+    # @spec FR-002: exit-1 fail-closed error boundary — .specs/features/055-checklist-from-drift-seeding/spec.md#fr-002
+    try:
+        checklist = seed_checklist_from_drift(args.drift_report, args.out, group=args.group)
+    except (ChecklistSeedError, OSError) as error:
+        # Exit 1, not PenflowError (exit 2): the spec pins exit 1 for every
+        # input failure, including an unwritable --out destination.
+        print(f"ERROR: {error}", file=sys.stderr)
+        return 1
+    _print(
+        {"status": checklist["status"], "items": len(checklist["items"]), "out": args.out},
+        args.json,
+    )
+    return 0
+
+
 def cmd_validate_actual(args: argparse.Namespace) -> int:
     issues = validate_actual_tree(load_tree(args.actual), schema=args.schema)
     code = _exit_code(issues, _is_lenient(args))
@@ -662,8 +707,19 @@ def cmd_validate_visual_evidence(args: argparse.Namespace) -> int:
         raise PenflowError(f"evidence directory not found: {directory}")
     if args.expected is not None and not Path(args.expected).exists():
         raise PenflowError(f"expected tree not found: {args.expected}")
+    # @spec FR-004: --theme-css boundary + gate arming — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#fr-004
+    # The fingerprint is armed BEFORE packet validation so a missing theme
+    # file is a usage boundary (exit 2) and never a packet-level issue.
+    fingerprint = None
+    if args.theme_css is not None:
+        try:
+            fingerprint = theme_fingerprint(args.theme_css)
+        except OSError as error:
+            raise PenflowError(str(error)) from error
     try:
-        issues = validate_visual_evidence(directory, expected_tree_path=args.expected)
+        issues = validate_visual_evidence(
+            directory, expected_tree_path=args.expected, theme_fingerprint=fingerprint
+        )
     except json.JSONDecodeError as error:
         raise PenflowError(f"expected tree is not valid JSON: {args.expected}: {error}") from error
     except ValueError as error:
@@ -767,6 +823,17 @@ def cmd_lint_tokens(args: argparse.Namespace) -> int:
         args.json,
     )
     return code
+
+
+def cmd_theme_fingerprint(args: argparse.Namespace) -> int:
+    # @spec FR-003: Subcommand with exits 0/2 and _print envelope — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#fr-003
+    try:
+        payload = theme_fingerprint(args.theme_css)
+    except OSError as error:
+        # Usage/IO boundary (lint-tokens AC-012 parity): ERROR on stderr, exit 2.
+        raise PenflowError(str(error)) from error
+    _print(payload, args.json)
+    return 0
 
 
 def _parse_scale(raw: str | None, flag: str) -> tuple[float, ...] | None:
@@ -949,6 +1016,7 @@ _SUPPORTED_REPORT_SCHEMA_KEYWORDS = frozenset(
         "enum",
         "items",
         "minLength",
+        "pattern",
         "properties",
         "required",
         "title",
@@ -992,6 +1060,41 @@ def _validate_json_schema_subset(
                 "message": f"expected at least {schema['minLength']} characters",
             }
         )
+    # @spec FR-001: validate-report path accepts the new schema — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#fr-001
+    # re.search is the JSON Schema `pattern` semantics; anchored patterns
+    # (^...$, like the manifest sha256) therefore behave as exact matches.
+    if "pattern" in schema and isinstance(value, str):
+        pattern = schema["pattern"]
+        if not isinstance(pattern, str):
+            # Fail-closed on malformed bundled schemas: report deterministically
+            # instead of crashing the validator on a non-string pattern.
+            issues.append(
+                {
+                    "severity": "error",
+                    "path": f"{path}.__schema__.pattern",
+                    "message": "schema pattern must be a string",
+                }
+            )
+        else:
+            try:
+                matched = re.search(pattern, value)
+            except re.error as exc:
+                issues.append(
+                    {
+                        "severity": "error",
+                        "path": f"{path}.__schema__.pattern",
+                        "message": f"schema pattern is not a valid regex: {exc}",
+                    }
+                )
+            else:
+                if matched is None:
+                    issues.append(
+                        {
+                            "severity": "error",
+                            "path": path,
+                            "message": f"expected string matching {pattern}",
+                        }
+                    )
     if isinstance(value, dict):
         for key in schema.get("required", []) or []:
             if key not in value:

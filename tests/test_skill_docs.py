@@ -481,6 +481,18 @@ def test_mockup_factory_skill_preconditions_include_the_three_gate_commands() ->
         assert phrase in skill
 
 
+# @spec AC-011: docs seed checklist via penflow checklist-from-drift — .specs/features/055-checklist-from-drift-seeding/spec.md#ac-011
+def test_mockup_factory_docs_seed_checklist_via_checklist_from_drift() -> None:
+    skill = MOCKUP_SKILL.read_text(encoding="utf-8")
+    workflow = MOCKUP_WORKFLOW.read_text(encoding="utf-8")
+
+    for document in (skill, workflow):
+        assert "penflow checklist-from-drift" in document
+        # The contract gate is machine-seeded; other-gate items are appended
+        # at the skill layer only after seeding.
+        assert "after seeding" in document
+
+
 def test_penflow_python_core_has_no_mockup_factory_runtime_dependencies() -> None:
     forbidden_imports = (
         "appium",
@@ -517,3 +529,30 @@ def test_penflow_python_core_has_no_mockup_factory_runtime_dependencies() -> Non
         "xcode",
     ):
         assert token not in pyproject
+
+
+# @spec AC-010: Skill docs pin runId, theme-fingerprint, and --theme-css — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#ac-010
+def test_mockup_factory_docs_bind_evidence_to_run_and_theme() -> None:
+    visual = MOCKUP_VISUAL.read_text(encoding="utf-8")
+    workflow = MOCKUP_WORKFLOW.read_text(encoding="utf-8")
+    skill = MOCKUP_SKILL.read_text(encoding="utf-8")
+
+    # Step 5 (evidence artifacts write) stamps the manifest with run identity
+    # and the theme fingerprint obtained via the command.
+    for phrase in ("runId", "penflow theme-fingerprint", "theme"):
+        assert phrase in visual
+    # The gate command is armed with the theme in all three documents.
+    for document in (visual, workflow, skill):
+        assert "--theme-css" in document
+        assert "penflow theme-fingerprint" in document
+        assert "runId" in document
+
+
+def test_readme_documents_theme_fingerprint_and_armed_gate() -> None:
+    readme = README.read_text(encoding="utf-8")
+
+    assert "penflow theme-fingerprint theme.css --json" in readme
+    assert "--theme-css" in readme
+    assert "evidence.theme.stale" in readme
+    assert "evidence.theme.missing" in readme
+    assert "runId" in readme

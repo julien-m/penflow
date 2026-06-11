@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from pathlib import Path
 from typing import Any
@@ -77,11 +78,64 @@ def load_theme(theme_css_path: str | Path | None = None) -> dict[str, Any]:
     return {"variables": variables, "style": style}
 
 
+def theme_fingerprint(theme_css_path: str | Path) -> dict[str, str]:
+    # @spec FR-002: Shared raw-bytes SHA-256 helper — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#fr-002
+    """Fingerprint a theme CSS file as the SHA-256 of its raw bytes.
+
+    No token parsing, no whitespace or encoding normalization: the digest is
+    independently reproducible via ``shasum -a 256`` and any byte change
+    (including CRLF/comment edits) changes it by design. Both the
+    `theme-fingerprint` subcommand and the `validate-visual-evidence`
+    `--theme-css` gate call this single helper.
+
+    Args:
+        theme_css_path: Path to the theme CSS file. Any readable file
+            fingerprints — content is never validated (0-byte files included).
+
+    Returns:
+        ``{"path": <path as passed>, "sha256": <64 lowercase hex chars>}``.
+
+    Raises:
+        FileNotFoundError: If the path is missing or not a regular file
+            (directories fail here too — fail closed).
+        OSError: If the file exists but cannot be read.
+    """
+    path = Path(theme_css_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"theme CSS not found: {path}")
+    return {
+        "path": str(theme_css_path),
+        "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+    }
+
+
 def parse_css_custom_properties(css: str) -> dict[str, str]:
-    """Extract `--name: value` declarations from CSS text."""
+    """Extract `--name: value` declarations from CSS text.
+
+    Scope-aware: when one or more ``:root { ... }`` blocks exist, only their
+    declarations are read so a shadcn-style ``.dark { ... }`` override block
+    never replaces the light-mode (default) palette. Without any ``:root``
+    block the whole text is scanned (token fragments stay supported). The
+    first declaration of a name wins in both modes.
+    """
+    # Strip /* ... */ comments first so a commented-out `:root` or selector
+    # fragment can never open or pollute a scope. Strings are not handled —
+    # custom-property values with braces inside quotes are out of scope for
+    # the draft palette (shadcn/tailwind themes never produce them).
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
+    # Matches a flat rule whose selector list contains `:root` and captures its
+    # body (custom-property values never contain braces, see the regex below).
+    root_block_re = re.compile(r"(?m)^[^{}]*:root[^{}]*\{([^}]*)\}")
     # Matches a CSS custom property declaration up to the value terminator.
     custom_property_re = re.compile(r"--([A-Za-z0-9_-]+)\s*:\s*([^;{}]+)")
-    return {name: value.strip() for name, value in custom_property_re.findall(css)}
+    scopes = [match.group(1) for match in root_block_re.finditer(css)] or [css]
+    tokens: dict[str, str] = {}
+    for body in scopes:
+        for name, value in custom_property_re.findall(body):
+            # First declaration wins — later `.dark`/duplicate overrides are
+            # runtime concerns, not part of the canonical draft palette.
+            tokens.setdefault(name, value.strip())
+    return tokens
 
 
 def theme_number(raw_value: str) -> int | float | str:
