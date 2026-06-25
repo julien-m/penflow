@@ -74,8 +74,9 @@ A themed but structurally generic output is a failure. Reject screens that ignor
 5. **Apply guided fixes (bounded loop, `iteration <= 3`):** change only audited checklist items that are open gate issues. No broad redesign, no unanchored "polish pass", no invented product behavior.
 6. **Revalidate anchors:** rerun the full Penflow command chain from Preconditions after every fix iteration and recompute all gates — no PASS without a final clean run.
 7. **Run Visual Evidence Gate:**
-   - Artifacts: open/render the `.pen`, export PNGs via `export_nodes`, dump `snapshot_layout` to `layout-snapshot.json`, inspect `get_screenshot` and answer ONLY the five locked vision categories (`visual_balance`, `rendering_artifacts`, `readability`, `perceived_hierarchy`, `imagery_quality`).
-   - Coherence (multi-screen sets): export all audited screens at a uniform scale, capture one contact sheet, answer ONLY the four coherence categories (`cross_screen_rhythm`, `palette_coherence`, `typography_coherence`, `component_recognition`) in the report's `coherence` section — required when the expected tree has ≥ 2 screens; the numeric anchor stays the 047 `check-consistency` report.
+   - Artifacts: open/render the `.pen`, export PNGs via `export_nodes`, expose each exported screen as a Markdown image with its absolute path, run `visual-preview url <absolute-path>` when available for browser annotation, dump `snapshot_layout` to `layout-snapshot.json`, inspect `get_screenshot` and answer ONLY the five locked vision categories (`visual_balance`, `rendering_artifacts`, `readability`, `perceived_hierarchy`, `imagery_quality`).
+   - Coherence (multi-screen sets): export all audited screens at a uniform scale, capture one `contact-sheet.png`, expose it through the same Markdown image + `visual-preview url <absolute-path>` channels, answer ONLY the four coherence categories (`cross_screen_rhythm`, `palette_coherence`, `typography_coherence`, `component_recognition`) in the report's `coherence` section — required when the expected tree has ≥ 2 screens; the numeric anchor stays the 047 `check-consistency` report.
+   - Preview boundary: `visual-preview` is for annotation and iteration only. Preview URLs are not canonical proof and must not be written into `manifest.json` or `vision-report.json`; the canonical proof remains `penflow validate-visual-evidence` exit 0. If `visual-preview` is unavailable, keep the Markdown image and record browser preview unavailable in operator notes/status.
    - Manifest stamps: write `.mockup-validation/visual-evidence/manifest.json` stamped with `runId` (ISO-8601 timestamp + short slug recommended) and the `theme` block from `penflow theme-fingerprint <theme.css> --json`, plus `vision-report.json` (legacy `visual-report.json` is deprecated).
    - Gate: `penflow validate-visual-evidence .mockup-validation/visual-evidence --expected expected-ui-tree.json --theme-css <theme.css> --json` — the gate is the exit code, not prose.
    - Stale theme: a modified theme.css deterministically invalidates stale packets (`evidence.theme.missing`/`evidence.theme.stale`) and forces a re-run of the bounded loop.
@@ -90,9 +91,9 @@ Critical = any error-severity gate issue or any `blocking: true` item (drift or 
 
 ## Runtime Boundary
 
-Allowed from this skill: Pencil MCP operations, screenshots, exported PNGs, and independent `cc-hub codex` audit calls when available.
+Allowed from this skill: Pencil MCP operations, screenshots, exported PNGs, `visual-preview url` browser annotation for exported PNGs/contact sheets, and independent `cc-hub codex` audit calls when available.
 
-Forbidden in Penflow Python core: importing or depending on Pencil MCP, cc-hub, browser automation, simulators, Playwright, React Native, Xcode, or a UI runtime.
+Forbidden in Penflow Python core: importing or depending on Pencil MCP, cc-hub, `visual-preview`, browser automation, simulators, Playwright, React Native, Xcode, or a UI runtime.
 
 ## Output Layout
 

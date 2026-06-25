@@ -440,6 +440,32 @@ def test_mockup_factory_documents_cross_mockup_coherence_contact_sheet() -> None
         assert phrase in workflow
 
 
+# @spec AC-001: exported PNGs use terminal and browser preview channels — .specs/features/057-visual-preview-proof-channel/spec.md#ac-001
+def test_mockup_factory_docs_expose_pngs_through_visual_preview_channel() -> None:
+    visual = MOCKUP_VISUAL.read_text(encoding="utf-8")
+    skill = MOCKUP_SKILL.read_text(encoding="utf-8")
+    mockup_readme = MOCKUP_README.read_text(encoding="utf-8")
+    root_readme = README.read_text(encoding="utf-8")
+    combined = "\n".join([visual, skill, mockup_readme, root_readme])
+
+    for phrase in (
+        "visual-preview url",
+        "Markdown image",
+        "absolute path",
+        "contact-sheet.png",
+        "annotation and iteration only",
+        "preview URLs",
+        "not canonical proof",
+        "penflow validate-visual-evidence",
+        "exit 0",
+        "visual-preview is unavailable",
+        "browser preview unavailable",
+        "Allowed from this skill",
+        "Forbidden in Penflow Python core",
+    ):
+        assert phrase in combined
+
+
 # @spec AC-003: bounded fix-re-audit loop — .specs/features/052-prescriptive-rubric-bounded-fix-loop/spec.md#ac-003
 def test_mockup_factory_workflow_bounds_the_fix_loop() -> None:
     workflow = MOCKUP_WORKFLOW.read_text(encoding="utf-8")

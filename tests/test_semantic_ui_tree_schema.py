@@ -104,9 +104,11 @@ def test_semantic_schema_does_not_add_feature_036_or_later_runtime_pipeline() ->
     # runtime adapter). Feature 056 is in scope — it ships the theme
     # fingerprint binding (`penflow theme-fingerprint` + the
     # `validate-visual-evidence --theme-css` gate, stdlib hashing of local
-    # bytes only, no runtime adapter); feature 057 remains guarded.
+    # bytes only, no runtime adapter). Feature 057 is in scope — it ships the
+    # Mockup Factory visual-preview proof channel at the skill/docs layer only,
+    # with no Python runtime adapter; feature 058 remains guarded.
     future_feature_dirs: list[Path] = []
-    for feature_number in range(57, 58):
+    for feature_number in range(58, 59):
         future_feature_dirs.extend((ROOT / ".specs" / "features").glob(f"{feature_number:03d}-*"))
     assert future_feature_dirs == []
     assert not (ROOT / "penflow" / "semantic_validator.py").exists()

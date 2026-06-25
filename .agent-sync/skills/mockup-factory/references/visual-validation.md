@@ -14,7 +14,11 @@ Run this gate after the deterministic Penflow anchors pass and before final PASS
 
 Use Pencil MCP or an equivalent Pencil renderer. All artifacts go to `.mockup-validation/visual-evidence/`:
 
-1. **Export PNGs** — `export_nodes` one PNG per audited screen (`<pencil_node_id>.png`). Every PNG must exist and be non-empty.
+1. **Export PNGs and expose previews** — `export_nodes` one PNG per audited screen (`<pencil_node_id>.png`). Every PNG must exist and be non-empty. Immediately after each export, expose the image in both human-review channels:
+   - Terminal: emit a Markdown image using the absolute path, e.g. `![checkoutScreen](/absolute/path/.mockup-validation/visual-evidence/checkoutScreen.png)`.
+   - Browser annotation: run `visual-preview url /absolute/path/.mockup-validation/visual-evidence/checkoutScreen.png` when available.
+
+   Browser preview is for annotation and iteration only. Preview URLs are not canonical proof and must not be written into `manifest.json` or `vision-report.json`; the canonical proof remains `penflow validate-visual-evidence` exit 0. If visual-preview is unavailable or fails, keep the Markdown image, record browser preview unavailable in operator notes/status, and continue the evidence packet without downgrading it solely for the missing preview channel.
 2. **Dump the layout snapshot** — capture `snapshot_layout` per screen and write `layout-snapshot.json`: `{"screens": [{"screen_id", "pencil_node_id", "width", "height"}]}`. Penflow cross-checks each screen against the expected root bbox within ±4px (`evidence.snapshot.bbox_mismatch`).
 3. **Run the vision pass (screenshot inspection)** — inspect each exported screen (e.g. via `get_screenshot`) and answer **ONLY** the five locked vision categories, one evidence sentence each (≥ 10 characters), per screen:
    - `visual_balance`
@@ -39,7 +43,7 @@ Use Pencil MCP or an equivalent Pencil renderer. All artifacts go to `.mockup-va
 Per-screen criteria judge each mockup in isolation; the coherence pass proves the set reads as one product. Run it after the per-screen vision pass:
 
 1. **Export all audited screens at a uniform scale** — `export_nodes` every audited screen with the same scale factor, so size differences on the sheet are real design differences, not export artifacts.
-2. **Capture one contact sheet** — a single `get_screenshot` of the board showing all screens, or a grid composed from the exported PNGs listed in the manifest. Save it in the evidence directory and reference it as `coherence.contact_sheet_png`. It must exist non-empty on disk.
+2. **Capture one contact sheet** — a single `get_screenshot` of the board showing all screens, or a grid composed from the exported PNGs listed in the manifest. Save it as `contact-sheet.png` in the evidence directory and reference it as `coherence.contact_sheet_png`. It must exist non-empty on disk. Immediately expose it as a Markdown image with its absolute path and run `visual-preview url <absolute-path-to-contact-sheet.png>` when available; this browser preview is annotation-only and never replaces the deterministic contact-sheet PNG check.
 3. **Run one vision pass over the contact sheet** answering **ONLY** the four locked coherence categories, one evidence sentence each (≥ 10 characters):
    - `cross_screen_rhythm` — do spacing rhythm and layout density read consistently across screens?
    - `palette_coherence` — does the set read as one palette, with accent colors used for the same intents?
