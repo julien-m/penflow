@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .context import Context, infer_role
 from .semantic_enrichment import (
     PenRecord,
     SemanticRecord,
@@ -17,6 +18,7 @@ from .semantic_enrichment import (
     _pen_records_by_semantic_id,
     _role_is_compatible,
     _semantic_records,
+    _normalize,
 )
 from .semantic_validation import validate_semantic_tree
 
@@ -72,7 +74,7 @@ def pencil_context_map(
     return {
         "version": MAP_VERSION,
         "kind": "pencil-context-map",
-        "status": "PARTIAL" if ambiguous or unmapped else "PASS",
+        "status": "PARTIAL" if created or ambiguous or unmapped else "PASS",
         "matched": matched,
         "created": created,
         "ambiguous": ambiguous,
@@ -86,6 +88,7 @@ def write_pencil_context_map(
     out_path: str | Path,
     *,
     pen_out: str | Path | None = None,
+    create_placeholders: bool = False,
 ) -> dict[str, Any]:
     """Write `pencil-context-map.json` and optionally a mapped Pencil copy.
 
@@ -94,13 +97,14 @@ def write_pencil_context_map(
         tree_path: Valid `semantic-ui-tree.json`.
         out_path: Destination context-map JSON file.
         pen_out: Optional destination for a Pencil copy enriched only on matched nodes.
+        create_placeholders: When true, unresolved semantic nodes are recorded as placeholders.
 
     Returns:
         The generated mapping artifact.
     """
     pen = json.loads(Path(pen_path).read_text(encoding="utf-8"))
     tree = json.loads(Path(tree_path).read_text(encoding="utf-8"))
-    context_map = pencil_context_map(pen, tree, create_missing=pen_out is not None)
+    context_map = pencil_context_map(pen, tree, create_missing=create_placeholders)
     Path(out_path).write_text(
         json.dumps(context_map, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -170,7 +174,7 @@ def _match_conservative_candidates(
         elif create_missing:
             created.append(_created_entry(semantic))
         else:
-            unmapped.append(_unmapped_entry(semantic))
+            unmapped.append(_unmapped_entry(semantic, pen_records))
 
 
 def _mapped_pen_copy(
@@ -218,22 +222,73 @@ def _ambiguous_entry(
 ) -> dict[str, Any]:
     return {
         "semantic_id": semantic.semantic_id,
+        "screen_id": _screen_id(semantic),
         "role": semantic.role,
         "strategy": strategy,
+        "candidates": [_candidate_entry(record) for record in candidates[:3]],
+    }
+
+
+def _unmapped_entry(semantic: SemanticRecord, candidates: list[PenRecord]) -> dict[str, Any]:
+    return {
+        "semantic_id": semantic.semantic_id,
+        "screen_id": _screen_id(semantic),
+        "role": semantic.role,
+        "parent_semantic_id": semantic.parent_semantic_id,
+        "reason": "no conservative Pencil match found",
         "candidates": [
-            {"pencil_node_id": str(record.node.get("id")), "pencil_path": _path_string(record.path)}
-            for record in candidates
+            _candidate_entry(record) for record in _closest_candidates(semantic, candidates)
         ],
     }
 
 
-def _unmapped_entry(semantic: SemanticRecord) -> dict[str, Any]:
+def _closest_candidates(semantic: SemanticRecord, candidates: list[PenRecord]) -> list[PenRecord]:
+    semantic_label = _normalize(
+        str(semantic.node.get("text") or semantic.semantic_id.rsplit(".", 1)[-1])
+    )
+
+    def score(record: PenRecord) -> tuple[int, str]:
+        labels = _pen_label_strings(record.node)
+        value = 0
+        if _role_is_compatible(record.node, semantic.role):
+            value += 4
+        if semantic_label in {_normalize(label) for label in labels}:
+            value += 3
+        if any(semantic_label in _normalize(label) for label in labels):
+            value += 2
+        if _screen_id(semantic) and record.path[:1] == (0,):
+            value += 1
+        return (-value, _path_string(record.path))
+
+    return sorted(candidates, key=score)[:3]
+
+
+def _candidate_entry(record: PenRecord) -> dict[str, Any]:
+    context = Context.from_raw(record.node.get("context"))
+    labels = _pen_label_strings(record.node)
     return {
-        "semantic_id": semantic.semantic_id,
-        "role": semantic.role,
-        "parent_semantic_id": semantic.parent_semantic_id,
-        "reason": "no conservative Pencil match found",
+        "pencil_node_id": str(record.node.get("id")),
+        "pencil_path": _path_string(record.path),
+        "name": record.node.get("name"),
+        "label": labels[0] if labels else None,
+        "role": infer_role(str(record.node.get("type") or "frame"), context),
     }
+
+
+def _pen_label_strings(node: dict[str, Any]) -> list[str]:
+    labels = [
+        str(value)
+        for value in (node.get("name"), node.get("content"))
+        if isinstance(value, str) and value.strip()
+    ]
+    for child in node.get("children", []) or []:
+        if isinstance(child, dict) and isinstance(child.get("content"), str):
+            labels.append(str(child["content"]))
+    return labels
+
+
+def _screen_id(semantic: SemanticRecord) -> str:
+    return semantic.semantic_id.split(".", 1)[0]
 
 
 def _is_already_ambiguous(semantic_id: str, ambiguous: list[dict[str, Any]]) -> bool:

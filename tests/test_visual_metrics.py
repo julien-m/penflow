@@ -79,6 +79,12 @@ def _write_tree(tmp_path: Path, tree: dict[str, Any], name: str = "expected.json
     return path
 
 
+def _write_layout_snapshot(tmp_path: Path, snapshot: dict[str, Any]) -> Path:
+    path = tmp_path / "layout-snapshot.json"
+    path.write_text(json.dumps(snapshot), encoding="utf-8")
+    return path
+
+
 def _text_on_background(text_fill: str, background_fill: str, **text_visual: Any) -> dict[str, Any]:
     visual = {"fill": text_fill, "fontSize": 16, **text_visual}
     text = _node("s1.label", "text", text="Hi", visual=visual)
@@ -283,6 +289,129 @@ def test_masked_nodes_skip_geometry_checks(tmp_path: Path) -> None:
     assert _issues_with_code(audit_visual(path), "visual.bbox.overlap") == []
 
 
+def test_flex_parent_skips_theoretical_overlap_and_overflow(tmp_path: Path) -> None:
+    first = _button("s1.primary", 20, 20, x=0, y=0)
+    second = _button("s1.secondary", 44, 44, x=0, y=0)
+    path = _write_tree(
+        tmp_path,
+        _tree(
+            _screen(
+                "s1",
+                [first, second],
+                visual={"layout": "vertical"},
+                bbox={"x": 0, "y": 0, "width": 40, "height": 40},
+            )
+        ),
+    )
+    report = audit_visual(path)
+
+    assert _issues_with_code(report, "visual.bbox.overlap") == []
+    assert _issues_with_code(report, "visual.bbox.overflow") == []
+    [touch_issue] = _issues_with_code(report, "visual.touch_target.too_small")
+    assert touch_issue["semantic_id"] == "s1.primary"
+
+
+def test_clean_layout_snapshot_overrides_theoretical_flex_overlap(tmp_path: Path) -> None:
+    first = _node("s1.a", "container", bbox={"x": 0, "y": 0, "width": 100, "height": 100})
+    second = _node("s1.b", "container", bbox={"x": 0, "y": 0, "width": 100, "height": 100})
+    path = _write_tree(
+        tmp_path, _tree(_screen("s1", [first, second], visual={"layout": "vertical"}))
+    )
+    snapshot_path = _write_layout_snapshot(
+        tmp_path,
+        {
+            "screens": [
+                {
+                    "screen_id": "s1",
+                    "nodes": [
+                        {
+                            "semantic_id": "s1",
+                            "bbox": {"x": 0, "y": 0, "width": 390, "height": 844},
+                        },
+                        {
+                            "semantic_id": "s1.a",
+                            "bbox": {"x": 16, "y": 16, "width": 100, "height": 100},
+                        },
+                        {
+                            "semantic_id": "s1.b",
+                            "bbox": {"x": 16, "y": 132, "width": 100, "height": 100},
+                        },
+                    ],
+                }
+            ]
+        },
+    )
+    report = audit_visual(path, layout_snapshot=snapshot_path)
+
+    assert _issues_with_code(report, "visual.bbox.overlap") == []
+    assert _issues_with_code(report, "visual.bbox.overflow") == []
+    assert report["inputs"]["layout_snapshot"] == str(snapshot_path)
+
+
+def test_partial_layout_snapshot_does_not_fall_back_to_flex_theoretical_geometry(
+    tmp_path: Path,
+) -> None:
+    first = _node("s1.a", "container", bbox={"x": 0, "y": 0, "width": 100, "height": 100})
+    second = _node("s1.b", "container", bbox={"x": 0, "y": 0, "width": 100, "height": 100})
+    path = _write_tree(
+        tmp_path, _tree(_screen("s1", [first, second], visual={"layout": "vertical"}))
+    )
+    snapshot_path = _write_layout_snapshot(
+        tmp_path,
+        {
+            "screens": [
+                {
+                    "screen_id": "s1",
+                    "nodes": [
+                        {"semantic_id": "s1", "bbox": {"x": 0, "y": 0, "width": 390, "height": 844}}
+                    ],
+                }
+            ]
+        },
+    )
+
+    report = audit_visual(path, layout_snapshot=snapshot_path)
+    assert _issues_with_code(report, "visual.bbox.overlap") == []
+    assert _issues_with_code(report, "visual.bbox.overflow") == []
+
+
+def test_layout_snapshot_geometry_still_reports_real_overlap(tmp_path: Path) -> None:
+    first = _node("s1.a", "container", bbox={"x": 0, "y": 0, "width": 100, "height": 100})
+    second = _node("s1.b", "container", bbox={"x": 0, "y": 120, "width": 100, "height": 100})
+    path = _write_tree(
+        tmp_path, _tree(_screen("s1", [first, second], visual={"layout": "vertical"}))
+    )
+    snapshot_path = _write_layout_snapshot(
+        tmp_path,
+        {
+            "screens": [
+                {
+                    "screen_id": "s1",
+                    "nodes": [
+                        {
+                            "semantic_id": "s1",
+                            "bbox": {"x": 0, "y": 0, "width": 390, "height": 844},
+                        },
+                        {
+                            "semantic_id": "s1.a",
+                            "bbox": {"x": 16, "y": 16, "width": 100, "height": 100},
+                        },
+                        {
+                            "semantic_id": "s1.b",
+                            "bbox": {"x": 80, "y": 80, "width": 100, "height": 100},
+                        },
+                    ],
+                }
+            ]
+        },
+    )
+    [issue] = _issues_with_code(
+        audit_visual(path, layout_snapshot=snapshot_path), "visual.bbox.overlap"
+    )
+    assert issue["semantic_id"] == "s1.a"
+    assert issue["other_semantic_id"] == "s1.b"
+
+
 # --- Text overflow heuristic (FR-005) ---
 
 
@@ -463,6 +592,57 @@ def test_generated_report_validates_against_bundled_schema(tmp_path: Path) -> No
     assert main(["validate-report", str(report_path), "--schema", "--json"]) == 0
 
 
+def test_cli_accepts_layout_snapshot_for_visual_audit(tmp_path: Path) -> None:
+    first = _node("s1.a", "container", bbox={"x": 0, "y": 0, "width": 100, "height": 100})
+    second = _node("s1.b", "container", bbox={"x": 0, "y": 0, "width": 100, "height": 100})
+    path = _write_tree(
+        tmp_path, _tree(_screen("s1", [first, second], visual={"layout": "vertical"}))
+    )
+    snapshot_path = _write_layout_snapshot(
+        tmp_path,
+        {
+            "screens": [
+                {
+                    "screen_id": "s1",
+                    "nodes": [
+                        {
+                            "semantic_id": "s1",
+                            "bbox": {"x": 0, "y": 0, "width": 390, "height": 844},
+                        },
+                        {
+                            "semantic_id": "s1.a",
+                            "bbox": {"x": 8, "y": 8, "width": 100, "height": 100},
+                        },
+                        {
+                            "semantic_id": "s1.b",
+                            "bbox": {"x": 8, "y": 128, "width": 100, "height": 100},
+                        },
+                    ],
+                }
+            ]
+        },
+    )
+    report_path = tmp_path / "visual-metrics-report.json"
+
+    assert (
+        main(
+            [
+                "audit-visual",
+                str(path),
+                "--layout-snapshot",
+                str(snapshot_path),
+                "--out",
+                str(report_path),
+                "--json",
+            ]
+        )
+        == 0
+    )
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["inputs"]["layout_snapshot"] == str(snapshot_path)
+    assert main(["validate-report", str(report_path), "--schema", "--json"]) == 0
+
+
 def test_report_schema_fails_closed_on_additional_property(tmp_path: Path) -> None:
     path = _write_tree(tmp_path, _tree(_screen("s1", [_button("s1.pay", 44, 44)])))
     report_path = tmp_path / "visual-metrics-report.json"
@@ -484,7 +664,11 @@ def test_empty_screens_pass_trivially(tmp_path: Path) -> None:
         "nodes_checked": 0,
         "screens_checked": 0,
     }
-    assert report["inputs"] == {"expected_tree": str(path), "theme_css": None}
+    assert report["inputs"] == {
+        "expected_tree": str(path),
+        "theme_css": None,
+        "layout_snapshot": None,
+    }
 
 
 def test_engine_rejects_malformed_screens(tmp_path: Path) -> None:

@@ -5,7 +5,7 @@
   "title": "Penflow Vision Report",
   "description": "Skill-layer vision pass results locked to vision-only categories. Deterministic categories (contrast, touch targets, overlap/overflow, tokens, consistency) belong to penflow audit-visual / lint-tokens / check-consistency and are rejected here.",
   "type": "object",
-  "required": ["version", "kind", "status", "renderer", "sourceFile", "model", "screens"],
+  "required": ["version", "kind", "status", "renderer", "sourceFile", "model", "generated_by", "inputs", "screens"],
   "additionalProperties": false,
   "properties": {
     "version": {"type": "integer"},
@@ -14,7 +14,56 @@
     "renderer": {"type": "string"},
     "sourceFile": {"type": "string"},
     "model": {"type": "string"},
+    "generated_by": {"type": "string", "minLength": 1},
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["file", "sha256"],
+        "additionalProperties": false,
+        "properties": {
+          "file": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
     "validatedAt": {"type": "string"},
+    "reference_fidelity": {
+      "type": "array",
+      "description": "Optional per-reference-screen fidelity pass. Required by validate-visual-evidence when manifest.json declares references_manifest.",
+      "items": {
+        "type": "object",
+        "required": ["screen_id", "reference", "export", "contact_sheet", "criteria"],
+        "additionalProperties": false,
+        "properties": {
+          "screen_id": {"type": "string"},
+          "reference": {"type": "string"},
+          "export": {"type": "string"},
+          "contact_sheet": {"type": "string"},
+          "criteria": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["category", "result", "evidence", "blocking"],
+              "additionalProperties": false,
+              "properties": {
+                "category": {
+                  "enum": [
+                    "layout_match",
+                    "palette_match",
+                    "component_parity",
+                    "density_match"
+                  ]
+                },
+                "result": {"enum": ["pass", "fail", "warning"]},
+                "evidence": {"type": "string", "minLength": 10},
+                "blocking": {"type": "boolean"}
+              }
+            }
+          }
+        }
+      }
+    },
     "coherence": {
       "type": "object",
       "description": "Optional cross-mockup coherence pass over one uniform-scale contact sheet. Required by validate-visual-evidence when the expected tree has >= 2 screens. Numeric cross-screen facts belong to penflow check-consistency and are rejected here.",

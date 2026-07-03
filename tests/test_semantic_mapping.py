@@ -74,7 +74,13 @@ def test_write_pencil_context_map_reports_all_buckets_and_preserves_existing_lay
     map_path = tmp_path / "pencil-context-map.json"
     pen_out = tmp_path / "ui.mapped.pen"
 
-    result = write_pencil_context_map(pen_path, tree_path, map_path, pen_out=pen_out)
+    result = write_pencil_context_map(
+        pen_path,
+        tree_path,
+        map_path,
+        pen_out=pen_out,
+        create_placeholders=True,
+    )
     mapped_pen = json.loads(pen_out.read_text(encoding="utf-8"))
     after_visual = visual_snapshot_by_id(mapped_pen)
 
@@ -83,6 +89,7 @@ def test_write_pencil_context_map_reports_all_buckets_and_preserves_existing_lay
     assert [item["semantic_id"] for item in result["created"]] == ["checkout.help"]
     assert [item["semantic_id"] for item in result["ambiguous"]] == ["checkout.title"]
     assert result["unmapped"] == []
+    assert result["status"] == "PARTIAL"
     for node_id, snapshot in before_visual.items():
         assert after_visual[node_id] == snapshot
 
@@ -115,6 +122,7 @@ def test_map_pencil_context_cli_outputs_json_and_buckets(tmp_path: Path) -> None
                 str(map_path),
                 "--pen-out",
                 str(pen_out),
+                "--create-placeholders",
                 "--json",
             ]
         )
@@ -122,7 +130,85 @@ def test_map_pencil_context_cli_outputs_json_and_buckets(tmp_path: Path) -> None
     )
     context_map = json.loads(map_path.read_text(encoding="utf-8"))
 
-    assert context_map["status"] == "PASS"
+    assert context_map["status"] == "PARTIAL"
     assert {key for key in ("matched", "created", "ambiguous", "unmapped")} <= set(context_map)
     assert [item["semantic_id"] for item in context_map["created"]] == ["checkout.help"]
     assert pen_out.exists()
+
+
+def test_map_pencil_context_strict_anchors_fails_with_unmapped_suggestions(
+    tmp_path: Path,
+) -> None:
+    pen_path = write_json(tmp_path / "ui.pen", legacy_pen())
+    tree_path = write_json(tmp_path / "semantic-ui-tree.json", mapping_tree())
+    map_path = tmp_path / "pencil-context-map.json"
+
+    assert (
+        main(
+            [
+                "map-pencil-context",
+                str(pen_path),
+                str(tree_path),
+                "--out",
+                str(map_path),
+                "--strict-anchors",
+                "--json",
+            ]
+        )
+        == 1
+    )
+    context_map = json.loads(map_path.read_text(encoding="utf-8"))
+
+    assert context_map["status"] == "PARTIAL"
+    assert [item["semantic_id"] for item in context_map["unmapped"]] == ["checkout.help"]
+    first_unmapped = context_map["unmapped"][0]
+    assert first_unmapped["screen_id"] == "checkout"
+    assert len(first_unmapped["candidates"]) == 3
+    assert {"pencil_node_id", "pencil_path", "name", "label", "role"} <= set(
+        first_unmapped["candidates"][0]
+    )
+
+
+def test_map_pencil_context_strict_anchors_fails_with_ambiguous_candidate_details(
+    tmp_path: Path,
+) -> None:
+    pen = legacy_pen()
+    pen["children"][0]["children"].insert(
+        1,
+        {
+            "id": "duplicateTitle",
+            "type": "text",
+            "name": "Checkout duplicate",
+            "content": "Checkout",
+            "width": 240,
+            "fill": "#222222",
+        },
+    )
+    pen_path = write_json(tmp_path / "ui.pen", pen)
+    tree_path = write_json(tmp_path / "semantic-ui-tree.json", mapping_tree())
+    map_path = tmp_path / "pencil-context-map.json"
+
+    assert (
+        main(
+            [
+                "map-pencil-context",
+                str(pen_path),
+                str(tree_path),
+                "--out",
+                str(map_path),
+                "--strict-anchors",
+                "--json",
+            ]
+        )
+        == 1
+    )
+    context_map = json.loads(map_path.read_text(encoding="utf-8"))
+
+    assert [item["semantic_id"] for item in context_map["ambiguous"]] == ["checkout.title"]
+    ambiguous = context_map["ambiguous"][0]
+    assert ambiguous["screen_id"] == "checkout"
+    assert [candidate["pencil_node_id"] for candidate in ambiguous["candidates"]] == [
+        "hero",
+        "duplicateTitle",
+    ]
+    assert {candidate["role"] for candidate in ambiguous["candidates"]} == {"text"}

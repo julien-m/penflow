@@ -25,6 +25,7 @@ from .compare import LENIENT_THRESHOLD, STRICT_THRESHOLD, compare_tree_files
 from .consistency import check_consistency, write_consistency_report
 from .contracts import (
     _raise_if_no_context,
+    assert_contextualized_pen_input,
     code_ir_from_contract,
     code_ir_from_pen,
     extract_design_tokens,
@@ -40,6 +41,7 @@ from .drift import detect_drift
 from .evidence import validate_visual_evidence
 from .flow_contract import (
     FlowContractValidationError,
+    interactive_coverage_report,
     load_flow_contract_v2,
     validate_flow_contract_v2,
 )
@@ -54,7 +56,10 @@ from .pen import (
     validate_pen_context,
     validate_pen_context_against_contract,
 )
+from .pencil_sync import PencilSyncError, sync_pencil_to_disk
+from .reference_fidelity import validate_reference_fidelity
 from .reverse import reverse_pen
+from .run_pipeline import RunPipelineError, run_pipeline
 from .semantic import write_semantic_tree
 from .semantic_draft import write_pen_draft_from_semantic_tree
 from .semantic_enrichment import enrich_pen_from_semantic_tree
@@ -96,10 +101,25 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
+    run = sub.add_parser("run", help="run the full Penflow gate chain for a workspace")
+    run.add_argument("--target", required=True, help="workspace containing Penflow artifacts")
+    run.add_argument("--theme-css", default=None, help="optional theme.css path")
+    run.add_argument("--references", default=None, help="optional references directory")
+    run.add_argument("--strict", action="store_true", help="fail on warning-only gates")
+    run.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    run.set_defaults(func=cmd_run)
+
     inspect_cmd = sub.add_parser("inspect", help="inspect a .pen file")
     inspect_cmd.add_argument("--json", action="store_true", help="print machine-readable JSON")
     inspect_cmd.add_argument("pen")
     inspect_cmd.set_defaults(func=cmd_inspect)
+
+    pencil_sync = sub.add_parser("pencil-sync", help="save Pencil editor state and re-inspect disk")
+    pencil_sync.add_argument("pen")
+    pencil_sync.add_argument("--expect-min-nodes", type=int, default=None)
+    pencil_sync.add_argument("--expect-screens", type=int, default=None)
+    pencil_sync.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    pencil_sync.set_defaults(func=cmd_pencil_sync)
 
     validate_pen = sub.add_parser(
         "validate-pen", aliases=["validate"], help="validate .pen context"
@@ -189,6 +209,16 @@ def build_parser() -> argparse.ArgumentParser:
     map_context.add_argument("semantic_tree")
     map_context.add_argument("-o", "--out", required=True)
     map_context.add_argument("--pen-out", default=None)
+    map_context.add_argument(
+        "--strict-anchors",
+        action="store_true",
+        help="exit 1 when mapping leaves ambiguous, unmapped, or placeholder anchors",
+    )
+    map_context.add_argument(
+        "--create-placeholders",
+        action="store_true",
+        help="record missing semantic nodes as placeholders; report status stays PARTIAL",
+    )
     map_context.set_defaults(func=cmd_map_pencil_context)
 
     reverse = sub.add_parser("reverse-pen", help="reverse Pencil file into flow specs")
@@ -253,9 +283,9 @@ def build_parser() -> argparse.ArgumentParser:
     consistency.add_argument("-o", "--out", default="consistency-report.json")
     consistency.add_argument(
         "--group-by",
-        choices=["role", "role+intent"],
+        choices=["role", "role+intent", "role+intent+variant", "role+intent+variant+size-class"],
         default=None,
-        help="coarsen the component signature (default: role+intent+variant)",
+        help="component signature granularity (default: role+intent+variant)",
     )
     _add_lenient(consistency)
     consistency.set_defaults(func=cmd_check_consistency)
@@ -269,6 +299,11 @@ def build_parser() -> argparse.ArgumentParser:
     visual_metrics.add_argument("expected")
     visual_metrics.add_argument(
         "--theme-css", default=None, help="project theme.css resolving $pf-* fill references"
+    )
+    visual_metrics.add_argument(
+        "--layout-snapshot",
+        default=None,
+        help="Pencil snapshot_layout JSON whose real bboxes drive overlap/overflow checks",
     )
     visual_metrics.add_argument("-o", "--out", default="visual-metrics-report.json")
     _add_lenient(visual_metrics)
@@ -293,6 +328,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
     _add_lenient(visual_evidence)
     visual_evidence.set_defaults(func=cmd_validate_visual_evidence)
+
+    reference_fidelity = sub.add_parser(
+        "validate-reference-fidelity",
+        help="validate exported evidence PNGs against reference images",
+    )
+    reference_fidelity.add_argument(
+        "--json", action="store_true", help="print machine-readable JSON"
+    )
+    reference_fidelity.add_argument("evidence_dir")
+    reference_fidelity.add_argument(
+        "--references",
+        required=True,
+        help="references directory containing references-manifest.json",
+    )
+    reference_fidelity.set_defaults(func=cmd_validate_reference_fidelity)
 
     flow = sub.add_parser("validate-flow", help="validate flow contract")
     flow.add_argument("--json", action="store_true", help="print machine-readable JSON")
@@ -445,6 +495,33 @@ def cmd_inspect(args: argparse.Namespace) -> int:
     return 1 if result["errors"] else 0
 
 
+def cmd_run(args: argparse.Namespace) -> int:
+    try:
+        summary = run_pipeline(
+            args.target,
+            theme_css=args.theme_css,
+            references=args.references,
+            strict=args.strict,
+        )
+    except RunPipelineError as error:
+        raise PenflowError(str(error)) from error
+    _print(summary, args.json)
+    return int(summary["exit"])
+
+
+def cmd_pencil_sync(args: argparse.Namespace) -> int:
+    try:
+        result = sync_pencil_to_disk(
+            args.pen,
+            expect_min_nodes=args.expect_min_nodes,
+            expect_screens=args.expect_screens,
+        )
+    except PencilSyncError as error:
+        raise PenflowError(str(error)) from error
+    _print(result, args.json)
+    return 0 if result["status"] == "PASS" else 1
+
+
 def cmd_validate_pen(args: argparse.Namespace) -> int:
     raw = load_pen(args.pen)
     roots = parse_pen(raw)
@@ -506,9 +583,17 @@ def cmd_validate_flow_specs(args: argparse.Namespace) -> int:
 
 def cmd_validate_flow_contract(args: argparse.Namespace) -> int:
     # @spec FR-004: Primary strict contract CLI — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-004
-    issues = validate_flow_contract_v2(load_flow_contract_v2(args.contract))
+    contract = load_flow_contract_v2(args.contract)
+    issues = validate_flow_contract_v2(contract)
     code = _exit_code(issues, _is_lenient(args))
-    _print({"status": _status(code), "issues": issues}, args.json)
+    _print(
+        {
+            "status": _status(code),
+            "issues": issues,
+            "interactive_coverage": interactive_coverage_report(contract),
+        },
+        args.json,
+    )
     return code
 
 
@@ -544,6 +629,7 @@ def cmd_draft_pen_from_tree(args: argparse.Namespace) -> int:
             "status": "PASS",
             "out": args.out,
             "screens": len(draft["children"]),
+            "fidelity": "wireframe",
             "theme_css": args.theme_css,
         },
         args.json,
@@ -567,9 +653,15 @@ def cmd_map_pencil_context(args: argparse.Namespace) -> int:
         _print({"status": "FAIL", "issues": issues}, args.json)
         return 1
     context_map = write_pencil_context_map(
-        args.pen, args.semantic_tree, args.out, pen_out=args.pen_out
+        args.pen,
+        args.semantic_tree,
+        args.out,
+        pen_out=args.pen_out,
+        create_placeholders=args.create_placeholders,
     )
     _print(context_map | {"out": args.out, "pen_out": args.pen_out}, args.json)
+    if args.strict_anchors and context_map["status"] != "PASS":
+        return 1
     return 0
 
 
@@ -652,7 +744,7 @@ def cmd_check_consistency(args: argparse.Namespace) -> int:
     if not tree_path.exists():
         raise PenflowError(f"expected tree not found: {tree_path}")
     try:
-        report = check_consistency(tree_path, group_by=args.group_by)
+        report = check_consistency(tree_path, group_by=args.group_by, lenient=_is_lenient(args))
     except json.JSONDecodeError as error:
         raise PenflowError(f"expected tree is not valid JSON: {tree_path}: {error}") from error
     except ValueError as error:
@@ -681,7 +773,12 @@ def cmd_audit_visual(args: argparse.Namespace) -> int:
     except FileNotFoundError as error:
         raise PenflowError(str(error)) from error
     try:
-        report = audit_visual(tree_path, theme=theme, theme_css=args.theme_css)
+        report = audit_visual(
+            tree_path,
+            theme=theme,
+            theme_css=args.theme_css,
+            layout_snapshot=args.layout_snapshot,
+        )
     except json.JSONDecodeError as error:
         raise PenflowError(f"expected tree is not valid JSON: {tree_path}: {error}") from error
     except ValueError as error:
@@ -735,6 +832,16 @@ def cmd_validate_visual_evidence(args: argparse.Namespace) -> int:
         args.json,
     )
     return code
+
+
+def cmd_validate_reference_fidelity(args: argparse.Namespace) -> int:
+    # @spec FR-004: validate-reference-fidelity CLI with exits 0/1/2 — .specs/features/063-reference-fidelity/spec.md#fr-004
+    try:
+        report = validate_reference_fidelity(args.evidence_dir, args.references)
+    except (FileNotFoundError, ValueError, json.JSONDecodeError, OSError) as error:
+        raise PenflowError(str(error)) from error
+    _print(report, args.json)
+    return 0 if report["status"] == "PASS" else 1
 
 
 def cmd_validate_flow(args: argparse.Namespace) -> int:
@@ -859,6 +966,10 @@ def cmd_export_ir(args: argparse.Namespace) -> int:
 
 def cmd_code_ir(args: argparse.Namespace) -> int:
     # @spec FR-008: v2 contract handoff in code IR — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-008
+    try:
+        assert_contextualized_pen_input(args.from_context)
+    except (ValueError, json.JSONDecodeError, OSError) as error:
+        raise PenflowError(str(error)) from error
     ir = code_ir_from_pen(
         args.from_context,
         flow_id=args.flow_id,
@@ -1030,7 +1141,76 @@ def _validate_report_schema(report: Any, report_path: str | Path) -> list[dict[s
         return [{"severity": "error", "path": "$", "message": "report must be an object"}]
     schema_name = _report_schema_name(report, Path(report_path).name)
     schema = load_schema(schema_name)
-    return _validate_json_schema_subset(report, schema, "$")
+    issues = _validate_json_schema_subset(report, schema, "$")
+    if report.get("kind") == "penflow-mockup-audit":
+        issues.extend(_validate_mockup_audit_receipts(report, Path(report_path)))
+    return sorted(issues, key=lambda item: (item["path"], item["message"]))
+
+
+def _validate_mockup_audit_receipts(
+    report: dict[str, Any], report_path: Path
+) -> list[dict[str, Any]]:
+    gates = report.get("gates")
+    if not isinstance(gates, list):
+        return []
+    base = report_path.parent
+    issues: list[dict[str, Any]] = []
+    for index, gate in enumerate(gates):
+        if not isinstance(gate, dict):
+            continue
+        result = gate.get("result")
+        exit_code = gate.get("exit_code")
+        referenced_report = gate.get("report_path")
+        path_prefix = f"$.gates[{index}]"
+        if result == "not_run":
+            if exit_code is not None or referenced_report is not None:
+                issues.append(
+                    {
+                        "severity": "error",
+                        "path": path_prefix,
+                        "message": "not_run gates must use null exit_code and null report_path",
+                    }
+                )
+            continue
+        if result == "pass" and exit_code != 0:
+            issues.append(
+                {
+                    "severity": "error",
+                    "path": f"{path_prefix}.exit_code",
+                    "message": "pass gate must have exit_code 0",
+                }
+            )
+        if result == "fail" and (not isinstance(exit_code, int) or exit_code == 0):
+            issues.append(
+                {
+                    "severity": "error",
+                    "path": f"{path_prefix}.exit_code",
+                    "message": "fail gate must have a non-zero exit_code",
+                }
+            )
+        if not isinstance(referenced_report, str) or not referenced_report:
+            issues.append(
+                {
+                    "severity": "error",
+                    "path": f"{path_prefix}.report_path",
+                    "message": "executed gates must reference an existing report_path",
+                }
+            )
+            continue
+        resolved_report = (
+            Path(referenced_report)
+            if Path(referenced_report).is_absolute()
+            else base / referenced_report
+        )
+        if not resolved_report.is_file():
+            issues.append(
+                {
+                    "severity": "error",
+                    "path": f"{path_prefix}.report_path",
+                    "message": f"referenced report_path does not exist: {referenced_report}",
+                }
+            )
+    return issues
 
 
 def _validate_json_schema_subset(

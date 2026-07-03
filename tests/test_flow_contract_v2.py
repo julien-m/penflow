@@ -8,8 +8,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from penflow.cli import main
-from penflow.flow_contract import load_flow_contract_v2, validate_flow_contract_v2
+from penflow.flow_contract import (
+    interactive_coverage_report,
+    load_flow_contract_v2,
+    validate_flow_contract_v2,
+)
 
 
 def valid_contract() -> dict:
@@ -199,6 +205,69 @@ def test_contract_requires_action_on_interactive_nodes() -> None:
     assert any(
         issue["code"] == "contract.reference.interactive_action_required" for issue in issues
     )
+    assert any(issue["code"] == "contract.interactive_unbound" for issue in issues)
+
+
+def test_contract_reports_screen_interactive_coverage() -> None:
+    coverage = interactive_coverage_report(valid_contract())
+
+    assert coverage["summary"] == {"covered": 1, "static": 0, "total": 1, "uncovered": 0}
+    assert coverage["screens"][0]["interactive_actions"] == [
+        {
+            "node": "checkout.pay",
+            "semantic_id": "checkout.pay",
+            "role": "button",
+            "binding": "action",
+        }
+    ]
+
+
+def test_validate_flow_contract_cli_includes_interactive_coverage(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    contract_path = write_json(tmp_path / "contract.json", valid_contract())
+
+    assert main(["validate-flow-contract", str(contract_path), "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+
+    assert payload["interactive_coverage"]["summary"]["covered"] == 1
+    assert payload["interactive_coverage"]["screens"][0]["status"] == "covered"
+
+
+def test_contract_rejects_screen_without_interactive_action_or_static_justification() -> None:
+    contract = valid_contract()
+    contract["nodes"][0]["children"] = ["checkout.title"]
+    contract["nodes"] = contract["nodes"][:2]
+    contract["guards"] = []
+    contract["actions"] = []
+    contract["permissions"] = []
+    contract["mutations"] = []
+    contract["transitions"] = []
+
+    issues = validate_flow_contract_v2(contract)
+
+    assert any(
+        issue["code"] == "contract.interactive_unbound" and issue["path"] == "$.screens[0]"
+        for issue in issues
+    )
+
+
+def test_contract_accepts_static_screen_justification_without_interactive_action() -> None:
+    contract = valid_contract()
+    contract["screens"][0]["static"] = True
+    contract["screens"][0]["static_reason"] = "Read-only confirmation screen."
+    contract["nodes"][0]["children"] = ["checkout.title"]
+    contract["nodes"] = contract["nodes"][:2]
+    contract["guards"] = []
+    contract["actions"] = []
+    contract["permissions"] = []
+    contract["mutations"] = []
+    contract["transitions"] = []
+
+    issues = validate_flow_contract_v2(contract)
+
+    assert issues == []
+    assert interactive_coverage_report(contract)["screens"][0]["status"] == "static"
 
 
 def test_contract_rejects_transition_trigger_without_action_or_interactive_node() -> None:

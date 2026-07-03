@@ -343,6 +343,29 @@ def code_ir_from_pen(
     return ir
 
 
+def assert_contextualized_pen_input(pen_path: str | Path) -> None:
+    """Fail early when `code-ir --from-context` receives the wrong artifact."""
+    path = Path(pen_path)
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError(_code_ir_context_message(path, "input JSON is not an object"))
+    if "children" in data:
+        return
+    if "screens" in data:
+        raise ValueError(
+            _code_ir_context_message(path, "got expected-ui-tree.json or actual-ui-tree.json")
+        )
+    raise ValueError(_code_ir_context_message(path, "missing Pencil document children"))
+
+
+def _code_ir_context_message(path: Path, reason: str) -> str:
+    return (
+        "code-ir --from-context expects the contextualized .pen file with Pencil "
+        "`context` metadata, not expected-ui-tree.json; "
+        f"received {path} ({reason})"
+    )
+
+
 def _semantic_contract_action(
     action: dict[str, Any], contract_nodes: dict[str, dict[str, Any]]
 ) -> dict[str, Any]:

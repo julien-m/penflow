@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 # Padding canonicalization is shared with the compare engine (feature 048)
 # so compare-tree and check-consistency can never disagree on spacing forms.
@@ -24,7 +24,13 @@ REPORT_KIND = "penflow-consistency-report"
 REPORT_VERSION = 1
 
 DEFAULT_GROUP_BY = "role+intent+variant"
-GROUP_BY_CHOICES: tuple[str, ...] = ("role", "role+intent", DEFAULT_GROUP_BY)
+SIZE_CLASS_GROUP_BY = "role+intent+variant+size-class"
+GROUP_BY_CHOICES: tuple[str, ...] = (
+    "role",
+    "role+intent",
+    DEFAULT_GROUP_BY,
+    SIZE_CLASS_GROUP_BY,
+)
 
 # Numeric deviations from the baseline within this distance downgrade to warning.
 NUMERIC_TOLERANCE = 2.0
@@ -46,8 +52,23 @@ CHECKED_PROPERTIES: tuple[str, ...] = (
 # always design errors regardless of numeric distance.
 _ALWAYS_ERROR_PROPERTIES = frozenset({"fill", "fontFamily"})
 
+# Bucket boundaries intentionally follow common UI block bands: controls and
+# headers <=64px, compact regions <=128px, normal panels <=256px, large panels
+# <=512px, and full-height regions above that. This keeps a 56px header out of
+# the same group as an 820px panel without needing runtime layout execution.
+SIZE_CLASS_BUCKETS: tuple[tuple[str, float], ...] = (
+    ("xs", 64.0),
+    ("sm", 128.0),
+    ("md", 256.0),
+    ("lg", 512.0),
+)
 
-def check_consistency(tree_path: str | Path, *, group_by: str | None = None) -> dict[str, Any]:
+MAX_MESSAGE_EXAMPLES = 3
+
+
+def check_consistency(
+    tree_path: str | Path, *, group_by: str | None = None, lenient: bool = False
+) -> dict[str, Any]:
     # @spec FR-001: Cross-screen consistency engine — .specs/features/047-cross-screen-consistency-check/spec.md#fr-001
     # @spec FR-005: Deterministic ordering and byte-identical reruns — .specs/features/047-cross-screen-consistency-check/spec.md#fr-005
     """Check cross-screen component consistency in an expected UI tree.
@@ -59,6 +80,8 @@ def check_consistency(tree_path: str | Path, *, group_by: str | None = None) -> 
         group_by: Component signature granularity — one of ``GROUP_BY_CHOICES``.
             ``None`` selects the full default signature
             (role + context.intent + context.variant).
+        lenient: Downgrade all non-always-error property divergences to warning
+            in the emitted report.
 
     Returns:
         A strict consistency report dictionary
@@ -85,7 +108,7 @@ def check_consistency(tree_path: str | Path, *, group_by: str | None = None) -> 
             continue
         groups_checked += 1
         for prop in CHECKED_PROPERTIES:
-            issues.extend(_property_issues(signature, group, prop))
+            issues.extend(_property_issues(signature, group, prop, lenient=lenient))
     issues.sort(key=_issue_sort_key)
 
     errors = sum(1 for issue in issues if issue["severity"] == "error")
@@ -138,6 +161,8 @@ def _collect_members(tree: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
         for node in flatten_nodes(root):
             if not node.get("role") or _is_masked(node):
                 continue
+            if _is_anonymous_container(node):
+                continue
             members.append((screen_id, node))
     return members
 
@@ -155,10 +180,12 @@ def _signature(node: dict[str, Any], group_by: str) -> str:
     raw_context = node.get("context")
     context: dict[str, Any] = raw_context if isinstance(raw_context, dict) else {}
     parts = [f"role={node.get('role')}"]
-    if group_by in ("role+intent", DEFAULT_GROUP_BY):
+    if group_by in ("role+intent", DEFAULT_GROUP_BY, SIZE_CLASS_GROUP_BY):
         parts.append(f"intent={_signature_part(context.get('intent'))}")
-    if group_by == DEFAULT_GROUP_BY:
+    if group_by in (DEFAULT_GROUP_BY, SIZE_CLASS_GROUP_BY):
         parts.append(f"variant={_signature_part(context.get('variant'))}")
+    if group_by == SIZE_CLASS_GROUP_BY:
+        parts.append(f"size={_size_class(node)}")
     return ";".join(parts)
 
 
@@ -167,7 +194,7 @@ def _signature_part(value: Any) -> str:
 
 
 def _property_issues(
-    signature: str, group: list[tuple[str, dict[str, Any]]], prop: str
+    signature: str, group: list[tuple[str, dict[str, Any]]], prop: str, *, lenient: bool
 ) -> list[dict[str, Any]]:
     participants = [
         (screen_id, node, canonical)
@@ -188,14 +215,26 @@ def _property_issues(
     # @spec AC-005: Majority baseline with sorted-first tie-break — .specs/features/047-cross-screen-consistency-check/spec.md#acceptance-criteria
     baseline_key = min(counts, key=lambda key: (-counts[key], key))
     baseline = canonical_by_key[baseline_key]
-    issues: list[dict[str, Any]] = []
+    divergences: dict[str, list[tuple[str, dict[str, Any], Any]]] = {}
     for screen_id, node, canonical in participants:
-        if _canonical_key(canonical) == baseline_key:
+        key = _canonical_key(canonical)
+        if key == baseline_key:
             continue
+        divergences.setdefault(key, []).append((screen_id, node, canonical))
+
+    issues: list[dict[str, Any]] = []
+    for key in sorted(divergences):
+        divergent_nodes = sorted(divergences[key], key=_participant_sort_key)
+        screen_id, node, canonical = divergent_nodes[0]
+        count = len(divergent_nodes)
+        examples = ", ".join(
+            str(example_node.get("_semantic_key") or example_node.get("semantic_id") or "-")
+            for _, example_node, _ in divergent_nodes[:MAX_MESSAGE_EXAMPLES]
+        )
         issues.append(
             {
                 "code": f"consistency.{prop}.divergent",
-                "severity": _severity(prop, canonical, baseline),
+                "severity": _severity(prop, canonical, baseline, lenient=lenient),
                 "property": prop,
                 "signature": signature,
                 "screen_id": screen_id,
@@ -204,12 +243,17 @@ def _property_issues(
                 "baseline": baseline,
                 "group_size": len(participants),
                 "message": (
-                    f"{prop} value {_canonical_key(canonical)} diverges from baseline "
-                    f"{baseline_key} for {signature} (group of {len(participants)})"
+                    f"{count} divergence(s) of {prop} value {key} from baseline {baseline_key} "
+                    f"for {signature} (group of {len(participants)}; examples: {examples})"
                 ),
             }
         )
     return issues
+
+
+def _participant_sort_key(participant: tuple[str, dict[str, Any], Any]) -> tuple[str, str, str]:
+    screen_id, node, canonical = participant
+    return (screen_id, str(node.get("_semantic_key") or ""), _canonical_key(canonical))
 
 
 class _Absent:
@@ -270,14 +314,53 @@ def _canonical_key(value: Any) -> str:
     return json.dumps(value, sort_keys=True)
 
 
-def _severity(prop: str, value: Any, baseline: Any) -> str:
+def _severity(prop: str, value: Any, baseline: Any, *, lenient: bool = False) -> str:
     # @spec FR-002: Severity model — .specs/features/047-cross-screen-consistency-check/spec.md#fr-002
     if prop in _ALWAYS_ERROR_PROPERTIES:
         return "error"
+    if lenient:
+        return "warning"
     deviation = _numeric_deviation(value, baseline)
     if deviation is None:
         return "error"
     return "warning" if deviation <= NUMERIC_TOLERANCE else "error"
+
+
+def _is_anonymous_container(node: dict[str, Any]) -> bool:
+    if node.get("role") != "container":
+        return False
+    raw_context = node.get("context")
+    context: dict[str, Any] = raw_context if isinstance(raw_context, dict) else {}
+    return not any(
+        _non_empty_string(value)
+        for value in (
+            context.get("intent"),
+            context.get("variant"),
+            node.get("name"),
+            node.get("label"),
+            node.get("text"),
+            context.get("name"),
+            context.get("label"),
+        )
+    )
+
+
+def _non_empty_string(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _size_class(node: dict[str, Any]) -> str:
+    bbox = node.get("bbox")
+    if not isinstance(bbox, dict) or not _bbox_is_measurable(bbox):
+        return "unmeasured"
+    height = bbox.get("height")
+    if not _is_number(height):
+        return "unmeasured"
+    value = float(cast(int | float, height))
+    for label, upper_bound in SIZE_CLASS_BUCKETS:
+        if value <= upper_bound:
+            return label
+    return "xl"
 
 
 def _numeric_deviation(value: Any, baseline: Any) -> float | None:

@@ -14,6 +14,7 @@ from .schema_cache import load_schema
 ID_RE = re.compile(r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$")
 BINDING_RE = re.compile(r"^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$")
 INTERACTIVE_ROLES = {"button", "link", "input", "select", "toggle", "form", "component"}
+VISUALLY_INTERACTIVE_ROLES = {"button", "link", "input"}
 HTTP_METHODS = {"GET", "POST", "PUT", "PATCH", "DELETE"}
 SCHEMA_PATH = Path(__file__).parent / "schemas" / "flow-contract-v2.schema.json"
 
@@ -37,6 +38,59 @@ def validate_flow_contract_v2(contract: Any) -> list[dict[str, Any]]:
     if not _has_errors(issues):
         _validate_references(contract, issues)
     return sorted(issues, key=lambda issue: (issue["path"], issue["code"], issue["message"]))
+
+
+def interactive_coverage_report(contract: Any) -> dict[str, Any]:
+    """Return per-screen interactive action coverage for a strict v2 contract."""
+    if not isinstance(contract, dict):
+        return {"screens": [], "summary": {"covered": 0, "static": 0, "total": 0, "uncovered": 0}}
+    transition_triggers = _transition_triggers(contract)
+    screens = []
+    for screen in _items(contract, "screens"):
+        screen_id = str(screen.get("id", ""))
+        actions = []
+        for node in _items(contract, "nodes"):
+            if (
+                node.get("screen_id") != screen_id
+                or node.get("role") not in VISUALLY_INTERACTIVE_ROLES
+            ):
+                continue
+            binding_kind = _interactive_binding_kind(node, transition_triggers)
+            if binding_kind is None:
+                continue
+            actions.append(
+                {
+                    "node": str(node.get("id")),
+                    "semantic_id": str(node.get("semantic_id")),
+                    "role": str(node.get("role")),
+                    "binding": binding_kind,
+                }
+            )
+        static = screen.get("static") is True
+        static_reason = screen.get("static_reason")
+        is_static_justified = (
+            static and isinstance(static_reason, str) and bool(static_reason.strip())
+        )
+        status = "covered" if actions else "static" if is_static_justified else "uncovered"
+        screens.append(
+            {
+                "screen_id": screen_id,
+                "interactive_actions": actions,
+                "static": static,
+                "static_reason": static_reason if isinstance(static_reason, str) else None,
+                "status": status,
+                "root_node": screen.get("root_node"),
+            }
+        )
+    return {
+        "screens": screens,
+        "summary": {
+            "covered": sum(1 for screen in screens if screen["status"] == "covered"),
+            "static": sum(1 for screen in screens if screen["status"] == "static"),
+            "total": len(screens),
+            "uncovered": sum(1 for screen in screens if screen["status"] == "uncovered"),
+        },
+    }
 
 
 def contract_registries(contract: dict[str, Any]) -> dict[str, Any]:
@@ -79,6 +133,7 @@ def _validate_schema(contract: dict[str, Any], issues: list[dict[str, Any]]) -> 
 
 def _validate_references(contract: dict[str, Any], issues: list[dict[str, Any]]) -> None:
     registries = contract_registries(contract)
+    transition_triggers = _transition_triggers(contract)
     _duplicate_id_issues(contract, issues)
     if contract.get("needs_clarification"):
         issues.append(
@@ -116,13 +171,25 @@ def _validate_references(contract: dict[str, Any], issues: list[dict[str, Any]])
         if action := node.get("action"):
             if action not in registries["actions"]:
                 _missing("action", action, f"{path}.action", issues)
-        elif node.get("role") in INTERACTIVE_ROLES:
+        elif node.get("role") in INTERACTIVE_ROLES and node.get("id") not in transition_triggers:
             issues.append(
                 _issue(
                     "error",
                     "contract.reference.interactive_action_required",
                     f"{path}.action",
-                    "interactive node requires action",
+                    "interactive node requires action or transition trigger",
+                )
+            )
+        if (
+            node.get("role") in VISUALLY_INTERACTIVE_ROLES
+            and _interactive_binding_kind(node, transition_triggers) is None
+        ):
+            issues.append(
+                _issue(
+                    "error",
+                    "contract.interactive_unbound",
+                    f"{path}.action",
+                    "visually interactive node requires an action or transition trigger",
                 )
             )
         for child_id in node.get("children", []) or []:
@@ -219,6 +286,38 @@ def _validate_references(contract: dict[str, Any], issues: list[dict[str, Any]])
                     )
                 )
     _unused_reference_issues(contract, issues)
+    _interactive_screen_coverage_issues(contract, issues)
+
+
+def _interactive_screen_coverage_issues(
+    contract: dict[str, Any], issues: list[dict[str, Any]]
+) -> None:
+    coverage = interactive_coverage_report(contract)
+    for index, screen in enumerate(coverage["screens"]):
+        if screen["status"] != "uncovered":
+            continue
+        path = f"$.screens[{index}]"
+        message = "screen requires a mapped interactive action or static justification"
+        if screen["static"] is True:
+            path = f"{path}.static_reason"
+            message = "static screen justification must be a non-empty static_reason"
+        issues.append(_issue("error", "contract.interactive_unbound", path, message))
+
+
+def _transition_triggers(contract: dict[str, Any]) -> set[str]:
+    return {
+        str(transition["trigger"])
+        for transition in _items(contract, "transitions")
+        if isinstance(transition.get("trigger"), str)
+    }
+
+
+def _interactive_binding_kind(node: dict[str, Any], transition_triggers: set[str]) -> str | None:
+    if isinstance(node.get("action"), str) and node["action"]:
+        return "action"
+    if isinstance(node.get("id"), str) and node["id"] in transition_triggers:
+        return "transition"
+    return None
 
 
 def _duplicate_id_issues(contract: dict[str, Any], issues: list[dict[str, Any]]) -> None:

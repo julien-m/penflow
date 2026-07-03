@@ -59,11 +59,16 @@ def lint_tokens(
     nodes = all_nodes(parse_pen(raw))
     spacing = tuple(spacing_scale) if spacing_scale is not None else DEFAULT_SPACING_SCALE
     radius = tuple(radius_scale) if radius_scale is not None else DEFAULT_RADIUS_SCALE
-    fontsize = tuple(fontsize_scale) if fontsize_scale is not None else DEFAULT_FONTSIZE_SCALE
-    palette, theme_font, theme_radius = _resolve_theme(theme)
+    palette, theme_fonts, theme_radius, theme_fontsize, theme_radius_scale = _resolve_theme(theme)
+    if radius_scale is None and theme_radius_scale:
+        radius = tuple(sorted(set(radius + theme_radius_scale)))
+    if fontsize_scale is not None:
+        fontsize = tuple(fontsize_scale)
+    else:
+        fontsize = tuple(sorted(set(DEFAULT_FONTSIZE_SCALE + theme_fontsize)))
     if theme_radius is not None and theme_radius not in radius:
         # Themed drafts must never flag their own radius token (round-trip rule).
-        radius = (*radius, theme_radius)
+        radius = tuple(sorted(set((*radius, theme_radius))))
 
     violations: list[dict[str, Any]] = _theme_violations(theme)
     for node in nodes:
@@ -72,7 +77,7 @@ def lint_tokens(
                 node,
                 variables=variables,
                 palette=palette,
-                theme_font=theme_font,
+                theme_fonts=theme_fonts,
                 check_palette=theme is not None,
                 spacing=spacing,
                 radius=radius,
@@ -135,34 +140,80 @@ def _theme_violations(theme: dict[str, Any] | None) -> list[dict[str, Any]]:
     return violations
 
 
+_FONT_VARIABLES = frozenset({"pf-font-sans", "pf-font-mono"})
+_FONTSIZE_VARIABLES = (
+    "pf-font-size-xs",
+    "pf-font-size-sm",
+    "pf-font-size-base",
+    "pf-font-size-lg",
+    "pf-font-size-xl",
+)
+_RADIUS_VARIABLE_PREFIX = "pf-radius-"
+
+
 def _resolve_theme(
     theme: dict[str, Any] | None,
-) -> tuple[set[tuple[int, int, int, int]], str | None, float | None]:
-    """Resolve a loaded theme into a color palette, reference font, and radius."""
+) -> tuple[
+    set[tuple[int, int, int, int]],
+    set[str],
+    float | None,
+    tuple[float, ...],
+    tuple[float, ...],
+]:
+    """Resolve a loaded theme into palette, fonts, base radius, type, and radius scales."""
     if theme is None:
-        return set(), None, None
+        return set(), set(), None, (), ()
     raw_theme_variables = theme.get("variables")
     theme_variables: dict[str, Any] = (
         raw_theme_variables if isinstance(raw_theme_variables, dict) else {}
     )
     palette: set[tuple[int, int, int, int]] = set()
-    theme_font: str | None = None
+    theme_fonts: set[str] = set()
     theme_radius: float | None = None
+    theme_fontsize_values: list[float] = []
+    theme_radius_values: list[float] = []
+
+    for name, definition in theme_variables.items():
+        if not isinstance(definition, dict):
+            continue
+        raw_value = definition.get("value")
+        if definition.get("type") == "color" and isinstance(raw_value, str):
+            parsed = parse_color(raw_value)
+            if parsed is not None:
+                palette.add(parsed)
+        if name in _FONT_VARIABLES and isinstance(raw_value, str):
+            theme_fonts.add(raw_value)
+        if name in _FONTSIZE_VARIABLES and isinstance(raw_value, (int, float)):
+            theme_fontsize_values.append(float(raw_value))
+        if name.startswith(_RADIUS_VARIABLE_PREFIX) and isinstance(raw_value, (int, float)):
+            theme_radius_values.append(float(raw_value))
+
     style = theme.get("style")
     for token, value in style.items() if isinstance(style, dict) else []:
         # Theme style values are `$pf-*` refs when sourced from theme.css.
         resolved = resolve_variable(value, theme_variables)
-        if token == "font_sans":
-            theme_font = resolved if isinstance(resolved, str) else None
+        if token in {"font_sans", "font_mono"}:
+            if isinstance(resolved, str):
+                theme_fonts.add(resolved)
             continue
         if token == "radius":
             theme_radius = float(resolved) if isinstance(resolved, (int, float)) else None
+            continue
+        if token.startswith("font_size_"):
+            if isinstance(resolved, (int, float)):
+                theme_fontsize_values.append(float(resolved))
             continue
         if isinstance(resolved, str):
             parsed = parse_color(resolved)
             if parsed is not None:
                 palette.add(parsed)
-    return palette, theme_font, theme_radius
+    return (
+        palette,
+        theme_fonts,
+        theme_radius,
+        tuple(sorted(set(theme_fontsize_values))),
+        tuple(sorted(set(theme_radius_values))),
+    )
 
 
 def _node_violations(
@@ -170,7 +221,7 @@ def _node_violations(
     *,
     variables: dict[str, Any],
     palette: set[tuple[int, int, int, int]],
-    theme_font: str | None,
+    theme_fonts: set[str],
     check_palette: bool,
     spacing: tuple[float, ...],
     radius: tuple[float, ...],
@@ -258,12 +309,13 @@ def _node_violations(
 
     if "fontFamily" in node.visual:
         resolved = resolve("fontFamily", node.visual["fontFamily"])
-        if theme_font is not None and isinstance(resolved, str) and resolved != theme_font:
+        if theme_fonts and isinstance(resolved, str) and resolved not in theme_fonts:
             add(
                 "token.fontfamily.mismatch",
                 "fontFamily",
                 node.visual["fontFamily"],
-                f"fontFamily {resolved!r} does not match the theme font {theme_font!r}",
+                f"fontFamily {resolved!r} is not declared by the theme fonts"
+                f" {sorted(theme_fonts)!r}",
             )
 
     return violations

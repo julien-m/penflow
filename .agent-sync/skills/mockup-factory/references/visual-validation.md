@@ -14,7 +14,7 @@ Run this gate after the deterministic Penflow anchors pass and before final PASS
 
 Use Pencil MCP or an equivalent Pencil renderer. All artifacts go to `.mockup-validation/visual-evidence/`:
 
-1. **Export PNGs and expose previews** — `export_nodes` one PNG per audited screen (`<pencil_node_id>.png`). Every PNG must exist and be non-empty. Immediately after each export, expose the image in both human-review channels:
+1. **Export PNGs and expose previews** — `export_nodes` one PNG per audited screen (`<pencil_node_id>.png`). Every PNG must exist and be non-empty. Immediately after each export, expose the image in both human-review channels before writing `vision-report.json`; do not write `vision-report.json` before displaying each image:
    - Terminal: emit a Markdown image using the absolute path, e.g. `![checkoutScreen](/absolute/path/.mockup-validation/visual-evidence/checkoutScreen.png)`.
    - Browser annotation: run `visual-preview url /absolute/path/.mockup-validation/visual-evidence/checkoutScreen.png` when available.
 
@@ -27,16 +27,24 @@ Use Pencil MCP or an equivalent Pencil renderer. All artifacts go to `.mockup-va
    - `perceived_hierarchy`
    - `imagery_quality`
 
-   Deterministic facts — contrast, touch targets, overlap/overflow, tokens, consistency — are already computed by `penflow audit-visual`, `lint-tokens`, and `check-consistency`. The vision-report schema **rejects** any other category, so vision cannot hand-wave computable facts.
+   Every category evidence sentence must cite the evaluated file name (`png`) it judged, and that file must be the exact manifest PNG for the same `screen_id`, not a prettier replacement. Deterministic facts — contrast, touch targets, overlap/overflow, tokens, consistency — are already computed by `penflow audit-visual`, `lint-tokens`, and `check-consistency`. The vision-report schema **rejects** any other category, so vision cannot hand-wave computable facts.
 4. **Run the cross-mockup coherence pass (contact sheet)** — after the per-screen vision pass, judge the mockup *set* as one product. See § Cross-Mockup Coherence below. Required whenever the expected tree has ≥ 2 screens (`evidence.coherence.missing`).
-5. **Write the evidence artifacts** — <!-- @spec FR-005: Step-5 manifest write includes runId + theme — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#fr-005 --> `manifest.json` (one entry per screen with `screen_id`, `semantic_id`, `pencil_node_id`, `png`, `layout_checked`, `screenshot_checked`) and `vision-report.json` (`kind: penflow-vision-report`, `version`, `status`, `renderer`, `sourceFile`, `model`, `screens[]` each with `screen_id`, `png`, and `criteria[]` of `{category, result pass|fail|warning, evidence, blocking}`, plus the top-level `coherence` section when the coherence pass ran). The manifest must also carry the run identity and theme binding: a top-level `runId` (opaque string — ISO-8601 timestamp + short slug recommended, e.g. `2026-06-11T08:52:00Z-checkout`) and the top-level `theme` block obtained via `penflow theme-fingerprint <theme.css> --json` (`{path, sha256}` — SHA-256 of the theme's raw bytes, reproducible via `shasum -a 256`), so the packet is traceable to the run and bound to the exact theme bytes the mockups were rendered against.
-6. **Run the gate:**
+5. **Run the reference-fidelity pass when references exist** — if `<workspace>/references/references-manifest.json` exists, or the evidence manifest declares `references_manifest`, generate one side-by-side contact sheet per reference/export pair and inspect the actual pair, not memory or prose. The locked `reference_fidelity` section answers ONLY:
+   - `layout_match`
+   - `palette_match`
+   - `component_parity`
+   - `density_match`
+
+   Every criterion evidence sentence must cite both the reference file and the export file. The contact sheet path is recorded per screen as `contact_sheet`. Deterministic enforcement is `penflow validate-reference-fidelity .mockup-validation/visual-evidence --references references --json`; copied exports fail as `reference.evidence_is_reference_copy`, and strong disagreement between deterministic metrics and the LLM/skill verdict fails as `reference.llm_metric_disagreement`.
+6. **Write the evidence artifacts** — <!-- @spec FR-005: Step-5 manifest write includes runId + theme — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#fr-005 --> `manifest.json` (one entry per screen with `screen_id`, `semantic_id`, `pencil_node_id`, `png`, `sha256`, `layout_checked`, `screenshot_checked`) and `vision-report.json` (`kind: penflow-vision-report`, `version`, `status`, `renderer`, `sourceFile`, `model`, `generated_by`, `inputs[]` of `{file, sha256}`, `screens[]` each with `screen_id`, `png`, and `criteria[]` of `{category, result pass|fail|warning, evidence, blocking}`, plus top-level `coherence` and `reference_fidelity` sections when those passes ran). Every evaluated PNG/contact sheet must be in `inputs[]`, and each SHA-256 must match the file bytes in `.mockup-validation/visual-evidence/`; receipts are mandatory and prose cannot replace them. The manifest must also carry the run identity and theme binding: a top-level `runId` (opaque string — ISO-8601 timestamp + short slug recommended, e.g. `2026-06-11T08:52:00Z-checkout`) and the top-level `theme` block obtained via `penflow theme-fingerprint <theme.css> --json` (`{path, sha256}` — SHA-256 of the theme's raw bytes, reproducible via `shasum -a 256`), so the packet is traceable to the run and bound to the exact theme bytes the mockups were rendered against. When references exist, add `references_manifest` pointing to `<workspace>/references/references-manifest.json` relative to the evidence directory.
+7. **Run the gates:**
 
    ```bash
    penflow validate-visual-evidence .mockup-validation/visual-evidence --expected expected-ui-tree.json --theme-css theme.css --json
+   penflow validate-reference-fidelity .mockup-validation/visual-evidence --references references --json
    ```
 
-   Exit 0 is the only acceptable proof. Exit 1 means the packet is incomplete or invalid: missing/empty PNG, invalid manifest or vision report, a screen of the expected tree left uncovered (`evidence.screen.uncovered`), an unanswered vision category, a layout snapshot mismatch, a missing coherence section for a multi-screen tree (`evidence.coherence.missing`), a missing/empty contact sheet (`evidence.contact_sheet.missing` / `evidence.contact_sheet.empty`), an unanswered coherence category (`evidence.coherence.category_missing`), a manifest without a theme stamp while the gate is armed (`evidence.theme.missing`), or a theme stamp that no longer matches the current theme.css bytes (`evidence.theme.stale` — any theme edit deterministically invalidates the packet and forces a re-run of the bounded loop). A `--theme-css` path missing on disk is a usage boundary (exit 2).
+   Exit 0 is the only acceptable proof. Exit 1 means the packet is incomplete or invalid: missing/empty PNG, invalid manifest or vision report, missing `generated_by`/`inputs` receipts, SHA mismatch (`evidence.png.sha_mismatch` / `evidence.vision_input.sha_mismatch`), a vision screen PNG that differs from the manifest PNG for the same screen (`evidence.vision_manifest.png_mismatch`), a PNG path outside `.mockup-validation/visual-evidence/` or symlink into `references/` (`evidence.png.outside_evidence_dir`), criterion evidence that does not cite the evaluated file (`evidence.vision.file_evidence_missing`), a screen of the expected tree left uncovered (`evidence.screen.uncovered`), an unanswered vision category, a layout snapshot mismatch, a missing coherence section for a multi-screen tree (`evidence.coherence.missing`), a missing/empty contact sheet (`evidence.contact_sheet.missing` / `evidence.contact_sheet.empty`), an unanswered coherence category (`evidence.coherence.category_missing`), missing/incomplete `reference_fidelity` (`evidence.reference_fidelity.*`), copied reference bytes (`reference.evidence_is_reference_copy`), deterministic-vs-LLM disagreement (`reference.llm_metric_disagreement`), a manifest without a theme stamp while the gate is armed (`evidence.theme.missing`), or a theme stamp that no longer matches the current theme.css bytes (`evidence.theme.stale` — any theme edit deterministically invalidates the packet and forces a re-run of the bounded loop). A `--theme-css` path missing on disk is a usage boundary (exit 2).
 
 ## Cross-Mockup Coherence (Contact Sheet)
 
@@ -55,6 +63,39 @@ Per-screen criteria judge each mockup in isolation; the coherence pass proves th
 
 The section is optional schema-wise but **required by `penflow validate-visual-evidence` whenever the expected tree has ≥ 2 screens** (`evidence.coherence.missing`); single-screen trees pass without it.
 
+## Reference Fidelity
+
+References live under `<workspace>/references/` with `references-manifest.json`:
+
+```json
+[
+  {"screen_id": "cockpit-live", "file": "cockpit-live.png", "sha256": "<sha256>", "source": "user-reference"}
+]
+```
+
+Files resolve relative to `references/`. The evidence manifest declares the manifest path with `references_manifest`, relative to `.mockup-validation/visual-evidence/`.
+
+For every referenced screen, export the matching Pencil screen PNG and create a side-by-side contact sheet showing `reference | export`. Write one `reference_fidelity` entry in `vision-report.json`:
+
+```json
+{
+  "screen_id": "cockpit-live",
+  "reference": "cockpit-live.png",
+  "export": "cockpit-live-export.png",
+  "contact_sheet": "cockpit-live-reference-contact-sheet.png",
+  "criteria": [
+    {
+      "category": "palette_match",
+      "result": "pass",
+      "evidence": "Compared reference cockpit-live.png with export cockpit-live-export.png in cockpit-live-reference-contact-sheet.png.",
+      "blocking": false
+    }
+  ]
+}
+```
+
+All four categories are required per referenced screen: `layout_match`, `palette_match`, `component_parity`, `density_match`. A narrative PASS is invalid without both command exits: `validate-visual-evidence` checks section completeness and `validate-reference-fidelity` computes deterministic image metrics.
+
 ## Vision Report
 
 `vision-report.json` example (validates via `penflow validate-report vision-report.json --schema`):
@@ -67,18 +108,40 @@ The section is optional schema-wise but **required by `penflow validate-visual-e
   "renderer": "pencil-mcp",
   "sourceFile": "penflow/ui.pen",
   "model": "claude-fable-5",
+  "generated_by": "mockup-factory.visual-evidence",
+  "inputs": [
+    {"file": "checkoutScreen.png", "sha256": "<sha256>"},
+    {"file": "contact-sheet.png", "sha256": "<sha256>"},
+    {"file": "checkout-reference-contact-sheet.png", "sha256": "<sha256>"}
+  ],
   "coherence": {
     "contact_sheet_png": "contact-sheet.png",
     "criteria": [
       {
         "category": "palette_coherence",
         "result": "pass",
-        "evidence": "All screens share one neutral surface palette with a single accent intent.",
+        "evidence": "The contact-sheet.png image shows one neutral surface palette with a single accent intent.",
         "blocking": false
       }
     ]
   },
-  "screens": [
+    "reference_fidelity": [
+      {
+        "screen_id": "checkout",
+        "reference": "checkout-reference.png",
+        "export": "checkoutScreen.png",
+        "contact_sheet": "checkout-reference-contact-sheet.png",
+        "criteria": [
+          {
+            "category": "layout_match",
+            "result": "pass",
+            "evidence": "Compared reference checkout-reference.png with export checkoutScreen.png in checkout-reference-contact-sheet.png.",
+            "blocking": false
+          }
+        ]
+      }
+    ],
+    "screens": [
     {
       "screen_id": "checkout",
       "semantic_id": "checkout",
@@ -88,7 +151,7 @@ The section is optional schema-wise but **required by `penflow validate-visual-e
         {
           "category": "visual_balance",
           "result": "pass",
-          "evidence": "Content forms one aligned column with even vertical rhythm.",
+          "evidence": "Content in checkoutScreen.png forms one aligned column with even vertical rhythm.",
           "blocking": false
         }
       ]

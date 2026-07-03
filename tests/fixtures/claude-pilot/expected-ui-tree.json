@@ -1,0 +1,192 @@
+{
+  "version": 1,
+  "source": "representative-claude-pilot-fixture.pen",
+  "issues": [],
+  "screens": [
+    {
+      "screen_id": "overview",
+      "name": "Overview",
+      "viewport": {"x": 0, "y": 0, "width": 1440, "height": 900},
+      "root": {
+        "id": "overview",
+        "semantic_id": "overview",
+        "role": "screen",
+        "bbox": {"x": 0, "y": 0, "width": 1440, "height": 900},
+        "visual": {},
+        "children": [
+          {
+            "id": "overview.layout",
+            "semantic_id": "overview.layout",
+            "role": "container",
+            "context": {"semantic_id": "overview.layout", "role": "container"},
+            "bbox": {"x": 0, "y": 0, "width": 1440, "height": 820},
+            "visual": {"gap": 4},
+            "children": []
+          },
+          {
+            "id": "overview.primary",
+            "semantic_id": "overview.primary",
+            "role": "button",
+            "context": {
+              "semantic_id": "overview.primary",
+              "role": "button",
+              "intent": "primary-action",
+              "variant": "primary"
+            },
+            "bbox": {"x": 1160, "y": 24, "width": 160, "height": 44},
+            "visual": {"fill": "#2563EB", "fontFamily": "Inter", "gap": 8},
+            "children": []
+          }
+        ]
+      }
+    },
+    {
+      "screen_id": "workers",
+      "name": "Workers",
+      "viewport": {"x": 0, "y": 0, "width": 1440, "height": 900},
+      "root": {
+        "id": "workers",
+        "semantic_id": "workers",
+        "role": "screen",
+        "bbox": {"x": 0, "y": 0, "width": 1440, "height": 900},
+        "visual": {},
+        "children": [
+          {
+            "id": "workers.layout",
+            "semantic_id": "workers.layout",
+            "role": "container",
+            "context": {"semantic_id": "workers.layout", "role": "container"},
+            "bbox": {"x": 0, "y": 0, "width": 1440, "height": 820},
+            "visual": {"gap": 64},
+            "children": []
+          },
+          {
+            "id": "workers.primary",
+            "semantic_id": "workers.primary",
+            "role": "button",
+            "context": {
+              "semantic_id": "workers.primary",
+              "role": "button",
+              "intent": "primary-action",
+              "variant": "primary"
+            },
+            "bbox": {"x": 1160, "y": 24, "width": 160, "height": 44},
+            "visual": {"fill": "#2563EB", "fontFamily": "Inter", "gap": 8},
+            "children": []
+          }
+        ]
+      }
+    },
+    {
+      "screen_id": "timeline",
+      "name": "Timeline",
+      "viewport": {"x": 0, "y": 0, "width": 1440, "height": 900},
+      "root": {
+        "id": "timeline",
+        "semantic_id": "timeline",
+        "role": "screen",
+        "bbox": {"x": 0, "y": 0, "width": 1440, "height": 900},
+        "visual": {},
+        "children": [
+          {
+            "id": "timeline.layout",
+            "semantic_id": "timeline.layout",
+            "role": "container",
+            "context": {"semantic_id": "timeline.layout", "role": "container"},
+            "bbox": {"x": 0, "y": 0, "width": 1440, "height": 820},
+            "visual": {"gap": 28},
+            "children": []
+          },
+          {
+            "id": "timeline.primary",
+            "semantic_id": "timeline.primary",
+            "role": "button",
+            "context": {
+              "semantic_id": "timeline.primary",
+              "role": "button",
+              "intent": "primary-action",
+              "variant": "primary"
+            },
+            "bbox": {"x": 1160, "y": 24, "width": 160, "height": 44},
+            "visual": {"fill": "#2563EB", "fontFamily": "Inter", "gap": 8},
+            "children": []
+          }
+        ]
+      }
+    },
+    {
+      "screen_id": "settings",
+      "name": "Settings",
+      "viewport": {"x": 0, "y": 0, "width": 1440, "height": 900},
+      "root": {
+        "id": "settings",
+        "semantic_id": "settings",
+        "role": "screen",
+        "bbox": {"x": 0, "y": 0, "width": 1440, "height": 900},
+        "visual": {},
+        "children": [
+          {
+            "id": "settings.layout",
+            "semantic_id": "settings.layout",
+            "role": "container",
+            "context": {"semantic_id": "settings.layout", "role": "container"},
+            "bbox": {"x": 0, "y": 0, "width": 1440, "height": 820},
+            "visual": {"gap": 96},
+            "children": []
+          },
+          {
+            "id": "settings.primary",
+            "semantic_id": "settings.primary",
+            "role": "button",
+            "context": {
+              "semantic_id": "settings.primary",
+              "role": "button",
+              "intent": "primary-action",
+              "variant": "primary"
+            },
+            "bbox": {"x": 1160, "y": 24, "width": 160, "height": 44},
+            "visual": {"fill": "#EF4444", "fontFamily": "Comic Sans MS", "gap": 24},
+            "children": []
+          }
+        ]
+      }
+    },
+    {
+      "screen_id": "audit",
+      "name": "Audit",
+      "viewport": {"x": 0, "y": 0, "width": 1440, "height": 900},
+      "root": {
+        "id": "audit",
+        "semantic_id": "audit",
+        "role": "screen",
+        "bbox": {"x": 0, "y": 0, "width": 1440, "height": 900},
+        "visual": {},
+        "children": [
+          {
+            "id": "audit.layout",
+            "semantic_id": "audit.layout",
+            "role": "container",
+            "context": {"semantic_id": "audit.layout", "role": "container"},
+            "bbox": {"x": 0, "y": 0, "width": 1440, "height": 820},
+            "visual": {"gap": 2},
+            "children": []
+          },
+          {
+            "id": "audit.primary",
+            "semantic_id": "audit.primary",
+            "role": "button",
+            "context": {
+              "semantic_id": "audit.primary",
+              "role": "button",
+              "intent": "primary-action",
+              "variant": "primary"
+            },
+            "bbox": {"x": 1160, "y": 24, "width": 160, "height": 44},
+            "visual": {"fill": "#2563EB", "fontFamily": "Inter", "gap": 24},
+            "children": []
+          }
+        ]
+      }
+    }
+  ]
+}

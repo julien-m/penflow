@@ -27,7 +27,14 @@
       "additionalProperties": false,
       "properties": {
         "expected_tree": {"type": "string"},
-        "group_by": {"enum": ["role", "role+intent", "role+intent+variant"]}
+        "group_by": {
+          "enum": [
+            "role",
+            "role+intent",
+            "role+intent+variant",
+            "role+intent+variant+size-class"
+          ]
+        }
       }
     },
     "issues": {

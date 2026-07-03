@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from penflow.cli import main
 from penflow.pen import parse_pen, validate_pen_context
 from penflow.semantic_draft import write_pen_draft_from_semantic_tree
@@ -69,12 +71,17 @@ def test_write_pen_draft_from_semantic_tree_is_deterministic(tmp_path: Path) -> 
     assert first_path.read_bytes() == second_path.read_bytes()
 
 
-def test_draft_pen_from_tree_cli_writes_json_and_validate_pen_compatible(tmp_path: Path) -> None:
+def test_draft_pen_from_tree_cli_writes_json_and_validate_pen_compatible(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     tree_path = tmp_path / "semantic-ui-tree.json"
     tree_path.write_text(json.dumps(load_example_without_mockup()), encoding="utf-8")
     out_path = tmp_path / "ui.pen"
 
     assert main(["draft-pen-from-tree", str(tree_path), "--out", str(out_path), "--json"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["status"] == "PASS"
+    assert report["fidelity"] == "wireframe"
     assert main(["validate-pen", str(out_path), "--json"]) == 0
 
 

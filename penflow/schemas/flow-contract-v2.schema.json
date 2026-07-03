@@ -95,7 +95,9 @@
         "surface": {"type": "string"},
         "viewport": {"$ref": "#/$defs/viewport"},
         "states": {"type": "array", "items": {"$ref": "#/$defs/idObject"}},
-        "root_node": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"}
+        "root_node": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "static": {"type": "boolean"},
+        "static_reason": {"type": "string", "pattern": ".*\\S.*"}
       }
     },
     "viewport": {

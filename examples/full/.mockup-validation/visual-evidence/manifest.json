@@ -9,6 +9,7 @@
       "semantic_id": "checkout",
       "pencil_node_id": "checkoutScreen",
       "png": "checkoutScreen.png",
+      "sha256": "3e7ce66cd7fc51a850490aea840954c26cff11086f0947ee271b6ceec6b7333a",
       "layout_checked": true,
       "screenshot_checked": true,
       "notes": "Real Pencil MCP screenshot/export completed; minimal fixture is structurally clean but visually sparse."

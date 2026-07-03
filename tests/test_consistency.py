@@ -14,8 +14,11 @@ from penflow.consistency import (
     CHECKED_PROPERTIES,
     DEFAULT_GROUP_BY,
     NUMERIC_TOLERANCE,
+    SIZE_CLASS_GROUP_BY,
     check_consistency,
 )
+
+ROOT = Path(__file__).resolve().parent.parent
 
 
 def _node(
@@ -45,6 +48,28 @@ def _node(
         "visual": visual or {},
         "children": children or [],
     }
+
+
+def _container(
+    semantic_id: str,
+    *,
+    intent: str | None = None,
+    variant: str | None = None,
+    name: str | None = None,
+    visual: dict[str, Any] | None = None,
+    bbox: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    node = _node(
+        semantic_id,
+        "container",
+        intent=intent,
+        variant=variant,
+        visual=visual,
+        bbox=bbox,
+    )
+    if name is not None:
+        node["name"] = name
+    return node
 
 
 def _screen(screen_id: str, children: list[dict[str, Any]]) -> dict[str, Any]:
@@ -152,6 +177,43 @@ def test_padding_deviation_beyond_tolerance_is_error(tmp_path: Path) -> None:
     [issue] = report["issues"]
     assert issue["code"] == "consistency.padding.divergent"
     assert issue["severity"] == "error"
+
+
+def test_lenient_downgrades_non_always_error_properties_in_report(tmp_path: Path) -> None:
+    path = _write_tree(
+        tmp_path, _two_screen_tree(_button("s1.pay", padding=12), _button("s2.pay", padding=24))
+    )
+    report_path = tmp_path / "report.json"
+    assert (
+        main(["check-consistency", str(path), "--out", str(report_path), "--lenient", "--json"])
+        == 0
+    )
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    [issue] = report["issues"]
+    assert report["status"] == "PASS"
+    assert issue["code"] == "consistency.padding.divergent"
+    assert issue["severity"] == "warning"
+
+
+def test_lenient_keeps_fill_and_font_family_as_errors(tmp_path: Path) -> None:
+    path = _write_tree(
+        tmp_path,
+        _two_screen_tree(
+            _button("s1.pay", fill="#0057FF", fontFamily="Inter"),
+            _button("s2.pay", fill="#FF0000", fontFamily="Comic Sans MS"),
+        ),
+    )
+    report_path = tmp_path / "report.json"
+    assert (
+        main(["check-consistency", str(path), "--out", str(report_path), "--lenient", "--json"])
+        == 1
+    )
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["status"] == "FAIL"
+    assert {(issue["property"], issue["severity"]) for issue in report["issues"]} == {
+        ("fill", "error"),
+        ("fontFamily", "error"),
+    }
 
 
 def test_padding_scalar_and_list_forms_are_equivalent(tmp_path: Path) -> None:
@@ -281,6 +343,36 @@ def test_group_by_role_merges_intents(tmp_path: Path) -> None:
     assert issue["severity"] == "error"
 
 
+def test_group_by_size_class_separates_header_from_full_height_panel(tmp_path: Path) -> None:
+    header = _button("s1.primary", fill="#0057FF")
+    header["bbox"] = {"x": 0, "y": 0, "width": 390, "height": 56}
+    panel = _button("s2.primary", fill="#FF0000")
+    panel["bbox"] = {"x": 0, "y": 0, "width": 390, "height": 820}
+    path = _write_tree(tmp_path, _two_screen_tree(header, panel))
+
+    default_issues = check_consistency(path)["issues"]
+    assert any(issue["code"] == "consistency.fill.divergent" for issue in default_issues)
+    assert check_consistency(path, group_by=SIZE_CLASS_GROUP_BY)["issues"] == []
+
+
+def test_anonymous_containers_are_skipped_but_named_containers_participate(
+    tmp_path: Path,
+) -> None:
+    anonymous_a = _container("s1.layout", visual={"gap": 8})
+    anonymous_b = _container("s2.layout", visual={"gap": 40})
+    named_a = _container("s1.nav", name="Primary nav", visual={"gap": 8})
+    named_b = _container("s2.nav", name="Primary nav", visual={"gap": 40})
+    path = _write_tree(
+        tmp_path,
+        _tree(_screen("s1", [anonymous_a, named_a]), _screen("s2", [anonymous_b, named_b])),
+    )
+    [issue] = check_consistency(path)["issues"]
+    assert issue["code"] == "consistency.gap.divergent"
+    assert issue["group_size"] == 2
+    assert issue["semantic_id"] in {"s1.nav", "s2.nav"}
+    assert "layout" not in issue["message"]
+
+
 def test_bbox_height_divergence_uses_measurable_boxes(tmp_path: Path) -> None:
     short = _button("s1.pay")
     short["bbox"] = {"x": 0, "y": 0, "width": 200, "height": 44}
@@ -328,6 +420,20 @@ def test_same_screen_same_signature_nodes_group(tmp_path: Path) -> None:
     assert issue["screen_id"] == "s1"
 
 
+def test_divergences_are_aggregated_per_group_property_and_value(tmp_path: Path) -> None:
+    tree = _tree(
+        _screen("s1", [_button("s1.a", gap=8), _button("s1.b", gap=8)]),
+        _screen("s2", [_button("s2.a", gap=24), _button("s2.b", gap=24)]),
+        _screen("s3", [_button("s3.a", gap=8)]),
+    )
+    path = _write_tree(tmp_path, tree)
+    [issue] = [issue for issue in check_consistency(path)["issues"] if issue["property"] == "gap"]
+    assert issue["group_size"] == 5
+    assert issue["semantic_id"] == "s2.a"
+    assert "2 divergence(s) of gap" in issue["message"]
+    assert "s2.a, s2.b" in issue["message"]
+
+
 def test_byte_identical_reruns(tmp_path: Path) -> None:
     path = _write_tree(
         tmp_path,
@@ -366,6 +472,19 @@ def test_generated_report_validates_against_bundled_schema(tmp_path: Path) -> No
     report_path = tmp_path / "consistency-report.json"
     main(["check-consistency", str(path), "--out", str(report_path), "--json"])
     assert main(["validate-report", str(report_path), "--schema", "--json"]) == 0
+
+
+def test_representative_claude_pilot_dense_fixture_stays_actionable() -> None:
+    fixture = ROOT / "tests" / "fixtures" / "claude-pilot" / "expected-ui-tree.json"
+    report = check_consistency(fixture, group_by=SIZE_CLASS_GROUP_BY)
+    assert len(report["issues"]) < 50
+    assert report["summary"]["errors"] == 3
+    assert {(issue["property"], issue["severity"]) for issue in report["issues"]} == {
+        ("fill", "error"),
+        ("fontFamily", "error"),
+        ("gap", "error"),
+    }
+    assert any("2 divergence(s) of gap" in issue["message"] for issue in report["issues"])
 
 
 def test_report_schema_fails_closed_on_additional_property(tmp_path: Path) -> None:

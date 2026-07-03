@@ -37,13 +37,16 @@ python3 -m pip install -e ".[dev]"
 ## Core Commands
 
 ```bash
+penflow run --target <workspace> --theme-css <workspace>/theme.css --references <workspace>/references --strict --json
 penflow inspect examples/demo/ui.pen
+penflow pencil-sync ui.pen --expect-screens 8 --json
 penflow validate-pen examples/demo/ui.pen
 penflow export-expected examples/demo/ui.pen -o expected-ui-tree.json
-penflow check-consistency expected-ui-tree.json --out consistency-report.json [--group-by role|role+intent]
-penflow audit-visual expected-ui-tree.json --theme-css theme.css --out visual-metrics-report.json
+penflow check-consistency expected-ui-tree.json --out consistency-report.json [--group-by role|role+intent|role+intent+variant|role+intent+variant+size-class]
+penflow audit-visual expected-ui-tree.json --theme-css theme.css [--layout-snapshot .mockup-validation/visual-evidence/layout-snapshot.json] --out visual-metrics-report.json
 penflow theme-fingerprint theme.css --json
 penflow validate-visual-evidence .mockup-validation/visual-evidence --expected expected-ui-tree.json --theme-css theme.css --json
+penflow validate-reference-fidelity .mockup-validation/visual-evidence --references references --json
 penflow validate-actual examples/demo/actual-ui-tree.json [--schema]
 penflow validate-flow-contract examples/full/flow-ui-contract/contract.json --json
 penflow export-semantic-tree path/to/flow-ui-contract/contract.json --out semantic-ui-tree.json
@@ -51,7 +54,7 @@ penflow validate-semantic-tree semantic-ui-tree.json --json
 penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --theme-css theme.css --json
 penflow lint-tokens ui.pen --theme-css theme.css --out token-lint-report.json --json
 penflow enrich-pen existing-ui.pen semantic-ui-tree.json --out ui.enriched.pen --json
-penflow map-pencil-context ui.pen semantic-ui-tree.json --out pencil-context-map.json --json
+penflow map-pencil-context ui.pen semantic-ui-tree.json --out pencil-context-map.json --strict-anchors --json
 penflow migrate-flow-md-to-contract-json flow-ui-contract --out flow-ui-contract/contract.json --json
 penflow reverse-pen ui.pen --out reverse-output --json
 penflow detect-drift path/to/flow-ui-contract/contract.json semantic-ui-tree.json ui.pen --out drift-report.json --json
@@ -64,6 +67,18 @@ penflow fix-report compare-report.json --out fix-report.json --json
 penflow validate-report review-report.json --schema --json
 penflow demo --out examples/full
 ```
+
+`penflow run --target <workspace> [--theme-css f] [--references dir] [--strict] --json` is the single-command CI/operator wrapper for an existing Penflow workspace. It preserves Penflow's runtime-agnostic boundary: no browser, simulator, Playwright, or Pencil MCP control is added to core; the optional `pencil-sync` gate only runs when explicitly armed with `PENFLOW_RUN_PENCIL_SYNC=1`, otherwise it is reported as `SKIP` in the aggregate JSON.
+
+For dense multi-screen mockups, prefer `penflow check-consistency expected-ui-tree.json --group-by role+intent+variant+size-class --out consistency-report.json --json`. The size class buckets node height so compact headers are not compared with full-height panels; anonymous containers without stable intent, variant, or human name are skipped, and repeated divergences are aggregated per group.
+
+### Theme Token Contract
+
+**Read** [`docs/theme-contract.md`](docs/theme-contract.md) before generating `theme.css` for `draft-pen-from-tree`, `lint-tokens`, or Brander-style handoff. The stable contract accepts canonical and `--pf-*` aliases for core colors, `panel`/`panel-2`, `success`/`warning`/`info`, `font-sans`/`font-mono`, `font-size-xs` through `font-size-xl`, plus dynamic `palette-*` color slots and `radius-*` numeric slots. `lint-tokens` records the effective `spacing_scale`, `radius_scale`, and `fontsize_scale` in the strict report inputs; theme-declared font sizes and radii extend defaults unless the matching CLI override is passed.
+
+### Pencil Editor Sync
+
+Run `penflow pencil-sync <ui.pen> [--expect-min-nodes N] [--expect-screens N] --json` after any Pencil editor or MCP mutation and before any Penflow command that reads that `.pen`. The command triggers Pencil **File > Save**, then re-inspects the disk file; it exits 0 only when the file mtime advances and the disk inspection meets the expected node/screen counts. If the editor shows more screens than disk inspection, stop as `BLOCKED` instead of running downstream CLI commands on stale mockup data.
 
 ### Three Trees
 
@@ -99,7 +114,9 @@ Run `penflow demo --out examples/full` to regenerate the contract **C14/C20** fi
 
 Since feature 055 the contract-gate checklist is machine-seeded: `penflow checklist-from-drift drift-report.json --out checklist.json [--group <name>] --json` maps every drift issue to one anchored open `gate: contract` item (id `drift-<code>-<NNN>` in `_issue_sort_key` order, copied `severity`/`blocking`, `screen_id` derived from `semantic_id`/path with a `_workspace` fallback so nothing is dropped). The command is deterministic (byte-identical reruns, no timestamps, top-level `sourceReport` traceability) and fail-closed (malformed JSON, wrong `kind`, or a schema-invalid report exits 1 without creating or modifying `--out`); items for the other five gates are appended at the skill layer after seeding.
 
-Before final PASS, Mockup Factory also runs the Visual Evidence Gate. **Read** [`.agent-sync/skills/mockup-factory/references/visual-validation.md`](.agent-sync/skills/mockup-factory/references/visual-validation.md) before applying it. When Pencil rendering is available, the gate must export PNGs, show every exported screen as a Markdown image with its absolute path, run `visual-preview url <absolute-path>` when available for browser annotation, dump a layout snapshot to `layout-snapshot.json`, run a vision pass answering ONLY the five locked categories (`visual_balance`, `rendering_artifacts`, `readability`, `perceived_hierarchy`, `imagery_quality`), and write `.mockup-validation/visual-evidence/manifest.json` plus `vision-report.json` (`kind: penflow-vision-report`; legacy `visual-report.json` is deprecated). The verdict is `penflow validate-visual-evidence <dir> --expected expected-ui-tree.json` exiting 0 — the gate is the exit code, not prose; preview URLs are annotation-only and not canonical proof. The schema rejects deterministic categories (contrast, touch targets, overflow belong to `audit-visual`), so vision cannot hand-wave computable facts. Since feature 053, multi-screen sets also require a cross-mockup coherence pass: export all audited screens at a uniform scale, capture one `contact-sheet.png`, expose it through the same Markdown image + `visual-preview url` channels, and answer ONLY the four coherence categories (`cross_screen_rhythm`, `palette_coherence`, `typography_coherence`, `component_recognition`) in the vision report's `coherence` section — required when the expected tree has ≥ 2 screens (`evidence.coherence.missing`), with a non-empty contact-sheet PNG on disk; the numeric cross-screen anchor stays the feature 047 `check-consistency` report. If `visual-preview` is unavailable, operators keep the Markdown image and record browser preview unavailable without changing the deterministic evidence packet by itself. Without a renderer the status is `BLOCKED_VISUAL_NOT_RUN` or escalated rather than silently passing structural-only validation.
+Before final PASS, Mockup Factory also runs the Visual Evidence Gate. **Read** [`.agent-sync/skills/mockup-factory/references/visual-validation.md`](.agent-sync/skills/mockup-factory/references/visual-validation.md) before applying it. When Pencil rendering is available, the gate must export PNGs, show every exported screen as a Markdown image with its absolute path, run `visual-preview url <absolute-path>` when available for browser annotation, dump a layout snapshot to `layout-snapshot.json`, run `audit-visual` with `--layout-snapshot` so overlap/overflow uses real Pencil bboxes, run a vision pass answering ONLY the five locked categories (`visual_balance`, `rendering_artifacts`, `readability`, `perceived_hierarchy`, `imagery_quality`), and write `.mockup-validation/visual-evidence/manifest.json` plus `vision-report.json` (`kind: penflow-vision-report`; legacy `visual-report.json` is deprecated). The verdict is `penflow validate-visual-evidence <dir> --expected expected-ui-tree.json` exiting 0 — the gate is the exit code, not prose; preview URLs are annotation-only and not canonical proof. The schema rejects deterministic categories (contrast, touch targets, overflow belong to `audit-visual`), so vision cannot hand-wave computable facts. Since feature 053, multi-screen sets also require a cross-mockup coherence pass: export all audited screens at a uniform scale, capture one `contact-sheet.png`, expose it through the same Markdown image + `visual-preview url` channels, and answer ONLY the four coherence categories (`cross_screen_rhythm`, `palette_coherence`, `typography_coherence`, `component_recognition`) in the vision report's `coherence` section — required when the expected tree has ≥ 2 screens (`evidence.coherence.missing`), with a non-empty contact-sheet PNG on disk; the numeric cross-screen anchor stays the feature 047 `check-consistency` report. If `visual-preview` is unavailable, operators keep the Markdown image and record browser preview unavailable without changing the deterministic evidence packet by itself. Without a renderer the status is `BLOCKED_VISUAL_NOT_RUN` or escalated rather than silently passing structural-only validation.
+
+When a workspace has `references/references-manifest.json`, each reference entry is `{screen_id, file, sha256, source}` and files resolve relative to `references/`. The evidence manifest declares that file via `references_manifest`; `vision-report.json` must add `reference_fidelity` entries for every referenced screen with the locked categories `layout_match`, `palette_match`, `component_parity`, and `density_match`, citing both reference and export files. The additional gate is `penflow validate-reference-fidelity .mockup-validation/visual-evidence --references references --json`: copied exports fail as `reference.evidence_is_reference_copy`, and strong deterministic-vs-LLM disagreement fails as `reference.llm_metric_disagreement`.
 
 Since feature 056 (contract C31), evidence packets are bindable to the exact theme bytes they were rendered against. `penflow theme-fingerprint theme.css --json` emits `{path, sha256}` — the SHA-256 of the file's raw bytes (no normalization, reproducible via `shasum -a 256`; missing/unreadable file exits 2). The skill layer writes that block plus an opaque `runId` (ISO-8601 timestamp + short slug recommended) into `manifest.json` — both fields are optional and backward compatible. Arming the gate with `penflow validate-visual-evidence <dir> --theme-css theme.css` requires the manifest stamp to match the current file: a missing stamp emits `evidence.theme.missing`, a mismatching one emits `evidence.theme.stale` (both error severity, exit 1), so any theme edit deterministically invalidates stale evidence and forces a re-run of the bounded loop; a `--theme-css` path missing on disk is a boundary error (exit 2). Without the flag, behavior and output are byte-identical to before — stamps stay inert.
 
@@ -122,6 +139,8 @@ penflow code-ir --from-context ui.pen --semantic-tree semantic-ui-tree.json --co
 penflow validate-code-ir code-ir.json --json
 ```
 
+`draft-pen-from-tree` is a structural draft stage. If its JSON output is saved as `draft-report.json`, the report includes `fidelity: "wireframe"`: draft = structure / wireframe, PAS un mockup final ; le hi-fi passe par mockup-factory.
+
 Legacy Markdown-only docs may still mention `penflow export-semantic-tree examples/full/flow-ui-contract --out semantic-ui-tree.json --json`; strict v2 uses `contract.json`.
 
 #### Enrichment
@@ -132,7 +151,7 @@ Start from an existing visual `.pen`, inject semantic context, preserve layout, 
 penflow export-semantic-tree examples/full/flow-ui-contract/contract.json --out semantic-ui-tree.json --json
 penflow validate-semantic-tree semantic-ui-tree.json --json
 penflow enrich-pen examples/full/ui.visual.pen semantic-ui-tree.json --out ui.enriched.pen --json
-penflow map-pencil-context ui.enriched.pen semantic-ui-tree.json --out pencil-context-map.json --json
+penflow map-pencil-context ui.enriched.pen semantic-ui-tree.json --out pencil-context-map.json --strict-anchors --json
 penflow validate-pen ui.enriched.pen --json
 penflow export-expected ui.enriched.pen --out expected-ui-tree.json --json
 penflow code-ir --from-context ui.enriched.pen --semantic-tree semantic-ui-tree.json --context-map pencil-context-map.json --contract examples/full/flow-ui-contract/contract.json --flow-id checkout --flow-name "Checkout flow" --out code-ir.json --json
@@ -204,6 +223,8 @@ penflow compare-tree examples/full/expected-ui-tree.json examples/full/actual-ui
 
 - `.pen` stays JSON-first and runtime-agnostic.
 - `context` carries semantic design intent: `semantic_id`, `role`, `intent`, `binding`, `repeat`, `entity`, `variant`, `test_id`, `tolerance`.
+- Pencil `context` is written as `key=value` pairs separated by `;` (`semantic_id=cockpit-live.git; role=container`). Attach it during `batch_design` insertion for screen frames, sections, interactive components, and lists. Run `map-pencil-context --strict-anchors` before downstream `.pen` readers; use `--create-placeholders` only as explicit repair scaffolding because it reports `PARTIAL`.
+- Semantic anti-gaming is fail-closed: `validate-semantic-tree` rejects repeated list-like containers without `repeat`, and `validate-flow-contract --json` reports per-screen `interactive_coverage` while rejecting unbound interactive nodes.
 - Runtime frameworks provide actual UI trees; Penflow validates and compares those trees.
 - The primary validation is structural and semantic, not pixel-perfect.
 - Demo `.pen` files use Pencil document schema `2.11` with context shorthand strings so they can be opened in Pencil and parsed by Penflow.
@@ -216,7 +237,7 @@ penflow compare-tree examples/full/expected-ui-tree.json examples/full/actual-ui
 
 **Read** [`.agent-sync/skills/mockup-factory/SKILL.md`](.agent-sync/skills/mockup-factory/SKILL.md) to run the tree-aware guided UX/UI optimizer for Pencil mockups. The skill can orchestrate external Pencil/audit tooling, but Penflow Python core stays runtime-agnostic.
 
-The pre-Pencil semantic contract is defined in [`penflow/schemas/semantic-ui-tree.schema.json`](penflow/schemas/semantic-ui-tree.schema.json), with a deterministic example at [`examples/demo/semantic-ui-tree.json`](examples/demo/semantic-ui-tree.json). Export it from `flow-ui-contract/contract.json` with `penflow export-semantic-tree path/to/flow-ui-contract/contract.json --out semantic-ui-tree.json`, validate it with `penflow validate-semantic-tree semantic-ui-tree.json --json`, then create a theme-aware Pencil draft with `penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --theme-css theme.css --json`, enrich an existing Pencil file with `penflow enrich-pen existing-ui.pen semantic-ui-tree.json --out ui.enriched.pen --json`, emit an explicit mapping artifact with `penflow map-pencil-context ui.pen semantic-ui-tree.json --out pencil-context-map.json --json`, reverse an existing Pencil file with `penflow reverse-pen ui.pen --out reverse-output --json`, or report drift with `penflow detect-drift path/to/flow-ui-contract/contract.json semantic-ui-tree.json ui.pen --out drift-report.json --json`. This schema is distinct from post-implementation actual UI trees.
+The pre-Pencil semantic contract is defined in [`penflow/schemas/semantic-ui-tree.schema.json`](penflow/schemas/semantic-ui-tree.schema.json), with a deterministic example at [`examples/demo/semantic-ui-tree.json`](examples/demo/semantic-ui-tree.json). Export it from `flow-ui-contract/contract.json` with `penflow export-semantic-tree path/to/flow-ui-contract/contract.json --out semantic-ui-tree.json`, validate it with `penflow validate-semantic-tree semantic-ui-tree.json --json`, then create a theme-aware Pencil draft with `penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --theme-css theme.css --json`, enrich an existing Pencil file with `penflow enrich-pen existing-ui.pen semantic-ui-tree.json --out ui.enriched.pen --json`, emit an explicit mapping artifact with `penflow map-pencil-context ui.pen semantic-ui-tree.json --out pencil-context-map.json --strict-anchors --json`, reverse an existing Pencil file with `penflow reverse-pen ui.pen --out reverse-output --json`, or report drift with `penflow detect-drift path/to/flow-ui-contract/contract.json semantic-ui-tree.json ui.pen --out drift-report.json --json`. `validate-flow-contract --json` includes `interactive_coverage`, and static screens without interactive actions must declare `static: true` plus `static_reason`. This schema is distinct from post-implementation actual UI trees.
 
 ## Conventions
 

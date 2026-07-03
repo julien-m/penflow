@@ -14,6 +14,7 @@ from .schema_cache import load_schema
 INTERACTIVE_ROLES = {"button", "link", "input", "select", "toggle", "form"}
 PASSIVE_STRUCTURE_ROLES = {"screen", "container", "component", "section", "shape"}
 REPEAT_ROLES = {"list", "list_item"}
+DOWNGRADE_SUSPECT_MIN_CHILDREN = 3
 BINDING_RE = re.compile(r"^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$")
 SCHEMA_PATH = Path(__file__).parent / "schemas" / "semantic-ui-tree.schema.json"
 
@@ -331,6 +332,18 @@ def _walk_node(
                 semantic_id if isinstance(semantic_id, str) else None,
             )
         )
+    if role == "container" and not node.get("repeat"):
+        repeated_signature = _repeated_visual_signature(node)
+        if repeated_signature is not None:
+            issues.append(
+                SemanticIssue(
+                    "error",
+                    "semantic.downgrade_suspect",
+                    f"{path}.repeat",
+                    "container has repeated visual children and should declare repeat or use list",
+                    semantic_id if isinstance(semantic_id, str) else None,
+                )
+            )
     if node.get("binding") and not BINDING_RE.match(str(node["binding"])):
         issues.append(
             SemanticIssue(
@@ -378,6 +391,38 @@ def _walk_node(
                 duplicate_test_ids,
                 issues,
             )
+
+
+def _repeated_visual_signature(node: dict[str, Any]) -> tuple[Any, ...] | None:
+    children = [child for child in node.get("children", []) or [] if isinstance(child, dict)]
+    if len(children) < DOWNGRADE_SUSPECT_MIN_CHILDREN:
+        return None
+    counts: dict[tuple[Any, ...], int] = {}
+    for child in children:
+        signature = _visual_signature(child)
+        if signature is None:
+            continue
+        counts[signature] = counts.get(signature, 0) + 1
+    for signature, count in counts.items():
+        if count >= DOWNGRADE_SUSPECT_MIN_CHILDREN:
+            return signature
+    return None
+
+
+def _visual_signature(node: dict[str, Any]) -> tuple[Any, ...] | None:
+    visual = node.get("visual")
+    bbox = node.get("bbox")
+    has_visual = isinstance(visual, dict) and bool(visual)
+    has_bbox = isinstance(bbox, dict) and ("width" in bbox or "height" in bbox)
+    if not has_visual and not has_bbox:
+        return None
+    bbox_size: tuple[Any, ...] = ()
+    if isinstance(bbox, dict):
+        bbox_size = (("height", bbox.get("height")), ("width", bbox.get("width")))
+    visual_items = (
+        json.dumps(visual, sort_keys=True, default=str) if isinstance(visual, dict) else ""
+    )
+    return (node.get("role"), bbox_size, visual_items)
 
 
 def _allowed_roles() -> set[str]:

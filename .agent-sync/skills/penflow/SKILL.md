@@ -54,7 +54,21 @@ For the semantic-tree formation rules, **Read** [`../flow-ui-contract/references
   python3 -m pip install -e ".[dev]"
   ```
 - **Read** [`README.md`](../../../README.md) for project-level command examples when a user asks for the full workflow.
+- **Read** [`../../../docs/theme-contract.md`](../../../docs/theme-contract.md) before generating `theme.css` for `draft-pen-from-tree`, `lint-tokens`, or Brander-style handoff. It defines accepted `--pf-*` aliases, extended status/panel/font tokens, dynamic `palette-*` slots, dynamic `radius-*` slots, and the strict report inputs.
 - Before any UI flow, Pencil draft, mockup, or visual validation work, **Read** [`../../../.conventions/index.md`](../../../.conventions/index.md) and load all matching design domains. UI work must use the convention-defined view/component patterns, not only theme colors.
+- After every Pencil editor/MCP mutation (`batch_design`, manual edit, or equivalent) and before any Penflow CLI command that reads the `.pen`, run `penflow pencil-sync <ui.pen> --expect-screens <N> --json` or add `--expect-min-nodes <N>`. If the editor shows more screens/nodes than disk inspection, report `BLOCKED`; do not work around stale disk state.
+
+## Pencil Context Grammar
+
+Pencil `context` is the shorthand string parsed by [`../../../penflow/context.py`](../../../penflow/context.py): `key=value` pairs separated by `;`. Allowed keys: `semantic_id`, `role`, `intent`, `binding`, `repeat`, `entity`, `variant`, `test_id`, `action`, `permission`, `mask`, `mask_text`, `tolerance`.
+
+Examples:
+- Screen frame: `semantic_id=cockpit-live; role=screen`
+- Section frame: `semantic_id=cockpit-live.git; role=container`
+- Button: `semantic_id=cockpit-live.stop-worker; role=button; intent=stop-worker; action=stop_worker`
+- List: `semantic_id=cockpit-live.workers; role=list; repeat=worker in workers`
+
+When creating frames/components via `batch_design`, attach context at insertion time to every screen frame, section frame, interactive component, and repeated list. Adding context later is error-prone and must be treated as repair work. Run `penflow map-pencil-context <ui.pen> <semantic-ui-tree.json> --out pencil-context-map.json --strict-anchors --json`; ambiguous or unmapped anchors block. `--create-placeholders` is opt-in only, and its report remains `PARTIAL`, never PASS.
 
 ## Mode Selection
 
@@ -85,6 +99,7 @@ Use when a user asks for mockup generation, audit, optimization, or `/mockup-fac
 Use when `flow-ui-contract/contract.json` is the source of truth. Keep Markdown examples as docs-only/migration references.
 
 ```bash
+penflow run --target penflow --theme-css penflow/theme.css --references penflow/references --strict --json
 penflow validate-flow-contract examples/full/flow-ui-contract/contract.json --json
 penflow export-semantic-tree examples/full/flow-ui-contract/contract.json --out semantic-ui-tree.json --json
 penflow validate-semantic-tree semantic-ui-tree.json --json
@@ -92,23 +107,40 @@ penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --theme-css theme
 penflow lint-tokens ui.pen --theme-css theme.css --out token-lint-report.json --json
 penflow validate-pen ui.pen --json
 penflow export-expected ui.pen --out expected-ui-tree.json --json
-penflow check-consistency expected-ui-tree.json --out consistency-report.json --json
-penflow audit-visual expected-ui-tree.json --theme-css theme.css --out visual-metrics-report.json --json
+penflow check-consistency expected-ui-tree.json --group-by role+intent+variant+size-class --out consistency-report.json --json
+penflow audit-visual expected-ui-tree.json --theme-css theme.css [--layout-snapshot .mockup-validation/visual-evidence/layout-snapshot.json] --out visual-metrics-report.json --json
 penflow code-ir --from-context ui.pen --semantic-tree semantic-ui-tree.json --contract examples/full/flow-ui-contract/contract.json --flow-id checkout --flow-name "Checkout flow" --out code-ir.json --json
 penflow validate-code-ir code-ir.json --json
 ```
 
+`draft-pen-from-tree` emits a structural Pencil draft only. When its JSON output is saved as `draft-report.json`, it includes `fidelity: "wireframe"`: draft = structure / wireframe, PAS un mockup final ; le hi-fi passe par mockup-factory.
+
+Use `--group-by role+intent+variant+size-class` on dense screens: `check-consistency` skips anonymous containers with no stable intent, variant, or human name; height buckets keep 56px headers out of 820px panel groups; repeated divergences are aggregated. `--lenient` downgrades non-`fill`/`fontFamily` divergences to warnings in the report; `fill` and `fontFamily` stay errors.
+
+`penflow run --target <workspace> [--theme-css f] [--references dir] [--strict] --json` is the single DX wrapper for an already authored workspace. It runs the deterministic gates in order: `validate-flow-contract`, `export-semantic-tree`, `pencil-sync` when explicitly armed (`PENFLOW_RUN_PENCIL_SYNC=1`), `map-pencil-context --strict-anchors`, `validate-pen`, `export-expected`, `lint-tokens`, `check-consistency`, `audit-visual`, `detect-drift`, `validate-visual-evidence`, optional `reference-fidelity`, and `code-ir`. The output is one JSON summary `{gate: {status, report_path, exit}}` plus an aggregate exit code; individual gate reports remain in the workspace.
+
+APEX integration rule: `penflow run` is the unite naturelle qu'une tache APEX encapsule cote orchestrateur. Penflow ne cree jamais de goal runtime propre: le goal appartient au run parent. Any APEX invocation that wraps Penflow must use `-G/--no-goal` so goal ownership is not nested or duplicated.
+
+`code-ir --from-context` expects the contextualized `.pen` file, not `expected-ui-tree.json`; wrong-tree inputs must fail before code IR generation with an explicit message.
+
+`export_nodes` batch limitation: Penflow core must not drive Pencil MCP/app exports. If Pencil `export_nodes` with multiple IDs fails as `wrong .pen file` while unitary exports pass, keep the deterministic Penflow gates intact and use exports unitaires at the skill/operator layer. The reproduced issue is tracked as [`PF-PENCIL-EXPORT-NODES-BATCH-20260701`](../../../docs/pencil-export-nodes-batch-issue.md); cite that ID in worker receipts instead of treating the fallback as untracked debt. Do not add browser, Pencil MCP, or renderer dependencies to Penflow Python core.
+
 Legacy route phrase for old docs/tests: `penflow export-semantic-tree examples/full/flow-ui-contract --out semantic-ui-tree.json --json`.
 
-`audit-visual` (feature 050) computes deterministic visual metrics from the expected tree, zero vision: WCAG AA contrast via parent-walk backgrounds (`visual.contrast.below_aa` error; 3:1 for fontSize ≥ 24 or ≥ 18 bold, else 4.5:1), touch targets on interactive roles (`visual.touch_target.too_small` — error < 24px, warning 24–43px; ≥ 44px passes; zero-sized drafts emit `visual.bbox.unmeasured` info), sibling overlap / parent overflow beyond 1px (`visual.bbox.overlap`, `visual.bbox.overflow`, errors), heuristic text overflow (`visual.text.likely_overflow` warning), and unparseable fills (`visual.color.unparsed` info). `$pf-*` fills resolve via `--theme-css`.
+Anti-gaming gates are strict: `validate-semantic-tree` emits `semantic.downgrade_suspect` for repeated list-like `container` children without `repeat`, and `validate-flow-contract --json` includes `interactive_coverage` while failing `contract.interactive_unbound` when a `button`/`link`/`input` has neither `action` nor transition binding. Static screens without interactive actions must declare `static: true` and a non-empty `static_reason`.
+
+`audit-visual` (feature 050/061) computes deterministic visual metrics from the expected tree, zero vision: WCAG AA contrast via parent-walk backgrounds (`visual.contrast.below_aa` error; 3:1 for fontSize ≥ 24 or ≥ 18 bold, else 4.5:1), touch targets on interactive roles (`visual.touch_target.too_small` — error < 24px, warning 24–43px; ≥ 44px passes; zero-sized drafts emit `visual.bbox.unmeasured` info), sibling overlap / parent overflow beyond 1px (`visual.bbox.overlap`, `visual.bbox.overflow`, errors), heuristic text overflow (`visual.text.likely_overflow` warning), and unparseable fills (`visual.color.unparsed` info). `$pf-*` fills resolve via `--theme-css`. When a renderer produced `layout-snapshot.json`, pass `--layout-snapshot` so overlap/overflow uses real Pencil bboxes; without it, flex-parent theoretical geometry is skipped while non-geometric checks still run on the tree.
 
 `validate-visual-evidence` (feature 051) deterministically gates the skill-layer visual evidence packet — Penflow never runs vision, it validates that vision happened:
 
 ```bash
 penflow validate-visual-evidence .mockup-validation/visual-evidence --expected expected-ui-tree.json --json
+penflow validate-reference-fidelity .mockup-validation/visual-evidence --references references --json
 ```
 
 Checks: `manifest.json` validates, every manifest screen PNG exists non-empty, `vision-report.json` (`kind: penflow-vision-report`) validates against the locked category enum (`visual_balance`, `rendering_artifacts`, `readability`, `perceived_hierarchy`, `imagery_quality` — deterministic categories like contrast/touch targets/overflow are rejected by schema), every screen answers all five categories, every expected-tree screen is covered (`evidence.screen.uncovered`), an optional `layout-snapshot.json` matches expected root bboxes within ±4px (`evidence.snapshot.bbox_mismatch`), and — when the expected tree has ≥ 2 screens — the report carries a `coherence` section (`evidence.coherence.missing`) whose `contact_sheet_png` exists non-empty (`evidence.contact_sheet.missing`/`.empty`) and whose criteria answer all four coherence categories (`cross_screen_rhythm`, `palette_coherence`, `typography_coherence`, `component_recognition` — `evidence.coherence.category_missing`; numeric cross-screen facts stay with `check-consistency`). All issues are errors; exit 0 is the only PASS. The vision report also validates standalone via `penflow validate-report vision-report.json --schema --json`.
+
+When references exist, `manifest.json` declares `references_manifest` pointing to `references/references-manifest.json` (`[{screen_id, file, sha256, source}]`, files relative to `references/`). `vision-report.json` must include `reference_fidelity` for every referenced screen, with one side-by-side contact sheet and exactly `layout_match`, `palette_match`, `component_parity`, and `density_match`; every evidence sentence cites both reference and export files. Run `penflow validate-reference-fidelity .mockup-validation/visual-evidence --references references --json` after `validate-visual-evidence`; copied exports (`reference.evidence_is_reference_copy`) and deterministic-vs-LLM disagreement (`reference.llm_metric_disagreement`) block PASS.
 
 ## Pencil Enrichment Mode
 
@@ -119,7 +151,7 @@ penflow validate-flow-contract examples/full/flow-ui-contract/contract.json --js
 penflow export-semantic-tree examples/full/flow-ui-contract/contract.json --out semantic-ui-tree.json --json
 penflow validate-semantic-tree semantic-ui-tree.json --json
 penflow enrich-pen examples/full/ui.visual.pen semantic-ui-tree.json --out ui.enriched.pen --json
-penflow map-pencil-context ui.enriched.pen semantic-ui-tree.json --out pencil-context-map.json --json
+penflow map-pencil-context ui.enriched.pen semantic-ui-tree.json --out pencil-context-map.json --strict-anchors --json
 penflow validate-pen ui.enriched.pen --json
 penflow export-expected ui.enriched.pen --out expected-ui-tree.json --json
 penflow code-ir --from-context ui.enriched.pen --semantic-tree semantic-ui-tree.json --context-map pencil-context-map.json --contract examples/full/flow-ui-contract/contract.json --flow-id checkout --flow-name "Checkout flow" --out code-ir.json --json

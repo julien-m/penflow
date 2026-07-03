@@ -28,6 +28,7 @@ BLOCKING_DRIFT_CODES = frozenset(
         "drift.semantic_node_missing_in_pen",
         "drift.pencil_context_obsolete",
         "drift.clarification_marker",
+        "semantic.downgrade_suspect",
     }
 )
 
@@ -90,17 +91,21 @@ def _drift_issues(
 
 
 def _semantic_validation_issues(tree: dict[str, Any]) -> list[dict[str, Any]]:
-    return [
-        _issue(
-            "error",
-            "drift.semantic_tree_invalid",
-            issue.get("path", "$"),
-            issue.get("message", "semantic tree validation failed"),
-            semantic_id=issue.get("semantic_id"),
+    issues: list[dict[str, Any]] = []
+    for issue in validate_semantic_tree(tree):
+        if issue.get("severity") != "error":
+            continue
+        code = str(issue.get("code", ""))
+        issues.append(
+            _issue(
+                "error",
+                code if code == "semantic.downgrade_suspect" else "drift.semantic_tree_invalid",
+                issue.get("path", "$"),
+                issue.get("message", "semantic tree validation failed"),
+                semantic_id=issue.get("semantic_id"),
+            )
         )
-        for issue in validate_semantic_tree(tree)
-        if issue.get("severity") == "error"
-    ]
+    return issues
 
 
 def _spec_tree_mismatch_issues(specs_dir: Path, tree: dict[str, Any]) -> list[dict[str, Any]]:

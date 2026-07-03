@@ -106,9 +106,28 @@ def test_semantic_schema_does_not_add_feature_036_or_later_runtime_pipeline() ->
     # `validate-visual-evidence --theme-css` gate, stdlib hashing of local
     # bytes only, no runtime adapter). Feature 057 is in scope — it ships the
     # Mockup Factory visual-preview proof channel at the skill/docs layer only,
-    # with no Python runtime adapter; feature 058 remains guarded.
+    # with no Python runtime adapter. Feature 058 is in scope — it ships the
+    # `penflow pencil-sync` editor-to-disk gate with an isolated AppleScript
+    # runner and no Pencil MCP/runtime dependency. Feature 059 is in scope —
+    # it ships context grammar docs and strict anchor mapping, with no runtime
+    # adapter. Feature 060 is in scope — it ships dense-screen consistency v2:
+    # anonymous-container skipping, size-class grouping, lenient severity fix,
+    # and aggregated report issues. Feature 061 is in scope — it ships
+    # `audit-visual --layout-snapshot` for real Pencil bbox geometry while
+    # keeping non-geometric visual checks on the expected tree. Feature 062 is
+    # in scope — it ships the extended theme token contract for Brander
+    # handoff. Feature 063 is in scope — it ships reference fidelity over
+    # local PNG/reference artifacts. Feature 064 is in scope — it ships
+    # receipt anti-fabrication for local visual/audit evidence, without any
+    # runtime adapter. Feature 065 is in scope — it ships semantic anti-gaming
+    # gates over local semantic-tree/contract JSON, without any runtime adapter.
+    # Feature 066 is in scope — it labels the existing draft report as
+    # wireframe fidelity and updates operator wording, without any runtime
+    # adapter or themed component library. Feature 067 is in scope — it ships
+    # the single `penflow run` gate orchestrator over local Penflow files only,
+    # without browser, simulator, Pencil MCP, or UI runtime adapters.
     future_feature_dirs: list[Path] = []
-    for feature_number in range(58, 59):
+    for feature_number in range(68, 69):
         future_feature_dirs.extend((ROOT / ".specs" / "features").glob(f"{feature_number:03d}-*"))
     assert future_feature_dirs == []
     assert not (ROOT / "penflow" / "semantic_validator.py").exists()

@@ -12,7 +12,7 @@ import pytest
 from penflow.cli import main
 from penflow.color import parse_color, resolve_variable
 from penflow.contracts import extract_design_tokens
-from penflow.theme import load_theme, parse_css_custom_properties
+from penflow.theme import THEME_TOKEN_MAP, load_theme, parse_css_custom_properties
 from penflow.token_lint import (
     DEFAULT_FONTSIZE_SCALE,
     DEFAULT_RADIUS_SCALE,
@@ -22,6 +22,7 @@ from penflow.token_lint import (
 
 ROOT = Path(__file__).resolve().parent.parent
 EXAMPLE = ROOT / "examples" / "demo" / "semantic-ui-tree.json"
+CLAUDE_PILOT_THEME = ROOT / "tests" / "fixtures" / "claude-pilot" / "theme-dark-extended.css"
 
 THEME_CSS = """:root {
   --background: #f6f4ef;
@@ -59,8 +60,8 @@ def _theme_path(tmp_path: Path) -> Path:
     return path
 
 
-def _write_pen(tmp_path: Path, data: dict) -> Path:
-    path = tmp_path / "fixture.pen"
+def _write_pen(tmp_path: Path, data: dict, name: str = "fixture.pen") -> Path:
+    path = tmp_path / name
     path.write_text(json.dumps(data), encoding="utf-8")
     return path
 
@@ -108,6 +109,52 @@ def test_load_theme_matches_legacy_shapes(tmp_path: Path) -> None:
     assert themed["style"]["primary"] == "$pf-primary"
     with pytest.raises(FileNotFoundError):
         load_theme(tmp_path / "missing.css")
+
+
+def test_load_theme_supports_extended_cockpit_contract() -> None:
+    themed = load_theme(CLAUDE_PILOT_THEME)
+
+    for token in (
+        "font-mono",
+        "font-size-xs",
+        "font-size-sm",
+        "font-size-base",
+        "font-size-lg",
+        "font-size-xl",
+        "success",
+        "warning",
+        "info",
+        "panel",
+        "panel-2",
+    ):
+        assert token in THEME_TOKEN_MAP
+
+    assert themed["variables"]["pf-font-mono"] == {"type": "string", "value": "JetBrains Mono"}
+    assert themed["variables"]["pf-font-size-xs"] == {"type": "number", "value": 10}
+    assert themed["variables"]["pf-font-size-xl"] == {"type": "number", "value": 18}
+    assert themed["variables"]["pf-success"] == {"type": "color", "value": "#38d978"}
+    assert themed["variables"]["pf-panel-2"] == {"type": "color", "value": "#1b1a18"}
+    assert themed["variables"]["pf-palette-overlay"] == {"type": "color", "value": "#000000aa"}
+    assert themed["variables"]["pf-palette-border-alt"] == {"type": "color", "value": "#2b2a27"}
+    assert themed["variables"]["pf-radius-hairline"] == {"type": "number", "value": 1}
+    assert themed["style"]["font_mono"] == "$pf-font-mono"
+
+
+def test_load_theme_accepts_prefixed_and_unprefixed_token_names(tmp_path: Path) -> None:
+    theme_path = tmp_path / "theme.css"
+    theme_path.write_text(
+        (
+            ":root { --font-mono: JetBrains Mono; --pf-font-size-xs: 10px;"
+            " --palette-rail: #070707; --pf-radius-hairline: 1px; }"
+        ),
+        encoding="utf-8",
+    )
+    themed = load_theme(theme_path)
+
+    assert themed["variables"]["pf-font-mono"]["value"] == "JetBrains Mono"
+    assert themed["variables"]["pf-font-size-xs"]["value"] == 10
+    assert themed["variables"]["pf-palette-rail"]["value"] == "#070707"
+    assert themed["variables"]["pf-radius-hairline"]["value"] == 1
 
 
 DARK_AUGMENTED_THEME_CSS = (
@@ -297,6 +344,24 @@ def test_theme_radius_is_auto_included_in_radius_scale(tmp_path: Path) -> None:
     assert 14 in report["inputs"]["radius_scale"]
 
 
+def test_theme_font_size_tokens_extend_default_scale(tmp_path: Path) -> None:
+    pen = _write_pen(tmp_path, _violation_pen(fontSize=10))
+    report = lint_tokens(pen, theme=load_theme(CLAUDE_PILOT_THEME))
+
+    assert report["status"] == "PASS"
+    assert 10 in report["inputs"]["fontsize_scale"]
+    assert set(DEFAULT_FONTSIZE_SCALE).issubset(set(report["inputs"]["fontsize_scale"]))
+
+
+def test_theme_radius_tokens_extend_default_scale(tmp_path: Path) -> None:
+    pen = _write_pen(tmp_path, _violation_pen(cornerRadius=1))
+    report = lint_tokens(pen, theme=load_theme(CLAUDE_PILOT_THEME))
+
+    assert report["status"] == "PASS"
+    assert 1 in report["inputs"]["radius_scale"]
+    assert set(DEFAULT_RADIUS_SCALE).issubset(set(report["inputs"]["radius_scale"]))
+
+
 def test_off_scale_font_size_reports_fontsize_offscale(tmp_path: Path) -> None:
     pen = _write_pen(tmp_path, _violation_pen(fontSize=17))
     report = lint_tokens(pen)
@@ -307,6 +372,18 @@ def test_off_scale_font_size_reports_fontsize_offscale(tmp_path: Path) -> None:
 def test_raw_font_family_reports_fontfamily_mismatch(tmp_path: Path) -> None:
     pen = _write_pen(tmp_path, _violation_pen(fontFamily="Comic Sans MS"))
     report = lint_tokens(pen, theme=load_theme(_theme_path(tmp_path)))
+    assert [v["code"] for v in report["violations"]] == ["token.fontfamily.mismatch"]
+
+
+def test_theme_fonts_allow_sans_and_mono_but_not_random_fonts(tmp_path: Path) -> None:
+    inter_pen = _write_pen(tmp_path, _violation_pen(fontFamily="Inter"), "inter.pen")
+    mono_pen = _write_pen(tmp_path, _violation_pen(fontFamily="JetBrains Mono"), "mono.pen")
+    random_pen = _write_pen(tmp_path, _violation_pen(fontFamily="Comic Sans MS"), "random.pen")
+    theme = load_theme(CLAUDE_PILOT_THEME)
+
+    assert lint_tokens(inter_pen, theme=theme)["status"] == "PASS"
+    assert lint_tokens(mono_pen, theme=theme)["status"] == "PASS"
+    report = lint_tokens(random_pen, theme=theme)
     assert [v["code"] for v in report["violations"]] == ["token.fontfamily.mismatch"]
 
 
@@ -397,3 +474,51 @@ def test_default_scales_match_documented_values() -> None:
     assert DEFAULT_SPACING_SCALE == (2, 4, 8, 12, 16, 24, 32, 40, 48, 64, 80)
     assert DEFAULT_RADIUS_SCALE == (0, 2, 4, 6, 8, 10, 12, 16, 24, 32)
     assert DEFAULT_FONTSIZE_SCALE == (12, 14, 16, 18, 20, 24, 30, 36)
+
+
+def test_claude_pilot_style_extended_dark_theme_fixture_lints_clean(tmp_path: Path) -> None:
+    pen = _write_pen(
+        tmp_path,
+        {
+            "version": "2.11",
+            "children": [
+                {
+                    "id": "screen",
+                    "type": "frame",
+                    "context": "semantic_id=cockpit-live; role=screen",
+                    "fill": "#0b0b0a",
+                    "cornerRadius": 7,
+                    "children": [
+                        {
+                            "id": "metric",
+                            "type": "text",
+                            "content": "12 workers",
+                            "fontFamily": "JetBrains Mono",
+                            "fontSize": 10,
+                            "fill": "#f5f1e8",
+                        },
+                        {
+                            "id": "status",
+                            "type": "frame",
+                            "fill": "#38d978",
+                            "cornerRadius": 7,
+                        },
+                        {
+                            "id": "overlay",
+                            "type": "frame",
+                            "fill": "#000000aa",
+                            "stroke": {"fill": "#6d5526", "thickness": 1},
+                            "cornerRadius": 1,
+                        },
+                    ],
+                }
+            ],
+        },
+        "cockpit.pen",
+    )
+
+    report = lint_tokens(
+        pen, theme=load_theme(CLAUDE_PILOT_THEME), theme_css=str(CLAUDE_PILOT_THEME)
+    )
+    assert report["status"] == "PASS"
+    assert report["violations"] == []

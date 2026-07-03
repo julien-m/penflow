@@ -13,16 +13,17 @@ Run every gate from the target project root with the strict default exit policy 
 | Gate | Category | Command | Pass condition | Report artifact |
 |---|---|---|---|---|
 | `tokens` | Design tokens (palette, spacing, radius, typography) | `penflow lint-tokens <target>/ui.pen --theme-css <target>/theme.css -o <target>/token-lint-report.json --json` | exit 0 | `token-lint-report.json` |
-| `consistency` | Cross-screen component consistency | `penflow check-consistency <target>/expected-ui-tree.json -o <target>/consistency-report.json --json` | exit 0 | `consistency-report.json` |
-| `accessibility_alignment` | Accessibility + Visual alignment (contrast, touch targets, overlap/overflow, text fit) | `penflow audit-visual <target>/expected-ui-tree.json --theme-css <target>/theme.css -o <target>/visual-metrics-report.json --json` | zero error-severity issues — exit 0 under the strict default (`info` never blocks) | `visual-metrics-report.json` |
+| `consistency` | Cross-screen component consistency | `penflow check-consistency <target>/expected-ui-tree.json --group-by role+intent+variant+size-class -o <target>/consistency-report.json --json` | exit 0 | `consistency-report.json` |
+| `accessibility_alignment` | Accessibility + Visual alignment (contrast, touch targets, overlap/overflow, text fit) | `penflow audit-visual <target>/expected-ui-tree.json --theme-css <target>/theme.css --layout-snapshot <target>/.mockup-validation/visual-evidence/layout-snapshot.json -o <target>/visual-metrics-report.json --json` when a renderer produced `layout-snapshot.json`; otherwise omit `--layout-snapshot` | zero error-severity issues — exit 0 under the strict default (`info` never blocks) | `visual-metrics-report.json` |
 | `contract` | Semantic contract drift | `penflow detect-drift <target>/flow-ui-contract/contract.json <target>/semantic-ui-tree.json <target>/ui.pen --out <target>/drift-report.json --json` | `summary.blocking == 0` and exit 0 | `drift-report.json` |
 | `structural_fidelity` | Structural fidelity vs runtime | `penflow compare-tree <target>/expected-ui-tree.json <target>/actual-ui-tree.json --out <target>/compare-report.json --json` | score ≥ 0.98 (strict default threshold) — exit 0 | `compare-report.json` |
-| `balance_readability` | Balance / readability (vision-only) | `penflow validate-visual-evidence <target>/.mockup-validation/visual-evidence --expected <target>/expected-ui-tree.json --json` | exit 0 **and** zero `blocking: true` criteria with result `fail` in `vision-report.json` | `.mockup-validation/visual-evidence/vision-report.json` |
+| `balance_readability` | Balance / readability (vision-only) | `penflow validate-visual-evidence <target>/.mockup-validation/visual-evidence --expected <target>/expected-ui-tree.json --json`; when references exist, also `penflow validate-reference-fidelity <target>/.mockup-validation/visual-evidence --references <target>/references --json` | both exits 0, zero `blocking: true` criteria with result `fail` in `vision-report.json`, and reference-fidelity status PASS when references exist | `.mockup-validation/visual-evidence/vision-report.json`, optional reference-fidelity report |
 
 Gate notes:
 
 - `structural_fidelity` applies only once an `actual-ui-tree.json` exists (post-implementation). In a BEFORE-CODE mockup audit, record it as `not_run` with `exit_code: null`; it never blocks a design-time PASS.
 - `balance_readability` requires a Pencil renderer (Visual Evidence Gate, **Read** [`visual-validation.md`](visual-validation.md)). Without a renderer the gate is `not_run` and the audit status is `BLOCKED_VISUAL_NOT_RUN` — never PASS.
+- `accessibility_alignment` requires `--layout-snapshot` whenever the renderer is available; otherwise `audit-visual` skips flex-parent overlap/overflow from theoretical positions and still checks contrast, touch targets, and text fit on the tree.
 - Every other gate marked `not_run` blocks PASS: a gate either ran clean or the audit is not done.
 
 ## Critical — Single Definition

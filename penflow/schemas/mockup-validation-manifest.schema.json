@@ -12,6 +12,7 @@
     "status": {"type": "string"},
     "validatedAt": {"type": "string"},
     "runId": {"type": "string", "minLength": 1},
+    "references_manifest": {"type": "string", "minLength": 1},
     "theme": {
       "type": "object",
       "required": ["path", "sha256"],
@@ -25,13 +26,14 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["screen_id", "semantic_id", "pencil_node_id", "png", "layout_checked", "screenshot_checked"],
+        "required": ["screen_id", "semantic_id", "pencil_node_id", "png", "sha256", "layout_checked", "screenshot_checked"],
         "additionalProperties": false,
         "properties": {
           "screen_id": {"type": "string"},
           "semantic_id": {"type": "string"},
           "pencil_node_id": {"type": "string"},
           "png": {"type": "string"},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
           "layout_checked": {"type": "boolean"},
           "screenshot_checked": {"type": "boolean"},
           "notes": {"type": "string"}

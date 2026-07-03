@@ -5,6 +5,17 @@
   "renderer": "pencil-mcp",
   "sourceFile": "examples/full/ui.pen",
   "model": "claude-fable-5",
+  "generated_by": "mockup-factory.visual-evidence",
+  "inputs": [
+    {
+      "file": "checkoutScreen.png",
+      "sha256": "3e7ce66cd7fc51a850490aea840954c26cff11086f0947ee271b6ceec6b7333a"
+    },
+    {
+      "file": "contact-sheet.png",
+      "sha256": "3e7ce66cd7fc51a850490aea840954c26cff11086f0947ee271b6ceec6b7333a"
+    }
+  ],
   "validatedAt": "2026-06-10",
   "coherence": {
     "contact_sheet_png": "contact-sheet.png",
@@ -12,25 +23,25 @@
       {
         "category": "cross_screen_rhythm",
         "result": "pass",
-        "evidence": "The single checkout screen on the sheet keeps one spacing rhythm; nothing diverges across the set.",
+      "evidence": "The single checkout screen on contact-sheet.png keeps one spacing rhythm; nothing diverges across the set.",
         "blocking": false
       },
       {
         "category": "palette_coherence",
         "result": "pass",
-        "evidence": "The sheet reads as one neutral palette with a single primary accent on the pay button.",
+      "evidence": "contact-sheet.png reads as one neutral palette with a single primary accent on the pay button.",
         "blocking": false
       },
       {
         "category": "typography_coherence",
         "result": "pass",
-        "evidence": "Title, body, and label sizes form one consistent type scale across the sheet.",
+      "evidence": "Title, body, and label sizes form one consistent type scale across contact-sheet.png.",
         "blocking": false
       },
       {
         "category": "component_recognition",
         "result": "pass",
-        "evidence": "The button and summary card styles are recognizable as the same components throughout the sheet.",
+      "evidence": "The button and summary card styles are recognizable as the same components throughout contact-sheet.png.",
         "blocking": false
       }
     ]
@@ -45,31 +56,31 @@
         {
           "category": "visual_balance",
           "result": "pass",
-          "evidence": "Content sits in a single left-aligned column with even vertical rhythm; the sparse lower half is intentional for this minimal fixture.",
+          "evidence": "Content sits in a single left-aligned column in checkoutScreen.png with even vertical rhythm; the sparse lower half is intentional for this minimal fixture.",
           "blocking": false
         },
         {
           "category": "rendering_artifacts",
           "result": "pass",
-          "evidence": "The exported PNG shows no clipping, missing glyphs, broken images, or stray frame borders.",
+          "evidence": "The exported PNG checkoutScreen.png shows no clipping, missing glyphs, broken images, or stray frame borders.",
           "blocking": false
         },
         {
           "category": "readability",
           "result": "pass",
-          "evidence": "Title, order summary, and payment label are legible at 1x scale with clear separation from the background.",
+          "evidence": "Title, order summary, and payment label are legible in checkoutScreen.png at 1x scale with clear separation from the background.",
           "blocking": false
         },
         {
           "category": "perceived_hierarchy",
           "result": "pass",
-          "evidence": "The eye lands on the checkout title, then the order summary, then the primary pay button, matching the intended task order.",
+          "evidence": "The eye lands on the checkout title in checkoutScreen.png, then the order summary, then the primary pay button, matching the intended task order.",
           "blocking": false
         },
         {
           "category": "imagery_quality",
           "result": "pass",
-          "evidence": "No raster imagery is used on this screen; vector shapes and text render crisply in the export.",
+          "evidence": "No raster imagery is used on checkoutScreen.png; vector shapes and text render crisply in the export.",
           "blocking": false
         }
       ]

@@ -5,7 +5,10 @@
 # @spec(FR-008)
 from __future__ import annotations
 
+import hashlib
 import json
+import struct
+import zlib
 from pathlib import Path
 
 import pytest
@@ -16,6 +19,7 @@ from penflow.evidence import (
     VISION_CATEGORIES,
     validate_visual_evidence,
 )
+from penflow.reference_fidelity import REFERENCE_CATEGORIES, validate_reference_fidelity
 
 EXAMPLES_EVIDENCE = Path("examples/full/.mockup-validation/visual-evidence")
 EXAMPLES_EXPECTED = Path("examples/full/expected-ui-tree.json")
@@ -39,12 +43,14 @@ def _expected_tree(path: Path, screen_ids: tuple[str, ...] = ("checkout",)) -> P
     return path
 
 
-def _criteria() -> list[dict[str, object]]:
+def _criteria(png: str = "checkoutScreen.png") -> list[dict[str, object]]:
     return [
         {
             "category": category,
             "result": "pass",
-            "evidence": f"Vision evidence sentence for {category} on the checkout screen.",
+            "evidence": (
+                f"Vision evidence sentence for {category} on the checkout screen evaluated in {png}."
+            ),
             "blocking": False,
         }
         for category in VISION_CATEGORIES
@@ -56,7 +62,7 @@ def _coherence_criteria() -> list[dict[str, object]]:
         {
             "category": category,
             "result": "pass",
-            "evidence": f"Coherence evidence sentence for {category} across the contact sheet.",
+            "evidence": f"Coherence evidence sentence for {category} across contact-sheet.png.",
             "blocking": False,
         }
         for category in COHERENCE_CATEGORIES
@@ -68,10 +74,106 @@ def _add_coherence(evidence: Path, png: str = "contact-sheet.png") -> None:
     (evidence / png).write_bytes(b"\x89PNG\r\n\x1a\nfake-but-non-empty-sheet")
     _mutate_vision_report(
         evidence,
-        lambda report: report.update(
-            {"coherence": {"contact_sheet_png": png, "criteria": _coherence_criteria()}}
+        lambda report: (
+            report["inputs"].append(
+                {"file": png, "sha256": hashlib.sha256((evidence / png).read_bytes()).hexdigest()}
+            ),
+            report.update(
+                {"coherence": {"contact_sheet_png": png, "criteria": _coherence_criteria()}}
+            ),
         ),
     )
+
+
+def _write_png(path: Path, width: int, height: int, color: tuple[int, int, int]) -> None:
+    raw = bytearray()
+    for _y in range(height):
+        raw.append(0)
+        for _x in range(width):
+            raw.extend(color)
+    payload = zlib.compress(bytes(raw))
+    chunks = [
+        _png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)),
+        _png_chunk(b"IDAT", payload),
+        _png_chunk(b"IEND", b""),
+    ]
+    path.write_bytes(b"\x89PNG\r\n\x1a\n" + b"".join(chunks))
+
+
+def _png_chunk(chunk_type: bytes, data: bytes) -> bytes:
+    checksum = zlib.crc32(chunk_type + data) & 0xFFFFFFFF
+    return struct.pack(">I", len(data)) + chunk_type + data + struct.pack(">I", checksum)
+
+
+def _add_references(
+    tmp_path: Path,
+    evidence: Path,
+    *,
+    reference_color: tuple[int, int, int] = (200, 20, 20),
+    export_color: tuple[int, int, int] = (202, 22, 22),
+    include_section: bool = True,
+) -> Path:
+    references = tmp_path / "references"
+    references.mkdir()
+    reference_png = references / "checkout-ref.png"
+    _write_png(reference_png, 8, 8, reference_color)
+    _write_png(evidence / "checkoutScreen.png", 8, 8, export_color)
+    (references / "references-manifest.json").write_text(
+        json.dumps(
+            [
+                {
+                    "screen_id": "checkout",
+                    "file": "checkout-ref.png",
+                    "sha256": hashlib.sha256(reference_png.read_bytes()).hexdigest(),
+                    "source": "unit-test",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    manifest_path = evidence / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["references_manifest"] = "../references/references-manifest.json"
+    manifest["screens"][0]["sha256"] = hashlib.sha256(
+        (evidence / "checkoutScreen.png").read_bytes()
+    ).hexdigest()
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    if include_section:
+        (evidence / "checkout-reference-contact-sheet.png").write_bytes(
+            b"\x89PNG\r\n\x1a\nside-by-side-reference-export"
+        )
+
+        def add_reference_section(report: dict[str, object]) -> None:
+            _replace_input_sha(report, evidence, "checkoutScreen.png")
+            _append_input(report, evidence, "checkout-reference-contact-sheet.png")
+            report.update(
+                {
+                    "reference_fidelity": [
+                        {
+                            "screen_id": "checkout",
+                            "reference": "checkout-ref.png",
+                            "export": "checkoutScreen.png",
+                            "contact_sheet": "checkout-reference-contact-sheet.png",
+                            "criteria": [
+                                {
+                                    "category": category,
+                                    "result": "pass",
+                                    "evidence": (
+                                        "Compared reference checkout-ref.png with export"
+                                        " checkoutScreen.png in contact sheet"
+                                        " checkout-reference-contact-sheet.png."
+                                    ),
+                                    "blocking": False,
+                                }
+                                for category in REFERENCE_CATEGORIES
+                            ],
+                        }
+                    ]
+                }
+            )
+
+        _mutate_vision_report(evidence, add_reference_section)
+    return references
 
 
 def _packet(tmp_path: Path, screen_ids: tuple[str, ...] = ("checkout",)) -> tuple[Path, Path]:
@@ -84,12 +186,14 @@ def _packet(tmp_path: Path, screen_ids: tuple[str, ...] = ("checkout",)) -> tupl
     for screen_id in screen_ids:
         png = f"{screen_id}Screen.png"
         (evidence / png).write_bytes(b"\x89PNG\r\n\x1a\nfake-but-non-empty")
+        png_sha = hashlib.sha256((evidence / png).read_bytes()).hexdigest()
         manifest_screens.append(
             {
                 "screen_id": screen_id,
                 "semantic_id": screen_id,
                 "pencil_node_id": f"{screen_id}Screen",
                 "png": png,
+                "sha256": png_sha,
                 "layout_checked": True,
                 "screenshot_checked": True,
             }
@@ -100,7 +204,7 @@ def _packet(tmp_path: Path, screen_ids: tuple[str, ...] = ("checkout",)) -> tupl
                 "semantic_id": screen_id,
                 "pencil_node_id": f"{screen_id}Screen",
                 "png": png,
-                "criteria": _criteria(),
+                "criteria": _criteria(png),
             }
         )
         snapshot_screens.append(
@@ -132,6 +236,11 @@ def _packet(tmp_path: Path, screen_ids: tuple[str, ...] = ("checkout",)) -> tupl
                 "renderer": "pencil-mcp",
                 "sourceFile": "ui.pen",
                 "model": "test-vision-model",
+                "generated_by": "pytest-visual-evidence-fixture",
+                "inputs": [
+                    {"file": screen["png"], "sha256": screen["sha256"]}
+                    for screen in manifest_screens
+                ],
                 "screens": report_screens,
             }
         ),
@@ -158,6 +267,31 @@ def _mutate_vision_report(evidence: Path, mutate) -> None:
     path.write_text(json.dumps(report), encoding="utf-8")
 
 
+def _replace_input_sha(report: dict[str, object], evidence: Path, png: str) -> None:
+    inputs = report["inputs"]
+    assert isinstance(inputs, list)
+    for item in inputs:
+        if isinstance(item, dict) and item.get("file") == png:
+            item["sha256"] = hashlib.sha256((evidence / png).read_bytes()).hexdigest()
+            return
+
+
+def _append_input(report: dict[str, object], evidence: Path, png: str) -> None:
+    inputs = report["inputs"]
+    assert isinstance(inputs, list)
+    inputs.append(
+        {"file": png, "sha256": hashlib.sha256((evidence / png).read_bytes()).hexdigest()}
+    )
+
+
+def _sync_cross_reference_inputs(
+    report: dict[str, object], evidence: Path, export_files: dict[str, str]
+) -> None:
+    for screen_id, export_file in export_files.items():
+        _replace_input_sha(report, evidence, export_file)
+        _append_input(report, evidence, f"{screen_id}-reference-contact-sheet.png")
+
+
 def test_complete_packet_passes(tmp_path: Path) -> None:
     evidence, expected = _packet(tmp_path)
 
@@ -165,6 +299,186 @@ def test_complete_packet_passes(tmp_path: Path) -> None:
     assert (
         main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
         == 0
+    )
+
+
+def test_visual_evidence_requires_generated_by_receipt(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    _mutate_vision_report(evidence, lambda report: report.pop("generated_by"))
+
+    assert "evidence.vision_report.invalid" in _codes(evidence, expected)
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 1
+    )
+    assert (
+        main(["validate-report", str(evidence / "vision-report.json"), "--schema", "--json"]) == 1
+    )
+
+
+def test_visual_evidence_requires_inputs_receipt(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    _mutate_vision_report(evidence, lambda report: report.pop("inputs"))
+
+    assert "evidence.vision_report.invalid" in _codes(evidence, expected)
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 1
+    )
+    assert (
+        main(["validate-report", str(evidence / "vision-report.json"), "--schema", "--json"]) == 1
+    )
+
+
+def test_visual_evidence_rejects_manifest_png_sha_mismatch(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    manifest_path = evidence / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["screens"][0]["sha256"] = "0" * 64
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    assert "evidence.png.sha_mismatch" in _codes(evidence, expected)
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 1
+    )
+
+
+def test_visual_evidence_rejects_manifest_png_outside_evidence_dir(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    references = tmp_path / "references"
+    references.mkdir()
+    reference_png = references / "ref.png"
+    reference_png.write_bytes(b"\x89PNG\r\n\x1a\nreference-bytes")
+    manifest_path = evidence / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["screens"][0]["png"] = "../references/ref.png"
+    manifest["screens"][0]["sha256"] = hashlib.sha256(reference_png.read_bytes()).hexdigest()
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    assert "evidence.png.outside_evidence_dir" in _codes(evidence, expected)
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 1
+    )
+
+
+def test_visual_evidence_rejects_manifest_png_symlink_to_references(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    references = tmp_path / "references"
+    references.mkdir()
+    reference_png = references / "ref.png"
+    reference_png.write_bytes(b"\x89PNG\r\n\x1a\nreference-bytes")
+    symlink = evidence / "linked-ref.png"
+    try:
+        symlink.symlink_to(reference_png)
+    except OSError:
+        pytest.skip("filesystem does not support symlinks")
+    manifest_path = evidence / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["screens"][0]["png"] = "linked-ref.png"
+    manifest["screens"][0]["sha256"] = hashlib.sha256(reference_png.read_bytes()).hexdigest()
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    assert "evidence.png.outside_evidence_dir" in _codes(evidence, expected)
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 1
+    )
+
+
+def test_visual_evidence_requires_category_evidence_to_cite_evaluated_file(
+    tmp_path: Path,
+) -> None:
+    evidence, expected = _packet(tmp_path)
+    _mutate_vision_report(
+        evidence,
+        lambda report: report["screens"][0]["criteria"][0].update(
+            {"evidence": "Vision sentence is long enough but omits the evaluated filename."}
+        ),
+    )
+
+    assert "evidence.vision.file_evidence_missing" in _codes(evidence, expected)
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 1
+    )
+
+
+def test_visual_evidence_rejects_vision_png_not_matching_manifest_screen(
+    tmp_path: Path,
+) -> None:
+    evidence, expected = _packet(tmp_path)
+    pretty_png = evidence / "pretty.png"
+    pretty_png.write_bytes(b"\x89PNG\r\n\x1a\nprettier-but-not-manifest-export")
+
+    def swap_evaluated_png(report: dict[str, object]) -> None:
+        screens = report["screens"]
+        assert isinstance(screens, list)
+        screen = screens[0]
+        assert isinstance(screen, dict)
+        screen["png"] = "pretty.png"
+        screen["criteria"] = _criteria("pretty.png")
+        _append_input(report, evidence, "pretty.png")
+
+    _mutate_vision_report(evidence, swap_evaluated_png)
+
+    assert "evidence.vision_manifest.png_mismatch" in _codes(evidence, expected)
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 1
+    )
+
+
+def test_visual_evidence_rejects_missing_vision_input_receipt(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    _mutate_vision_report(evidence, lambda report: report.update({"inputs": []}))
+
+    assert "evidence.vision_input.missing" in _codes(evidence, expected)
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 1
+    )
+
+
+def test_visual_evidence_rejects_vision_input_sha_mismatch(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+
+    def stale_input_sha(report: dict[str, object]) -> None:
+        inputs = report["inputs"]
+        assert isinstance(inputs, list)
+        inputs[0]["sha256"] = "0" * 64
+
+    _mutate_vision_report(evidence, stale_input_sha)
+
+    assert "evidence.vision_input.sha_mismatch" in _codes(evidence, expected)
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 1
+    )
+
+
+def test_visual_evidence_rejects_vision_input_outside_evidence_dir(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    references = tmp_path / "references"
+    references.mkdir()
+    reference_png = references / "ref.png"
+    reference_png.write_bytes(b"\x89PNG\r\n\x1a\nreference-bytes")
+
+    def smuggle_input_path(report: dict[str, object]) -> None:
+        inputs = report["inputs"]
+        assert isinstance(inputs, list)
+        inputs[0] = {
+            "file": "../references/ref.png",
+            "sha256": hashlib.sha256(reference_png.read_bytes()).hexdigest(),
+        }
+
+    _mutate_vision_report(evidence, smuggle_input_path)
+
+    assert "evidence.vision_input.outside_evidence_dir" in _codes(evidence, expected)
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 1
     )
 
 
@@ -969,5 +1283,255 @@ def test_manifest_with_only_runid_validates_and_stays_inert(tmp_path: Path) -> N
     assert main(["validate-report", str(path), "--schema", "--json"]) == 0
     assert (
         main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 0
+    )
+
+
+def test_reference_fidelity_divergent_palette_fails(tmp_path: Path) -> None:
+    evidence, _expected = _packet(tmp_path)
+    references = _add_references(
+        tmp_path,
+        evidence,
+        reference_color=(220, 20, 20),
+        export_color=(20, 20, 220),
+    )
+
+    report = validate_reference_fidelity(evidence, references)
+    screen = report["screens"][0]
+
+    assert report["status"] == "FAIL"
+    assert {issue["code"] for issue in report["issues"]} >= {
+        "reference.palette_mismatch",
+        "reference.llm_metric_disagreement",
+    }
+    assert {criterion["category"]: criterion["result"] for criterion in screen["criteria"]}[
+        "palette_match"
+    ] == "fail"
+    assert (
+        main(
+            [
+                "validate-reference-fidelity",
+                str(evidence),
+                "--references",
+                str(references),
+                "--json",
+            ]
+        )
+        == 1
+    )
+
+
+def test_reference_fidelity_rejects_copied_export(tmp_path: Path) -> None:
+    evidence, _expected = _packet(tmp_path)
+    references = _add_references(tmp_path, evidence)
+    (evidence / "checkoutScreen.png").write_bytes((references / "checkout-ref.png").read_bytes())
+
+    report = validate_reference_fidelity(evidence, references)
+
+    assert "reference.evidence_is_reference_copy" in {issue["code"] for issue in report["issues"]}
+    assert (
+        main(
+            [
+                "validate-reference-fidelity",
+                str(evidence),
+                "--references",
+                str(references),
+                "--json",
+            ]
+        )
+        == 1
+    )
+
+
+def test_reference_fidelity_rejects_cross_screen_reference_copy(tmp_path: Path) -> None:
+    evidence, _expected = _packet(tmp_path, ("checkout", "settings"))
+    references = tmp_path / "references"
+    references.mkdir()
+    reference_files = {
+        "checkout": "checkout-ref.png",
+        "settings": "settings-ref.png",
+    }
+    export_files = {
+        "checkout": "checkoutScreen.png",
+        "settings": "settingsScreen.png",
+    }
+    _write_png(references / reference_files["checkout"], 8, 8, (210, 20, 20))
+    _write_png(references / reference_files["settings"], 8, 8, (20, 210, 20))
+    (evidence / export_files["checkout"]).write_bytes(
+        (references / reference_files["settings"]).read_bytes()
+    )
+    (evidence / export_files["settings"]).write_bytes(
+        (references / reference_files["checkout"]).read_bytes()
+    )
+    (references / "references-manifest.json").write_text(
+        json.dumps(
+            [
+                {
+                    "screen_id": screen_id,
+                    "file": reference_file,
+                    "sha256": hashlib.sha256(
+                        (references / reference_file).read_bytes()
+                    ).hexdigest(),
+                    "source": "unit-test",
+                }
+                for screen_id, reference_file in reference_files.items()
+            ]
+        ),
+        encoding="utf-8",
+    )
+    manifest_path = evidence / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["references_manifest"] = "../references/references-manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    for screen_id in reference_files:
+        (evidence / f"{screen_id}-reference-contact-sheet.png").write_bytes(
+            b"\x89PNG\r\n\x1a\nside-by-side-reference-export"
+        )
+
+    def add_cross_reference_section(report: dict[str, object]) -> None:
+        _sync_cross_reference_inputs(report, evidence, export_files)
+        report.update(
+            {
+                "reference_fidelity": [
+                    {
+                        "screen_id": screen_id,
+                        "reference": reference_file,
+                        "export": export_files[screen_id],
+                        "contact_sheet": f"{screen_id}-reference-contact-sheet.png",
+                        "criteria": [
+                            {
+                                "category": category,
+                                "result": "pass",
+                                "evidence": (
+                                    f"Compared reference {reference_file} with export"
+                                    f" {export_files[screen_id]} in contact sheet"
+                                    f" {screen_id}-reference-contact-sheet.png."
+                                ),
+                                "blocking": False,
+                            }
+                            for category in REFERENCE_CATEGORIES
+                        ],
+                    }
+                    for screen_id, reference_file in reference_files.items()
+                ]
+            }
+        )
+
+    _mutate_vision_report(evidence, add_cross_reference_section)
+
+    report = validate_reference_fidelity(evidence, references)
+
+    assert "reference.evidence_is_reference_copy" in {issue["code"] for issue in report["issues"]}
+    assert (
+        main(
+            [
+                "validate-reference-fidelity",
+                str(evidence),
+                "--references",
+                str(references),
+                "--json",
+            ]
+        )
+        == 1
+    )
+
+
+def test_visual_evidence_reports_reference_screen_missing_png(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    _add_references(tmp_path, evidence)
+    manifest_path = evidence / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["screens"][0].pop("png")
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    codes = _codes(evidence, expected)
+
+    assert "evidence.manifest.invalid" in codes
+    assert "evidence.reference_fidelity.export_missing" in codes
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 1
+    )
+
+
+def test_reference_fidelity_rejects_empty_references_manifest(tmp_path: Path) -> None:
+    evidence, _expected = _packet(tmp_path)
+    references = tmp_path / "references"
+    references.mkdir()
+    (references / "references-manifest.json").write_text("[]", encoding="utf-8")
+
+    report = validate_reference_fidelity(evidence, references)
+
+    assert report["status"] == "FAIL"
+    assert report["summary"]["screens_checked"] == 0
+    assert "reference.manifest.empty" in {issue["code"] for issue in report["issues"]}
+    assert (
+        main(
+            [
+                "validate-reference-fidelity",
+                str(evidence),
+                "--references",
+                str(references),
+                "--json",
+            ]
+        )
+        == 1
+    )
+
+
+def test_visual_evidence_rejects_empty_references_manifest(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    references = tmp_path / "references"
+    references.mkdir()
+    (references / "references-manifest.json").write_text("[]", encoding="utf-8")
+    manifest_path = evidence / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["references_manifest"] = "../references/references-manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    codes = _codes(evidence, expected)
+
+    assert "reference.manifest.empty" in codes
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 1
+    )
+
+
+def test_visual_evidence_requires_reference_fidelity_when_references_declared(
+    tmp_path: Path,
+) -> None:
+    evidence, expected = _packet(tmp_path)
+    _add_references(tmp_path, evidence, include_section=False)
+
+    codes = _codes(evidence, expected)
+
+    assert "evidence.reference_fidelity.missing" in codes
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 1
+    )
+
+
+def test_complete_reference_fidelity_packet_passes(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    references = _add_references(tmp_path, evidence)
+
+    assert validate_visual_evidence(evidence, expected_tree_path=expected) == []
+    assert validate_reference_fidelity(evidence, references)["status"] == "PASS"
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 0
+    )
+    assert (
+        main(
+            [
+                "validate-reference-fidelity",
+                str(evidence),
+                "--references",
+                str(references),
+                "--json",
+            ]
+        )
         == 0
     )

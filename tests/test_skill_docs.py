@@ -29,6 +29,8 @@ SEMANTIC_TREE_REFERENCE = (
 )
 README = ROOT / "README.md"
 PROJECT_INTEGRATION = ROOT / "docs" / "project-integration.md"
+THEME_CONTRACT = ROOT / "docs" / "theme-contract.md"
+PENCIL_EXPORT_BATCH_ISSUE = ROOT / "docs" / "pencil-export-nodes-batch-issue.md"
 
 
 REQUIRED_COMMANDS = (
@@ -74,6 +76,150 @@ def test_penflow_skill_documents_llm_workflow_modes() -> None:
     assert "../flow-ui-contract/references/semantic-ui-tree.md" in skill
     assert "External adapters produce `actual-ui-tree.json`" in skill
     assert "does **not** run browsers, Xcode, simulators, Playwright, React Native" in skill
+
+
+def test_pencil_sync_gate_is_documented_for_stale_editor_state() -> None:
+    penflow_skill = PENFLOW_SKILL.read_text(encoding="utf-8")
+    mockup_skill = MOCKUP_SKILL.read_text(encoding="utf-8")
+    readme = README.read_text(encoding="utf-8")
+    combined = "\n".join([penflow_skill, mockup_skill, readme])
+
+    for phrase in (
+        "penflow pencil-sync",
+        "After every Pencil",
+        "batch_design",
+        "before any Penflow CLI command that reads",
+        "BLOCKED",
+        "fewer screens",
+    ):
+        assert phrase in combined
+
+
+def test_draft_pen_from_tree_is_documented_as_wireframe_not_final_mockup() -> None:
+    penflow_skill = PENFLOW_SKILL.read_text(encoding="utf-8")
+    flow_skill = FLOW_SKILL.read_text(encoding="utf-8")
+    mockup_skill = MOCKUP_SKILL.read_text(encoding="utf-8")
+    readme = README.read_text(encoding="utf-8")
+    combined = "\n".join([penflow_skill, flow_skill, mockup_skill, readme])
+
+    for phrase in (
+        'fidelity: "wireframe"',
+        "draft = structure / wireframe",
+        "PAS un mockup final",
+        "hi-fi passe par mockup-factory",
+    ):
+        assert phrase in combined
+
+
+def test_penflow_run_apex_no_goal_and_export_nodes_fallback_are_documented() -> None:
+    penflow_skill = PENFLOW_SKILL.read_text(encoding="utf-8")
+    issue = PENCIL_EXPORT_BATCH_ISSUE.read_text(encoding="utf-8")
+
+    for phrase in (
+        "penflow run --target",
+        "unite naturelle",
+        "Penflow ne cree jamais de goal runtime propre",
+        "-G/--no-goal",
+        "export_nodes",
+        "exports unitaires",
+        "wrong .pen file",
+        "PF-PENCIL-EXPORT-NODES-BATCH-20260701",
+    ):
+        assert phrase in penflow_skill
+
+    for phrase in (
+        "PF-PENCIL-EXPORT-NODES-BATCH-20260701",
+        "wrong .pen file",
+        "get_editor_state",
+        "unit export",
+        "three-node batch succeeds",
+        "four-node batch fails",
+        "Pencil MCP/app batch-export state issue",
+        "exports unitaires",
+    ):
+        assert phrase in issue
+
+
+def test_theme_contract_documents_extended_token_lint_surface() -> None:
+    contract = THEME_CONTRACT.read_text(encoding="utf-8")
+    penflow_skill = PENFLOW_SKILL.read_text(encoding="utf-8")
+    readme = README.read_text(encoding="utf-8")
+    combined = "\n".join([contract, penflow_skill, readme])
+
+    for phrase in (
+        "docs/theme-contract.md",
+        "font-mono",
+        "font-size-xs",
+        "font-size-xl",
+        "success",
+        "warning",
+        "info",
+        "panel-2",
+        "palette-*",
+        "radius-*",
+        "spacing_scale",
+        "radius_scale",
+        "fontsize_scale",
+        "random families still fail",
+    ):
+        assert phrase in combined
+
+
+def test_context_grammar_and_strict_anchor_mapping_are_documented() -> None:
+    penflow_skill = PENFLOW_SKILL.read_text(encoding="utf-8")
+    flow_skill = FLOW_SKILL.read_text(encoding="utf-8")
+    mockup_skill = MOCKUP_SKILL.read_text(encoding="utf-8")
+    readme = README.read_text(encoding="utf-8")
+    combined = "\n".join([penflow_skill, flow_skill, mockup_skill, readme])
+
+    for phrase in (
+        "Pencil Context Grammar",
+        "key=value",
+        "semantic_id=cockpit-live.git; role=container",
+        "batch_design",
+        "--strict-anchors",
+        "--create-placeholders",
+        "PARTIAL",
+        "ambiguous or unmapped anchors block",
+    ):
+        assert phrase in combined
+
+
+def test_dense_consistency_grouping_is_documented() -> None:
+    penflow_skill = PENFLOW_SKILL.read_text(encoding="utf-8")
+    mockup_skill = MOCKUP_SKILL.read_text(encoding="utf-8")
+    rubric = MOCKUP_RUBRIC.read_text(encoding="utf-8")
+    readme = README.read_text(encoding="utf-8")
+    combined = "\n".join([penflow_skill, mockup_skill, rubric, readme])
+
+    for phrase in (
+        "role+intent+variant+size-class",
+        "anonymous containers",
+        "56px headers",
+        "820px panel",
+        "aggregated",
+        "`fill`/`fontFamily`",
+    ):
+        assert phrase in combined
+
+
+def test_audit_visual_layout_snapshot_gate_is_documented() -> None:
+    penflow_skill = PENFLOW_SKILL.read_text(encoding="utf-8")
+    mockup_skill = MOCKUP_SKILL.read_text(encoding="utf-8")
+    rubric = MOCKUP_RUBRIC.read_text(encoding="utf-8")
+    workflow = MOCKUP_WORKFLOW.read_text(encoding="utf-8")
+    readme = README.read_text(encoding="utf-8")
+    combined = "\n".join([penflow_skill, mockup_skill, rubric, workflow, readme])
+
+    for phrase in (
+        "--layout-snapshot",
+        "layout-snapshot.json",
+        "when a renderer",
+        "real Pencil bboxes",
+        "flex-parent",
+        "non-geometric checks",
+    ):
+        assert phrase in combined
 
 
 def test_flow_ui_contract_skill_and_readme_document_modes() -> None:
@@ -294,6 +440,16 @@ def test_visual_evidence_gate_is_the_exit_code_not_prose() -> None:
         "penflow-vision-report",
         "evidence.screen.uncovered",
         "evidence.snapshot.bbox_mismatch",
+        "Reference Fidelity",
+        "references-manifest.json",
+        "reference_fidelity",
+        "layout_match",
+        "palette_match",
+        "component_parity",
+        "density_match",
+        "validate-reference-fidelity",
+        "reference.evidence_is_reference_copy",
+        "reference.llm_metric_disagreement",
     ):
         assert phrase in visual
 
@@ -308,6 +464,8 @@ def test_visual_evidence_gate_is_the_exit_code_not_prose() -> None:
     project_guide = PROJECT_INTEGRATION.read_text(encoding="utf-8")
     for doc in (skill, workflow, rubric, penflow_skill, root_readme, project_guide):
         assert "validate-visual-evidence" in doc
+    for doc in (skill, penflow_skill, root_readme):
+        assert "validate-reference-fidelity" in doc
 
 
 def test_examples_full_visual_evidence_packet_is_real_and_anchored() -> None:
@@ -505,6 +663,30 @@ def test_mockup_factory_skill_preconditions_include_the_three_gate_commands() ->
         "single CI-able final check",
     ):
         assert phrase in skill
+
+
+def test_mockup_factory_docs_require_receipts_before_visual_pass() -> None:
+    skill = MOCKUP_SKILL.read_text(encoding="utf-8")
+    visual = MOCKUP_VISUAL.read_text(encoding="utf-8")
+    combined = "\n".join([skill, visual])
+
+    for phrase in (
+        "before writing `vision-report.json`",
+        "do not write `vision-report.json` before displaying each image",
+        "generated_by",
+        "inputs[]",
+        "sha256",
+        "Every category evidence sentence must cite the evaluated file name",
+        "every evaluated PNG/contact sheet must resolve inside",
+        "symlinks into `references/`",
+        "SHA mismatch",
+        "Receipts are mandatory and prose cannot replace them",
+        "every executed gate must cite an existing `report_path`",
+        "`pass` => 0",
+        "`fail` => non-zero",
+        "`not_run` => null/null",
+    ):
+        assert phrase in combined
 
 
 # @spec AC-011: docs seed checklist via penflow checklist-from-drift — .specs/features/055-checklist-from-drift-seeding/spec.md#ac-011

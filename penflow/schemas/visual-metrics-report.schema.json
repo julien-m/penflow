@@ -24,11 +24,12 @@
     },
     "inputs": {
       "type": "object",
-      "required": ["expected_tree", "theme_css"],
+      "required": ["expected_tree", "theme_css", "layout_snapshot"],
       "additionalProperties": false,
       "properties": {
         "expected_tree": {"type": "string"},
-        "theme_css": {"type": ["string", "null"]}
+        "theme_css": {"type": ["string", "null"]},
+        "layout_snapshot": {"type": ["string", "null"]}
       }
     },
     "issues": {

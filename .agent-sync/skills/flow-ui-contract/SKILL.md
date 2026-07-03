@@ -25,6 +25,18 @@ Use this skill before Penflow needs a `semantic-ui-tree.json`. It turns product 
 
 This skill prepares inputs. It does **not** run browser, Xcode, simulator, Playwright, React Native, Metro, app builds, or runtime adapters.
 
+## Pencil Context Grammar
+
+When a contract is consumed by Pencil authoring, every screen/section/interactive/repeated element must map to Pencil `context` at insertion time. The shorthand string is `key=value` pairs separated by `;`; allowed keys come from [`../../../penflow/context.py`](../../../penflow/context.py): `semantic_id`, `role`, `intent`, `binding`, `repeat`, `entity`, `variant`, `test_id`, `action`, `permission`, `mask`, `mask_text`, `tolerance`.
+
+Examples:
+- Screen frame: `semantic_id=cockpit-live; role=screen`
+- Section frame: `semantic_id=cockpit-live.git; role=container`
+- Button: `semantic_id=cockpit-live.stop-worker; role=button; intent=stop-worker; action=stop_worker`
+- List: `semantic_id=cockpit-live.workers; role=list; repeat=worker in workers`
+
+After authoring/enrichment, run `penflow map-pencil-context <ui.pen> <semantic-ui-tree.json> --out pencil-context-map.json --strict-anchors --json`. Any `ambiguous` or `unmapped` anchor blocks downstream work; `--create-placeholders` is explicit repair scaffolding and yields `PARTIAL`, never PASS.
+
 ## Invocation
 
 | Form | Use |
@@ -219,11 +231,13 @@ penflow export-expected ui.pen --out expected-ui-tree.json --json
 penflow code-ir --from-context ui.pen --semantic-tree semantic-ui-tree.json --flow-id <flow-id> --flow-name "<Flow name>" --out code-ir.json --json
 ```
 
+`draft-pen-from-tree` is only the structural handoff draft. Its JSON output can be saved as `draft-report.json` and carries `fidelity: "wireframe"`: draft = structure / wireframe, PAS un mockup final ; le hi-fi passe par mockup-factory.
+
 ## Enrichment Command Sequence
 
 ```bash
 penflow enrich-pen <target>/ui.pen semantic-ui-tree.json --out ui.enriched.pen --json
-penflow map-pencil-context ui.enriched.pen semantic-ui-tree.json --out pencil-context-map.json --json
+penflow map-pencil-context ui.enriched.pen semantic-ui-tree.json --out pencil-context-map.json --strict-anchors --json
 penflow validate-pen ui.enriched.pen --json
 penflow export-expected ui.enriched.pen --out expected-ui-tree.json --json
 penflow code-ir --from-context ui.enriched.pen --semantic-tree semantic-ui-tree.json --context-map pencil-context-map.json --flow-id <flow-id> --flow-name "<Flow name>" --out code-ir.json --json

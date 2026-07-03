@@ -242,6 +242,41 @@ def test_detect_drift_reports_missing_stale_obsolete_uncovered_and_clarification
     assert "| Blocking |" in markdown
 
 
+def test_detect_drift_keeps_semantic_downgrade_suspect_blocking(tmp_path: Path) -> None:
+    specs_dir = write_specs(tmp_path)
+    tree = aligned_tree()
+    tree["screens"][0]["root"]["children"].append(
+        {
+            "semantic_id": "checkout.degraded-list",
+            "role": "container",
+            "source_map": {"screen_spec": "flow-ui-contract/screens/checkout.md"},
+            "children": [
+                {
+                    "semantic_id": f"checkout.degraded-list.{index}",
+                    "role": "container",
+                    "bbox": {"x": 0, "y": index * 56, "width": 320, "height": 48},
+                    "visual": {"fill": "#FFFFFF", "gap": 8, "layout": "horizontal"},
+                    "source_map": {"screen_spec": "flow-ui-contract/screens/checkout.md"},
+                }
+                for index in range(3)
+            ],
+        }
+    )
+    tree_path = write_json(tmp_path / "semantic-ui-tree.json", tree)
+    pen_path = write_json(tmp_path / "ui.pen", aligned_pen())
+    report_path = tmp_path / "drift-report.json"
+
+    report = detect_drift(specs_dir, tree_path, pen_path, report_path)
+
+    assert report["status"] == "BLOCKED"
+    assert any(
+        issue["code"] == "semantic.downgrade_suspect"
+        and issue["blocking"] is True
+        and issue["semantic_id"] == "checkout.degraded-list"
+        for issue in report["issues"]
+    )
+
+
 def test_detect_drift_cli_writes_json_and_markdown(tmp_path: Path) -> None:
     specs_dir = write_specs(tmp_path)
     tree_path = write_json(tmp_path / "semantic-ui-tree.json", aligned_tree())

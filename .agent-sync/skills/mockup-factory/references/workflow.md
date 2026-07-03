@@ -8,16 +8,16 @@
 
 The full chain, run in order (strict default exit policy, no `--lenient`):
 
-1. `penflow validate-flow-contract <target>/flow-ui-contract/contract.json --json`
-2. `penflow export-semantic-tree` + `penflow validate-semantic-tree` for `semantic-ui-tree.json`
+1. `penflow validate-flow-contract <target>/flow-ui-contract/contract.json --json` — `interactive_coverage` must have no `uncovered` screens.
+2. `penflow export-semantic-tree` + `penflow validate-semantic-tree` for `semantic-ui-tree.json` — `semantic.downgrade_suspect` blocks; add `repeat` to repeated list-like containers.
 3. `penflow validate-pen` on the source `.pen`
 4. `penflow map-pencil-context` → `pencil-context-map.json`
 5. `penflow export-expected` → `expected-ui-tree.json`
 6. `penflow lint-tokens` → `token-lint-report.json` (`tokens` gate)
 7. `penflow check-consistency` → `consistency-report.json` (`consistency` gate)
-8. `penflow audit-visual` → `visual-metrics-report.json` (`accessibility_alignment` gate)
+8. `penflow audit-visual` → `visual-metrics-report.json` (`accessibility_alignment` gate; pass `--layout-snapshot <target>/.mockup-validation/visual-evidence/layout-snapshot.json` when the renderer produced it)
 9. `penflow detect-drift` → `drift-report.json` (`contract` gate)
-10. Visual Evidence Gate from **Read** [`visual-validation.md`](visual-validation.md): export PNGs, dump the layout snapshot, run the per-screen vision pass over the five locked categories, then the cross-mockup coherence pass — export all audited screens at a uniform scale, capture one contact sheet, one vision pass answering only the four coherence categories (required when the expected tree has ≥ 2 screens; the numeric cross-screen anchor remains the feature 047 `check-consistency` report) — write manifest plus `vision-report.json` (with the `coherence` section), stamping the manifest with `runId` and the `theme` block from `penflow theme-fingerprint <theme.css> --json`, then `penflow validate-visual-evidence <dir> --expected expected-ui-tree.json --theme-css <theme.css> --json` (`balance_readability` gate; `evidence.theme.missing`/`evidence.theme.stale` deterministically invalidate packets rendered against other theme bytes) — the gate is the exit code, not prose.
+10. Visual Evidence Gate from **Read** [`visual-validation.md`](visual-validation.md): export PNGs, dump the layout snapshot, run the per-screen vision pass over the five locked categories, then the cross-mockup coherence pass — export all audited screens at a uniform scale, capture one contact sheet, one vision pass answering only the four coherence categories (required when the expected tree has ≥ 2 screens; the numeric cross-screen anchor remains the feature 047 `check-consistency` report) — write manifest plus `vision-report.json` (with the `coherence` section), stamping the manifest with `runId` and the `theme` block from `penflow theme-fingerprint <theme.css> --json`, then `penflow validate-visual-evidence <dir> --expected expected-ui-tree.json --theme-css <theme.css> --json` (`balance_readability` gate; `evidence.theme.missing`/`evidence.theme.stale` deterministically invalidate packets rendered against other theme bytes). When references exist, also run `penflow validate-reference-fidelity <dir> --references <target>/references --json` and keep the receipt with the visual evidence. The gate is the exit code, not prose.
 11. When an `actual-ui-tree.json` exists: `penflow compare-tree` (`structural_fidelity` gate); otherwise record it `not_run`.
 
 Exact commands, pass conditions, and report artifacts: **Read** [`audit-rubric.md`](audit-rubric.md).
@@ -52,6 +52,7 @@ Record the loop state machine in `.mockup-validation/<group>/state.json` (workin
 - Treat `ambiguous` or `unmapped` entries from `pencil-context-map.json` as review work before implementation.
 - Treat `drift-report.json` blocking issues as higher priority than visual polish.
 - Cross-screen styling divergence is decided by `check-consistency` (047), never by the coherence contact-sheet pass — coherence answers perception-only questions, and each loop iteration reruns the contact-sheet pass with the rest of the chain.
+- Flex layout geometry is decided by real `snapshot_layout` bboxes when available; without a renderer, `audit-visual` still checks contrast, touch targets, and text fit but does not turn theoretical flex overlap/overflow into gate errors.
 - Use screenshots as required visual evidence for final PASS when a renderer is available; tree and drift artifacts remain the deterministic source of truth.
 
 ## Terminal States

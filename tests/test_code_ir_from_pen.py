@@ -245,6 +245,39 @@ def test_code_ir_cli_fails_when_pen_has_no_context(
     assert not out_path.exists()
 
 
+def test_code_ir_cli_rejects_expected_tree_input_early(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    expected_tree = {
+        "version": 1,
+        "screens": [
+            {
+                "screen_id": "checkout",
+                "root": {"id": "checkout", "role": "screen", "children": []},
+            }
+        ],
+    }
+    expected_path = write_json(tmp_path / "expected-ui-tree.json", expected_tree)
+    out_path = tmp_path / "code-ir.json"
+
+    exit_code = main(
+        [
+            "code-ir",
+            "--from-context",
+            str(expected_path),
+            "--out",
+            str(out_path),
+            "--json",
+        ]
+    )
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert "expects the contextualized .pen file" in captured.err
+    assert "not expected-ui-tree.json" in captured.err
+    assert not out_path.exists()
+
+
 def test_code_ir_cli_accepts_optional_semantic_tree_and_context_map(tmp_path: Path) -> None:
     pen_path = write_json(tmp_path / "ui.pen", contextualized_pen())
     semantic_tree_path = write_json(

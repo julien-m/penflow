@@ -17,10 +17,12 @@ stamp matches the theme.css bytes the mockups were rendered against.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any, TypeGuard
 
+from .reference_fidelity import reference_fidelity_evidence_issues
 from .schema_cache import validator_for
 from .tree import load_tree
 
@@ -108,9 +110,12 @@ def validate_visual_evidence(
         directory / VISION_REPORT_FILENAME, "evidence.vision_report", _VISION_REPORT_SCHEMA, issues
     )
     issues.extend(_png_issues(directory, manifest))
+    issues.extend(_vision_receipt_issues(directory, vision_report))
+    issues.extend(_vision_manifest_screen_issues(manifest, vision_report))
     issues.extend(_theme_issues(manifest, theme_fingerprint))
     issues.extend(_category_issues(vision_report))
     issues.extend(_coherence_issues(directory, vision_report, expected_screens))
+    issues.extend(reference_fidelity_evidence_issues(directory, manifest, vision_report))
     if expected_tree_path is not None:
         issues.extend(_coverage_issues(expected_screens, manifest, MANIFEST_FILENAME))
         issues.extend(_coverage_issues(expected_screens, vision_report, VISION_REPORT_FILENAME))
@@ -183,7 +188,7 @@ def _json_path(absolute_path: Any) -> str:
 
 
 def _png_issues(directory: Path, manifest: dict[str, Any] | None) -> list[dict[str, Any]]:
-    """Every manifest screen PNG must exist and be non-empty on disk."""
+    """Every manifest screen PNG must be inside the evidence dir and match its receipt."""
     if manifest is None or not isinstance(manifest.get("screens"), list):
         return []
     issues: list[dict[str, Any]] = []
@@ -193,14 +198,232 @@ def _png_issues(directory: Path, manifest: dict[str, Any] | None) -> list[dict[s
         png = screen.get("png")
         if not isinstance(png, str) or not png:
             continue  # the manifest schema already flags the malformed entry
-        path = directory / png
         json_path = f"$.screens[{index}].png"
+        path = _evidence_file_path(directory, png)
+        if path is None:
+            issues.append(
+                _issue(
+                    "evidence.png.outside_evidence_dir",
+                    json_path,
+                    f"exported PNG must resolve inside evidence directory: {png}",
+                )
+            )
+            continue
         if not path.is_file():
             issues.append(
                 _issue("evidence.png.missing", json_path, f"exported PNG not found: {png}")
             )
         elif path.stat().st_size == 0:
             issues.append(_issue("evidence.png.empty", json_path, f"exported PNG is empty: {png}"))
+        else:
+            expected_sha = screen.get("sha256")
+            if isinstance(expected_sha, str) and _sha256(path) != expected_sha:
+                issues.append(
+                    _issue(
+                        "evidence.png.sha_mismatch",
+                        f"$.screens[{index}].sha256",
+                        f"exported PNG sha256 does not match manifest receipt: {png}",
+                    )
+                )
+    return issues
+
+
+def _vision_receipt_issues(
+    directory: Path,
+    vision_report: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Cross-check vision-report inputs against evaluated evidence files."""
+    if vision_report is None:
+        return []
+    inputs = vision_report.get("inputs")
+    if not isinstance(inputs, list):
+        return []  # the vision-report schema already flags missing/malformed receipts
+    issues: list[dict[str, Any]] = []
+    input_by_file = {
+        item.get("file"): item.get("sha256")
+        for item in inputs
+        if isinstance(item, dict)
+        and isinstance(item.get("file"), str)
+        and isinstance(item.get("sha256"), str)
+    }
+    for index, item in enumerate(inputs):
+        if not isinstance(item, dict):
+            continue
+        file_value = item.get("file")
+        sha_value = item.get("sha256")
+        if not isinstance(file_value, str) or not isinstance(sha_value, str):
+            continue
+        path = _evidence_file_path(directory, file_value)
+        json_path = f"$.inputs[{index}].file"
+        if path is None:
+            issues.append(
+                _issue(
+                    "evidence.vision_input.outside_evidence_dir",
+                    json_path,
+                    f"vision input must resolve inside evidence directory: {file_value}",
+                )
+            )
+        elif not path.is_file():
+            issues.append(
+                _issue(
+                    "evidence.vision_input.missing",
+                    json_path,
+                    f"vision input file not found: {file_value}",
+                )
+            )
+        elif _sha256(path) != sha_value:
+            issues.append(
+                _issue(
+                    "evidence.vision_input.sha_mismatch",
+                    f"$.inputs[{index}].sha256",
+                    f"vision input sha256 does not match file bytes: {file_value}",
+                )
+            )
+    evaluated_files = _evaluated_vision_files(vision_report)
+    for file_value, json_path in evaluated_files:
+        if file_value not in input_by_file:
+            issues.append(
+                _issue(
+                    "evidence.vision_input.missing",
+                    json_path,
+                    f"vision-report inputs must include evaluated file: {file_value}",
+                )
+            )
+    issues.extend(_criterion_file_evidence_issues(vision_report))
+    return issues
+
+
+def _vision_manifest_screen_issues(
+    manifest: dict[str, Any] | None,
+    vision_report: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Ensure the vision pass judged the exact screen exports listed by the manifest."""
+    if (
+        manifest is None
+        or vision_report is None
+        or not isinstance(manifest.get("screens"), list)
+        or not isinstance(vision_report.get("screens"), list)
+    ):
+        return []
+    manifest_by_screen = {
+        screen.get("screen_id"): screen.get("png")
+        for screen in manifest["screens"]
+        if isinstance(screen, dict)
+        and isinstance(screen.get("screen_id"), str)
+        and isinstance(screen.get("png"), str)
+    }
+    issues: list[dict[str, Any]] = []
+    for index, screen in enumerate(vision_report["screens"]):
+        if not isinstance(screen, dict):
+            continue
+        screen_id = screen.get("screen_id")
+        png = screen.get("png")
+        if not isinstance(screen_id, str) or not isinstance(png, str):
+            continue
+        manifest_png = manifest_by_screen.get(screen_id)
+        if manifest_png != png:
+            expected = manifest_png if manifest_png is not None else "<missing manifest screen>"
+            issues.append(
+                _issue(
+                    "evidence.vision_manifest.png_mismatch",
+                    f"$.screens[{index}].png",
+                    (
+                        f"vision screen {screen_id!r} evaluated {png!r}, "
+                        f"but manifest records {expected!r}"
+                    ),
+                )
+            )
+    return issues
+
+
+def _evaluated_vision_files(vision_report: dict[str, Any]) -> list[tuple[str, str]]:
+    files: list[tuple[str, str]] = []
+    screens = vision_report.get("screens")
+    if isinstance(screens, list):
+        for index, screen in enumerate(screens):
+            if isinstance(screen, dict) and isinstance(screen.get("png"), str):
+                files.append((screen["png"], f"$.screens[{index}].png"))
+    coherence = vision_report.get("coherence")
+    if isinstance(coherence, dict) and isinstance(coherence.get("contact_sheet_png"), str):
+        files.append((coherence["contact_sheet_png"], "$.coherence.contact_sheet_png"))
+    references = vision_report.get("reference_fidelity")
+    if isinstance(references, list):
+        for index, entry in enumerate(references):
+            if not isinstance(entry, dict):
+                continue
+            for key in ("export", "contact_sheet"):
+                value = entry.get(key)
+                if isinstance(value, str):
+                    files.append((value, f"$.reference_fidelity[{index}].{key}"))
+    return files
+
+
+def _criterion_file_evidence_issues(vision_report: dict[str, Any]) -> list[dict[str, Any]]:
+    issues: list[dict[str, Any]] = []
+    screens = vision_report.get("screens")
+    if not isinstance(screens, list):
+        return issues
+    for screen_index, screen in enumerate(screens):
+        if not isinstance(screen, dict):
+            continue
+        png = screen.get("png")
+        criteria = screen.get("criteria")
+        if not isinstance(png, str) or not isinstance(criteria, list):
+            continue
+        for criterion_index, criterion in enumerate(criteria):
+            evidence = criterion.get("evidence") if isinstance(criterion, dict) else None
+            if isinstance(evidence, str) and png not in evidence:
+                issues.append(
+                    _issue(
+                        "evidence.vision.file_evidence_missing",
+                        f"$.screens[{screen_index}].criteria[{criterion_index}].evidence",
+                        f"criterion evidence must cite evaluated file {png}",
+                    )
+                )
+    coherence = vision_report.get("coherence")
+    if isinstance(coherence, dict):
+        contact_sheet = coherence.get("contact_sheet_png")
+        criteria = coherence.get("criteria")
+        if isinstance(contact_sheet, str) and isinstance(criteria, list):
+            for criterion_index, criterion in enumerate(criteria):
+                evidence = criterion.get("evidence") if isinstance(criterion, dict) else None
+                if isinstance(evidence, str) and contact_sheet not in evidence:
+                    issues.append(
+                        _issue(
+                            "evidence.coherence.file_evidence_missing",
+                            f"$.coherence.criteria[{criterion_index}].evidence",
+                            f"criterion evidence must cite contact sheet {contact_sheet}",
+                        )
+                    )
+    references = vision_report.get("reference_fidelity")
+    if isinstance(references, list):
+        for ref_index, entry in enumerate(references):
+            if not isinstance(entry, dict):
+                continue
+            required_files = [
+                value
+                for value in (
+                    entry.get("reference"),
+                    entry.get("export"),
+                    entry.get("contact_sheet"),
+                )
+                if isinstance(value, str) and value
+            ]
+            criteria = entry.get("criteria")
+            if not isinstance(criteria, list):
+                continue
+            for criterion_index, criterion in enumerate(criteria):
+                evidence = criterion.get("evidence") if isinstance(criterion, dict) else None
+                if isinstance(evidence, str) and any(
+                    path not in evidence for path in required_files
+                ):
+                    issues.append(
+                        _issue(
+                            "evidence.reference_fidelity.file_evidence_missing",
+                            f"$.reference_fidelity[{ref_index}].criteria[{criterion_index}].evidence",
+                            "criterion evidence must cite reference, export, and contact-sheet files",
+                        )
+                    )
     return issues
 
 
@@ -472,6 +695,20 @@ def _is_finite_number(value: Any) -> TypeGuard[int | float]:
 
 def _fmt(value: float) -> str:
     return str(int(value)) if value == int(value) else str(value)
+
+
+def _evidence_file_path(directory: Path, file_value: str) -> Path | None:
+    candidate = Path(file_value)
+    path = candidate if candidate.is_absolute() else directory / candidate
+    try:
+        path.resolve(strict=False).relative_to(directory.resolve())
+    except (OSError, RuntimeError, ValueError):
+        return None
+    return path
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _issue(code: str, path: str, message: str) -> dict[str, Any]:

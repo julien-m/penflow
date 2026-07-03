@@ -40,15 +40,19 @@ penflow export-semantic-tree <target>/flow-ui-contract/contract.json --out <targ
 penflow validate-semantic-tree <target>/semantic-ui-tree.json --json
 penflow draft-pen-from-tree <target>/semantic-ui-tree.json --out <target>/ui.pen --theme-css <target>/theme.css --json
 penflow validate-pen <target>/ui.pen --json
-penflow map-pencil-context <target>/ui.pen <target>/semantic-ui-tree.json --out <target>/pencil-context-map.json --json
+penflow map-pencil-context <target>/ui.pen <target>/semantic-ui-tree.json --out <target>/pencil-context-map.json --strict-anchors --json
 penflow export-expected <target>/ui.pen --out <target>/expected-ui-tree.json --json
 penflow lint-tokens <target>/ui.pen --theme-css <target>/theme.css -o <target>/token-lint-report.json --json
-penflow check-consistency <target>/expected-ui-tree.json -o <target>/consistency-report.json --json
+penflow check-consistency <target>/expected-ui-tree.json --group-by role+intent+variant+size-class -o <target>/consistency-report.json --json
 penflow audit-visual <target>/expected-ui-tree.json --theme-css <target>/theme.css -o <target>/visual-metrics-report.json --json
 penflow detect-drift <target>/flow-ui-contract/contract.json <target>/semantic-ui-tree.json <target>/ui.pen --out <target>/drift-report.json --json
 ```
 
-All commands run with the strict default exit policy — no `--lenient` in the canonical chain. If any command fails, stop and report the failing artifact. Do not optimize a mockup whose semantic anchors are invalid.
+Treat `draft-pen-from-tree` output as the starting structure only. Its `draft-report.json` metadata must say `fidelity: "wireframe"`: draft = structure / wireframe, PAS un mockup final ; le hi-fi passe par mockup-factory.
+
+All commands run with the strict default exit policy — no `--lenient` in the canonical chain. If any command fails, stop and report the failing artifact. Do not optimize a mockup whose semantic anchors are invalid. `validate-flow-contract --json` must show `interactive_coverage` with every screen either `covered` or `static`; `uncovered` means `contract.interactive_unbound` and blocks the audit. `validate-semantic-tree` must not emit `semantic.downgrade_suspect`; repeated list-like containers need `repeat`.
+
+After every Pencil MCP/editor mutation (`batch_design`, manual edit, or equivalent), run `penflow pencil-sync <target>/ui.pen --expect-screens <expected-screen-count> --json` before any CLI command that reads the `.pen`. If `pencil-sync` sees fewer screens/nodes on disk than the editor state, return `BLOCKED`; MCP-only memory mutations are not proof that Penflow can inspect the updated file.
 
 ## Design Convention Gate
 
@@ -71,20 +75,24 @@ A themed but structurally generic output is a failure. Reject screens that ignor
    - Append items for the other five gates (`tokens`, `consistency`, `accessibility_alignment`, `structural_fidelity`, `balance_readability`) at the skill layer only after seeding.
    - Each item must reference `screen_id` plus `semantic_id` or `pencil_node_id` when available.
 4. **Run the gates:** use the rubric gate table — every category maps to a scripted command with an exit-code/report-field pass condition. Critical = any error-severity gate issue or any `blocking: true` item; critical UX/UI issues block PASS.
-5. **Apply guided fixes (bounded loop, `iteration <= 3`):** change only audited checklist items that are open gate issues. No broad redesign, no unanchored "polish pass", no invented product behavior.
+5. **Apply guided fixes (bounded loop, `iteration <= 3`):** change only audited checklist items that are open gate issues. No broad redesign, no unanchored "polish pass", no invented product behavior. After each `batch_design`, run `penflow pencil-sync` and block on stale disk inspection before continuing.
 6. **Revalidate anchors:** rerun the full Penflow command chain from Preconditions after every fix iteration and recompute all gates — no PASS without a final clean run.
 7. **Run Visual Evidence Gate:**
-   - Artifacts: open/render the `.pen`, export PNGs via `export_nodes`, expose each exported screen as a Markdown image with its absolute path, run `visual-preview url <absolute-path>` when available for browser annotation, dump `snapshot_layout` to `layout-snapshot.json`, inspect `get_screenshot` and answer ONLY the five locked vision categories (`visual_balance`, `rendering_artifacts`, `readability`, `perceived_hierarchy`, `imagery_quality`).
+   - Artifacts: open/render the `.pen`, export PNGs via `export_nodes`, expose each exported screen as a Markdown image with its absolute path before writing `vision-report.json`, run `visual-preview url <absolute-path>` when available for browser annotation, dump `snapshot_layout` to `layout-snapshot.json`, inspect `get_screenshot` and answer ONLY the five locked vision categories (`visual_balance`, `rendering_artifacts`, `readability`, `perceived_hierarchy`, `imagery_quality`). Every category evidence sentence must cite the evaluated file name.
    - Coherence (multi-screen sets): export all audited screens at a uniform scale, capture one `contact-sheet.png`, expose it through the same Markdown image + `visual-preview url <absolute-path>` channels, answer ONLY the four coherence categories (`cross_screen_rhythm`, `palette_coherence`, `typography_coherence`, `component_recognition`) in the report's `coherence` section — required when the expected tree has ≥ 2 screens; the numeric anchor stays the 047 `check-consistency` report.
+   - Reference fidelity (when `<target>/references/references-manifest.json` exists or `manifest.json` declares `references_manifest`): generate one side-by-side contact sheet per reference/export pair, answer ONLY `layout_match`, `palette_match`, `component_parity`, and `density_match` in `vision-report.json` `reference_fidelity`, and cite both reference and export file names in every criterion evidence sentence.
    - Preview boundary: `visual-preview` is for annotation and iteration only. Preview URLs are not canonical proof and must not be written into `manifest.json` or `vision-report.json`; the canonical proof remains `penflow validate-visual-evidence` exit 0. If `visual-preview` is unavailable, keep the Markdown image and record browser preview unavailable in operator notes/status.
-   - Manifest stamps: write `.mockup-validation/visual-evidence/manifest.json` stamped with `runId` (ISO-8601 timestamp + short slug recommended) and the `theme` block from `penflow theme-fingerprint <theme.css> --json`, plus `vision-report.json` (legacy `visual-report.json` is deprecated).
+   - Manifest stamps: write `.mockup-validation/visual-evidence/manifest.json` stamped with `runId` (ISO-8601 timestamp + short slug recommended), the `theme` block from `penflow theme-fingerprint <theme.css> --json`, per-screen PNG `sha256`, and `references_manifest` when references are present, plus `vision-report.json` with `generated_by` and `inputs[]` `{file, sha256}` for every evaluated file (legacy `visual-report.json` is deprecated).
+   - Receipts: every evaluated PNG/contact sheet must resolve inside `.mockup-validation/visual-evidence/`; each `vision-report.screens[].png` must match the manifest PNG for the same `screen_id`; symlinks into `references/`, SHA mismatch, missing `generated_by`, missing `inputs`, and category evidence that omits the evaluated file are blocking failures. Receipts are mandatory and prose cannot replace them.
    - Gate: `penflow validate-visual-evidence .mockup-validation/visual-evidence --expected expected-ui-tree.json --theme-css <theme.css> --json` — the gate is the exit code, not prose.
+   - Reference gate: `penflow validate-reference-fidelity .mockup-validation/visual-evidence --references <target>/references --json` — the gate is the exit code, not prose. It fails copied exports (`reference.evidence_is_reference_copy`) and deterministic-vs-LLM disagreement (`reference.llm_metric_disagreement`).
    - Stale theme: a modified theme.css deterministically invalidates stale packets (`evidence.theme.missing`/`evidence.theme.stale`) and forces a re-run of the bounded loop.
-8. **Decide final state and prove it:** PASS requires valid anchors, every rubric gate clean on the final run, and complete visual evidence when a renderer is available. Write `audit-report.json` (`kind: penflow-mockup-audit`) recording `iterations`, per-gate `{gate, command, exit_code, report_path, result}`, and `residual_issues[]`, then validate it with `penflow validate-report .mockup-validation/audit-report.json --schema --json` — the single CI-able final check.
+   - Renderer coupling: when `layout-snapshot.json` is available from the renderer, rerun the `accessibility_alignment` gate with `--layout-snapshot` so overlap/overflow uses real Pencil bboxes, not theoretical flex positions.
+8. **Decide final state and prove it:** PASS requires valid anchors, every rubric gate clean on the final run, and complete visual evidence when a renderer is available. Write `audit-report.json` (`kind: penflow-mockup-audit`) recording `iterations`, per-gate `{gate, command, exit_code, report_path, result}`, and `residual_issues[]`; every executed gate must cite an existing `report_path`, and `result` must match `exit_code` (`pass` => 0, `fail` => non-zero, `not_run` => null/null). Validate it with `penflow validate-report .mockup-validation/audit-report.json --schema --json` — the single CI-able final check.
 
 ## Quality Gate
 
-PASS/FAIL comes only from the rubric gate table (**Read** [`references/audit-rubric.md`](references/audit-rubric.md)) — six scripted gates: `tokens` (`penflow lint-tokens` exit 0), `consistency` (`penflow check-consistency` exit 0), `accessibility_alignment` (`penflow audit-visual` zero errors), `contract` (`penflow detect-drift` `summary.blocking == 0`), `structural_fidelity` (`penflow compare-tree` threshold 0.98, when an actual tree exists), and `balance_readability` (Visual Evidence Gate: `penflow validate-visual-evidence` exit 0 plus zero blocking vision criteria — every audited screen has inspected screenshot evidence, exported PNG, manifest entry, and a locked `vision-report.json` anchored by `screen_id`, `semantic_id`, and `pencil_node_id` when available; proven by exit code, never by prose).
+PASS/FAIL comes only from the rubric gate table (**Read** [`references/audit-rubric.md`](references/audit-rubric.md)) — six scripted gates: `tokens` (`penflow lint-tokens` exit 0), `consistency` (`penflow check-consistency` exit 0), `accessibility_alignment` (`penflow audit-visual` zero errors, with `--layout-snapshot` when a renderer produced `layout-snapshot.json`), `contract` (`penflow detect-drift` `summary.blocking == 0`), `structural_fidelity` (`penflow compare-tree` threshold 0.98, when an actual tree exists), and `balance_readability` (Visual Evidence Gate: `penflow validate-visual-evidence` exit 0 plus `penflow validate-reference-fidelity` exit 0 when references exist, zero blocking vision/reference criteria — every audited screen has inspected screenshot evidence, exported PNG, manifest entry, and a locked `vision-report.json` anchored by `screen_id`, `semantic_id`, `pencil_node_id`, and reference/export pairs when available; proven by exit code, never by prose).
 
 Critical = any error-severity gate issue or any `blocking: true` item (drift or vision). PASS requires a final clean run of all gates and a schema-valid `audit-report.json`. PASSED_WITH_WARNINGS is allowed only for non-critical, explicitly listed residual warnings. ESCALATED is required when a critical issue remains after the bounded fix loop (max 3 iterations), with the residual issue list attached.
 `BLOCKED_VISUAL_NOT_RUN` is required when a Pencil renderer is expected but unavailable, unless the user explicitly accepts structural-only validation.
@@ -104,6 +112,7 @@ Forbidden in Penflow Python core: importing or depending on Pencil MCP, cc-hub, 
     visual-evidence/
       manifest.json
       vision-report.json
+      *-reference-contact-sheet.png
       layout-snapshot.json
       visual-report.json   # legacy 044 artifact, deprecated
       *.png

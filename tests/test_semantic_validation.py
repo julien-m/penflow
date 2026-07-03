@@ -93,6 +93,57 @@ def test_validate_semantic_tree_reports_role_and_context_field_errors() -> None:
     assert "semantic.repeat_required" in codes
 
 
+def test_validate_semantic_tree_reports_container_downgrade_suspect() -> None:
+    tree = load_example()
+    degraded_list = {
+        "semantic_id": "checkout.recent-workers",
+        "role": "container",
+        "source_map": {"screen_spec": "flow-ui-contract/screens/checkout.md"},
+        "children": [
+            {
+                "semantic_id": f"checkout.recent-workers.{index}",
+                "role": "container",
+                "bbox": {"x": 0, "y": index * 56, "width": 320, "height": 48},
+                "visual": {"fill": "#FFFFFF", "gap": 8, "layout": "horizontal"},
+                "source_map": {"screen_spec": "flow-ui-contract/screens/checkout.md"},
+            }
+            for index in range(3)
+        ],
+    }
+    tree["screens"][0]["root"]["children"].append(degraded_list)
+
+    issues = validate_semantic_tree(tree)
+
+    assert any(
+        issue["code"] == "semantic.downgrade_suspect"
+        and issue["semantic_id"] == "checkout.recent-workers"
+        for issue in issues
+    )
+
+
+def test_validate_semantic_tree_accepts_repeated_visual_children_with_repeat() -> None:
+    tree = load_example()
+    repeated_container = {
+        "semantic_id": "checkout.valid-workers",
+        "role": "container",
+        "repeat": "worker in workers",
+        "source_map": {"screen_spec": "flow-ui-contract/screens/checkout.md"},
+        "children": [
+            {
+                "semantic_id": f"checkout.valid-workers.{index}",
+                "role": "container",
+                "bbox": {"x": 0, "y": index * 56, "width": 320, "height": 48},
+                "visual": {"fill": "#FFFFFF", "gap": 8, "layout": "horizontal"},
+                "source_map": {"screen_spec": "flow-ui-contract/screens/checkout.md"},
+            }
+            for index in range(3)
+        ],
+    }
+    tree["screens"][0]["root"]["children"].append(repeated_container)
+
+    assert "semantic.downgrade_suspect" not in issue_codes(tree)
+
+
 def test_validate_semantic_tree_reports_incoherent_source_maps() -> None:
     tree = load_example()
     tree["flows"][0]["source_map"]["notes"] = ["keeps source_map non-empty"]
