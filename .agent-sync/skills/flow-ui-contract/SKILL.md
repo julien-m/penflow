@@ -10,6 +10,7 @@ description: >
 ---
 <!-- LiveSpec traceability anchors -->
 <!-- @spec(AC-002) -->
+<!-- @spec(FR-001) -->
 <!-- @spec(FR-002) -->
 <!-- @spec(FR-003) -->
 <!-- @spec(FR-004) -->
@@ -55,7 +56,7 @@ After authoring/enrichment, run `penflow map-pencil-context <ui.pen> <semantic-u
 
 ## Required Reads
 
-Before generating or validating files, **Read** [`references/grammar.md`](references/grammar.md), **Read** [`references/templates/flow.md`](references/templates/flow.md), **Read** [`references/templates/screen.md`](references/templates/screen.md), and **Read** [`references/semantic-ui-tree.md`](references/semantic-ui-tree.md).
+Before generating or validating files, **Read** [`references/grammar.md`](references/grammar.md), **Read** [`references/templates/flow.md`](references/templates/flow.md), **Read** [`references/templates/screen.md`](references/templates/screen.md), **Read** [`references/semantic-ui-tree.md`](references/semantic-ui-tree.md), and **Read** [`references/design-read.md`](references/design-read.md).
 
 ## Design Convention Gate
 
@@ -67,6 +68,22 @@ Before writing or editing `flow-ui-contract/` for any UI surface, **Read** [`../
 - Also load `design-realtime` for live status, websocket, SSE, progress, or streaming screens.
 
 Screen specs must describe visible hierarchy using those conventions: app shell/sidebar/header/content zones, forms, lists/tables, cards, empty/loading/error states, payment anatomy, metric cards, and responsive variants where relevant. Do not produce a flow/screen spec that only lists labels and buttons when the convention defines a richer view pattern.
+
+## Design Read Capture
+
+<!-- @spec(FR-001) -->
+<!-- @spec(FR-002) -->
+<!-- @spec(FR-003) -->
+
+During Step 5, landing and showcase workspaces must capture `<target>/design-read.json` before Step 6 Generation. The artifact records the exact `design-read-protocol.md` one-liner:
+
+```text
+Reading this as: <page kind> for <audience>, with a <vibe> language, leaning toward <design system or aesthetic family>.
+```
+
+It also records integer dials from 1 to 10 for `variance`, `motion`, and `density`, plus the six protocol signals. Use the Design Convention Gate to load `design-read-protocol.md`; do not duplicate its dial table. For non-landing/showcase surfaces, write `status: skipped` with a reason.
+
+`design-read.json` is not a gate. It informs generation and the Mockup Factory advisory pass, but it never decides PASS/FAIL and never changes Penflow validation exit codes.
 
 ## Tree Formation Contract
 
@@ -160,6 +177,7 @@ Expected `semantic-ui-tree.json` excerpt:
 
 Read from `<target>/`:
 - `mockups/manifest.json` if present; required only when mapping visual exports.
+- `design-read.json` if present, so reruns preserve or review the prior design direction.
 - `project-profile.md`, `01-exploration.md`, `02-market-research.md`, `theme.css` if present.
 - `ui.pen` if present for Pencil auto-fill.
 
@@ -183,6 +201,8 @@ For each mapped screen, inspect `<target>/ui.pen` with Penflow/Pencil tooling wh
 ### Step 5 — Guided Conversation
 
 For each flow, ask only about business details not visible in mockups or profile data: conditional rules, error conditions, backend side effects, entity state transitions, and access rules. Mark skipped answers as `[NEEDS CLARIFICATION]`.
+
+If any flow or screen declares surface `landing` or `showcase`, run the Design Read Capture in [`references/design-read.md`](references/design-read.md): ask at most one clarifying question only if required for missing design-read signals, write the exact `Reading this as:` one-liner, and record `variance`, `motion`, and `density` as integers from 1 to 10. If no `landing` or `showcase` surface exists, write `<target>/design-read.json` with `status: skipped` and the non-applicable surfaces.
 
 ### Step 6 — Generation
 

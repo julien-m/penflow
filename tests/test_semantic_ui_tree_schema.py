@@ -125,9 +125,12 @@ def test_semantic_schema_does_not_add_feature_036_or_later_runtime_pipeline() ->
     # wireframe fidelity and updates operator wording, without any runtime
     # adapter or themed component library. Feature 067 is in scope — it ships
     # the single `penflow run` gate orchestrator over local Penflow files only,
-    # without browser, simulator, Pencil MCP, or UI runtime adapters.
+    # without browser, simulator, Pencil MCP, or UI runtime adapters. Feature
+    # 068 is in scope — it ships skill/docs/tests for advisory design-read and
+    # design-taste reporting only, with no Python runtime adapter, schema
+    # expansion, or gate promotion.
     future_feature_dirs: list[Path] = []
-    for feature_number in range(68, 69):
+    for feature_number in range(69, 70):
         future_feature_dirs.extend((ROOT / ".specs" / "features").glob(f"{feature_number:03d}-*"))
     assert future_feature_dirs == []
     assert not (ROOT / "penflow" / "semantic_validator.py").exists()

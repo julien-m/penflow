@@ -6,6 +6,8 @@ description: >
   detect-drift reports as deterministic anchors before any Pencil/Codex audit loop.
 ---
 <!-- LiveSpec traceability anchors -->
+<!-- @spec(FR-004) -->
+<!-- @spec(FR-005) -->
 <!-- @spec(FR-006) -->
 <!-- @spec(FR-007) -->
 
@@ -67,7 +69,7 @@ A themed but structurally generic output is a failure. Reject screens that ignor
 
 ## Workflow
 
-1. **Load anchors and conventions:** **Read** [`references/workflow.md`](references/workflow.md), **Read** [`references/audit-rubric.md`](references/audit-rubric.md), **Read** [`references/visual-validation.md`](references/visual-validation.md), then apply the Design Convention Gate above.
+1. **Load anchors and conventions:** **Read** [`references/workflow.md`](references/workflow.md), **Read** [`references/audit-rubric.md`](references/audit-rubric.md), **Read** [`references/visual-validation.md`](references/visual-validation.md), **Read** [`references/design-taste-advisory.md`](references/design-taste-advisory.md), then apply the Design Convention Gate above.
 2. **Build an anchor table:** for every screen, list `screen_id`, `semantic_id`, `pencil_node_id` when available, source flow/screen file, and drift severity.
 3. **Seed and freeze checklist:** <!-- @spec FR-009: Skill docs seed checklist via command — .specs/features/055-checklist-from-drift-seeding/spec.md#fr-009 -->
    - Seed: `penflow checklist-from-drift <target>/drift-report.json --out .mockup-validation/<group>/checklist.json --group <group> --json` — every drift issue becomes one open `gate: contract` item.
@@ -88,7 +90,8 @@ A themed but structurally generic output is a failure. Reject screens that ignor
    - Reference gate: `penflow validate-reference-fidelity .mockup-validation/visual-evidence --references <target>/references --json` — the gate is the exit code, not prose. It fails copied exports (`reference.evidence_is_reference_copy`) and deterministic-vs-LLM disagreement (`reference.llm_metric_disagreement`).
    - Stale theme: a modified theme.css deterministically invalidates stale packets (`evidence.theme.missing`/`evidence.theme.stale`) and forces a re-run of the bounded loop.
    - Renderer coupling: when `layout-snapshot.json` is available from the renderer, rerun the `accessibility_alignment` gate with `--layout-snapshot` so overlap/overflow uses real Pencil bboxes, not theoretical flex positions.
-8. **Decide final state and prove it:** PASS requires valid anchors, every rubric gate clean on the final run, and complete visual evidence when a renderer is available. Write `audit-report.json` (`kind: penflow-mockup-audit`) recording `iterations`, per-gate `{gate, command, exit_code, report_path, result}`, and `residual_issues[]`; every executed gate must cite an existing `report_path`, and `result` must match `exit_code` (`pass` => 0, `fail` => non-zero, `not_run` => null/null). Validate it with `penflow validate-report .mockup-validation/audit-report.json --schema --json` — the single CI-able final check.
+8. **Run Design Taste Advisory:** <!-- @spec(FR-004) --> <!-- @spec(FR-005) --> <!-- @spec(FR-006) --> after computing the scripted gates and before final proof, read `<target>/design-read.json` when present, then follow [`references/design-taste-advisory.md`](references/design-taste-advisory.md) to write `<target>/.mockup-validation/design-taste-advisory.md`. This report is advisory only: it never decides PASS/FAIL, never adds checklist items, and never changes gate status.
+9. **Decide final state and prove it:** PASS requires valid anchors, every rubric gate clean on the final run, and complete visual evidence when a renderer is available. Write `audit-report.json` (`kind: penflow-mockup-audit`) recording `iterations`, per-gate `{gate, command, exit_code, report_path, result}`, and `residual_issues[]`; every executed gate must cite an existing `report_path`, and `result` must match `exit_code` (`pass` => 0, `fail` => non-zero, `not_run` => null/null). Validate it with `penflow validate-report .mockup-validation/audit-report.json --schema --json` — the single CI-able final check.
 
 ## Quality Gate
 

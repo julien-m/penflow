@@ -60,6 +60,7 @@ The following guidance informs **what to fix and how**, but it cannot pass or fa
 | Responsive behavior | Desktop/tablet/mobile frame assumptions are explicit when targeted — record gaps as warnings. |
 | Modernity | Components follow current SaaS/app conventions without ornamental one-off styling. |
 | Polish | Spacing, radius, typography, icons, and borders follow project conventions — measured by the `tokens` gate. |
+| Design taste | Anti-default/AI-tell/landing pre-flight subset: **Read** [`design-taste-advisory.md`](design-taste-advisory.md). Reported in `.mockup-validation/design-taste-advisory.md` — advisory report only, never a gate. |
 
 ## Visual Evidence Criteria
 

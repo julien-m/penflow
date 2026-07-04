@@ -23,6 +23,12 @@ MOCKUP_RUBRIC = (
 MOCKUP_VISUAL = (
     ROOT / ".agent-sync" / "skills" / "mockup-factory" / "references" / "visual-validation.md"
 )
+MOCKUP_DESIGN_TASTE = (
+    ROOT / ".agent-sync" / "skills" / "mockup-factory" / "references" / "design-taste-advisory.md"
+)
+FLOW_DESIGN_READ = (
+    ROOT / ".agent-sync" / "skills" / "flow-ui-contract" / "references" / "design-read.md"
+)
 EXAMPLE_VISUAL_DIR = ROOT / "examples" / "full" / ".mockup-validation" / "visual-evidence"
 SEMANTIC_TREE_REFERENCE = (
     ROOT / ".agent-sync" / "skills" / "flow-ui-contract" / "references" / "semantic-ui-tree.md"
@@ -254,6 +260,98 @@ def test_flow_ui_contract_skill_and_readme_document_modes() -> None:
     assert '"trigger": "submit_payment"' in skill
     assert "references/semantic-ui-tree.md" in combined
     assert "does **not** run browser, Xcode, simulator, Playwright, React Native" in skill
+
+
+def test_design_read_capture_is_documented() -> None:
+    skill = FLOW_SKILL.read_text(encoding="utf-8")
+    reference = FLOW_DESIGN_READ.read_text(encoding="utf-8")
+    combined = skill + "\n" + reference
+
+    for phrase in (
+        "Design Read Capture",
+        "design-read.json",
+        "design-read-protocol.md",
+        "Reading this as:",
+        "landing",
+        "showcase",
+        "variance",
+        "motion",
+        "density",
+    ):
+        assert phrase in combined
+
+
+def test_design_taste_advisory_pass_is_documented() -> None:
+    skill = MOCKUP_SKILL.read_text(encoding="utf-8")
+    rubric = MOCKUP_RUBRIC.read_text(encoding="utf-8")
+    reference = MOCKUP_DESIGN_TASTE.read_text(encoding="utf-8")
+
+    for phrase in (
+        "design-taste-advisory",
+        "design-taste.md",
+        "never decides PASS/FAIL",
+        "never adds checklist items",
+        "never changes gate status",
+    ):
+        assert phrase in skill + "\n" + reference
+
+    assert "Design taste" in rubric
+    assert "Advisory only" in reference
+
+
+def test_vision_report_schema_categories_unchanged() -> None:
+    schema = json.loads((ROOT / "penflow" / "schemas" / "vision-report.schema.json").read_text())
+
+    screen_categories = schema["properties"]["screens"]["items"]["properties"]["criteria"]["items"][
+        "properties"
+    ]["category"]["enum"]
+    coherence_categories = schema["properties"]["coherence"]["properties"]["criteria"]["items"][
+        "properties"
+    ]["category"]["enum"]
+    reference_categories = schema["properties"]["reference_fidelity"]["items"]["properties"][
+        "criteria"
+    ]["items"]["properties"]["category"]["enum"]
+
+    assert screen_categories == [
+        "visual_balance",
+        "rendering_artifacts",
+        "readability",
+        "perceived_hierarchy",
+        "imagery_quality",
+    ]
+    assert coherence_categories == [
+        "cross_screen_rhythm",
+        "palette_coherence",
+        "typography_coherence",
+        "component_recognition",
+    ]
+    assert reference_categories == [
+        "layout_match",
+        "palette_match",
+        "component_parity",
+        "density_match",
+    ]
+
+    rubric = MOCKUP_RUBRIC.read_text(encoding="utf-8")
+    gate_table = rubric.split("## Gate Table", maxsplit=1)[1].split(
+        "## Advisory UX Notes", maxsplit=1
+    )[0]
+    advisory_notes = rubric.split("## Advisory UX Notes", maxsplit=1)[1]
+    gate_rows = [
+        line
+        for line in gate_table.splitlines()
+        if line.startswith("| `") and not line.startswith("| `Gate")
+    ]
+    assert gate_rows == [
+        "| `tokens` | Design tokens (palette, spacing, radius, typography) | `penflow lint-tokens <target>/ui.pen --theme-css <target>/theme.css -o <target>/token-lint-report.json --json` | exit 0 | `token-lint-report.json` |",
+        "| `consistency` | Cross-screen component consistency | `penflow check-consistency <target>/expected-ui-tree.json --group-by role+intent+variant+size-class -o <target>/consistency-report.json --json` | exit 0 | `consistency-report.json` |",
+        "| `accessibility_alignment` | Accessibility + Visual alignment (contrast, touch targets, overlap/overflow, text fit) | `penflow audit-visual <target>/expected-ui-tree.json --theme-css <target>/theme.css --layout-snapshot <target>/.mockup-validation/visual-evidence/layout-snapshot.json -o <target>/visual-metrics-report.json --json` when a renderer produced `layout-snapshot.json`; otherwise omit `--layout-snapshot` | zero error-severity issues — exit 0 under the strict default (`info` never blocks) | `visual-metrics-report.json` |",
+        "| `contract` | Semantic contract drift | `penflow detect-drift <target>/flow-ui-contract/contract.json <target>/semantic-ui-tree.json <target>/ui.pen --out <target>/drift-report.json --json` | `summary.blocking == 0` and exit 0 | `drift-report.json` |",
+        "| `structural_fidelity` | Structural fidelity vs runtime | `penflow compare-tree <target>/expected-ui-tree.json <target>/actual-ui-tree.json --out <target>/compare-report.json --json` | score ≥ 0.98 (strict default threshold) — exit 0 | `compare-report.json` |",
+        "| `balance_readability` | Balance / readability (vision-only) | `penflow validate-visual-evidence <target>/.mockup-validation/visual-evidence --expected <target>/expected-ui-tree.json --json`; when references exist, also `penflow validate-reference-fidelity <target>/.mockup-validation/visual-evidence --references <target>/references --json` | both exits 0, zero `blocking: true` criteria with result `fail` in `vision-report.json`, and reference-fidelity status PASS when references exist | `.mockup-validation/visual-evidence/vision-report.json`, optional reference-fidelity report |",
+    ]
+    assert "Design taste" not in gate_table
+    assert "Design taste" in advisory_notes
 
 
 def test_semantic_tree_reference_documents_formation_contract() -> None:
