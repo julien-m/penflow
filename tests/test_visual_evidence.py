@@ -176,6 +176,15 @@ def _add_references(
     return references
 
 
+def _replace_reference_png(references: Path, data: bytes) -> None:
+    reference_png = references / "checkout-ref.png"
+    reference_png.write_bytes(data)
+    manifest_path = references / "references-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest[0]["sha256"] = hashlib.sha256(reference_png.read_bytes()).hexdigest()
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+
 def _packet(tmp_path: Path, screen_ids: tuple[str, ...] = ("checkout",)) -> tuple[Path, Path]:
     """Write a complete, valid evidence packet and matching expected tree."""
     evidence = tmp_path / "visual-evidence"
@@ -1341,6 +1350,62 @@ def test_reference_fidelity_rejects_copied_export(tmp_path: Path) -> None:
         )
         == 1
     )
+
+
+def test_reference_fidelity_reports_corrupt_ihdr_as_gate_issue(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    evidence, _expected = _packet(tmp_path)
+    references = _add_references(tmp_path, evidence)
+    malformed_png = (
+        b"\x89PNG\r\n\x1a\n"
+        + _png_chunk(b"IHDR", b"short")
+        + _png_chunk(b"IDAT", zlib.compress(b""))
+        + _png_chunk(b"IEND", b"")
+    )
+    _replace_reference_png(references, malformed_png)
+
+    report = validate_reference_fidelity(evidence, references)
+    exit_code = main(
+        ["validate-reference-fidelity", str(evidence), "--references", str(references), "--json"]
+    )
+    captured = capsys.readouterr()
+
+    assert report["status"] == "FAIL"
+    assert "reference.image.invalid" in {issue["code"] for issue in report["issues"]}
+    issue = next(issue for issue in report["issues"] if issue["code"] == "reference.image.invalid")
+    assert "invalid PNG IHDR length" in issue["message"]
+    assert exit_code == 1
+    assert "reference.image.invalid" in captured.out
+    assert "Traceback" not in captured.err
+
+
+def test_reference_fidelity_reports_truncated_idat_as_gate_issue(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    evidence, _expected = _packet(tmp_path)
+    references = _add_references(tmp_path, evidence)
+    malformed_png = (
+        b"\x89PNG\r\n\x1a\n"
+        + _png_chunk(b"IHDR", struct.pack(">IIBBBBB", 8, 8, 8, 2, 0, 0, 0))
+        + _png_chunk(b"IDAT", zlib.compress(b"\x00"))
+        + _png_chunk(b"IEND", b"")
+    )
+    _replace_reference_png(references, malformed_png)
+
+    report = validate_reference_fidelity(evidence, references)
+    exit_code = main(
+        ["validate-reference-fidelity", str(evidence), "--references", str(references), "--json"]
+    )
+    captured = capsys.readouterr()
+
+    assert report["status"] == "FAIL"
+    assert "reference.image.invalid" in {issue["code"] for issue in report["issues"]}
+    issue = next(issue for issue in report["issues"] if issue["code"] == "reference.image.invalid")
+    assert "truncated PNG scanline" in issue["message"]
+    assert exit_code == 1
+    assert "reference.image.invalid" in captured.out
+    assert "Traceback" not in captured.err
 
 
 def test_reference_fidelity_rejects_cross_screen_reference_copy(tmp_path: Path) -> None:

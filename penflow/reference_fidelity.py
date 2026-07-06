@@ -526,9 +526,13 @@ def _read_png_rgba(path: Path) -> tuple[int, int, list[tuple[int, int, int, int]
             raise ValueError(f"truncated PNG chunk header: {path}")
         length = struct.unpack(">I", data[offset : offset + 4])[0]
         chunk_type = data[offset + 4 : offset + 8]
+        if offset + 12 + length > len(data):
+            raise ValueError(f"truncated PNG chunk data for {chunk_type.decode('latin1')}: {path}")
         chunk_data = data[offset + 8 : offset + 8 + length]
         offset += 12 + length
         if chunk_type == b"IHDR":
+            if length != 13:
+                raise ValueError(f"invalid PNG IHDR length {length}: {path}")
             width, height, bit_depth, color_type, _compression, _filter, interlace = struct.unpack(
                 ">IIBBBBB", chunk_data
             )
@@ -544,15 +548,24 @@ def _read_png_rgba(path: Path) -> tuple[int, int, list[tuple[int, int, int, int]
         raise ValueError(
             f"unsupported PNG format in {path}: bit_depth={bit_depth} color_type={color_type}"
         )
+    if not idat:
+        raise ValueError(f"PNG missing IDAT: {path}")
     channels = {0: 1, 2: 3, 6: 4}[color_type]
-    raw = zlib.decompress(bytes(idat))
+    try:
+        raw = zlib.decompress(bytes(idat))
+    except zlib.error as error:
+        raise ValueError(f"invalid PNG IDAT data: {path}") from error
     stride = width * channels
     rows: list[bytes] = []
     previous = bytes(stride)
     cursor = 0
-    for _row_index in range(height):
+    for row_index in range(height):
+        if cursor >= len(raw):
+            raise ValueError(f"truncated PNG scanline {row_index}: {path}")
         filter_type = raw[cursor]
         cursor += 1
+        if cursor + stride > len(raw):
+            raise ValueError(f"truncated PNG scanline {row_index}: {path}")
         encoded = raw[cursor : cursor + stride]
         cursor += stride
         decoded = _unfilter_scanline(filter_type, encoded, previous, channels)

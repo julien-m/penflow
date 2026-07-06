@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
+import struct
+import zlib
 from pathlib import Path
 
 from penflow.cli import main
@@ -15,6 +18,37 @@ def copy_full_workspace(tmp_path: Path) -> Path:
     workspace = tmp_path / "workspace"
     shutil.copytree(ROOT / "examples" / "full", workspace)
     return workspace
+
+
+def _png_chunk(chunk_type: bytes, data: bytes) -> bytes:
+    checksum = zlib.crc32(chunk_type + data) & 0xFFFFFFFF
+    return struct.pack(">I", len(data)) + chunk_type + data + struct.pack(">I", checksum)
+
+
+def write_truncated_reference(workspace: Path) -> Path:
+    references = workspace / "references"
+    references.mkdir()
+    reference_png = references / "checkout-ref.png"
+    reference_png.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + _png_chunk(b"IHDR", struct.pack(">IIBBBBB", 8, 8, 8, 2, 0, 0, 0))
+        + _png_chunk(b"IDAT", zlib.compress(b"\x00"))
+        + _png_chunk(b"IEND", b"")
+    )
+    (references / "references-manifest.json").write_text(
+        json.dumps(
+            [
+                {
+                    "screen_id": "checkout",
+                    "file": "checkout-ref.png",
+                    "sha256": hashlib.sha256(reference_png.read_bytes()).hexdigest(),
+                    "source": "unit-test",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return references
 
 
 def test_run_pipeline_returns_single_gate_summary_json(tmp_path: Path) -> None:
@@ -99,6 +133,21 @@ def test_run_pipeline_refreshes_stale_run_gate_report(tmp_path: Path) -> None:
     assert summary["gates"]["validate-pen"]["status"] == "PASS"
     assert refreshed_report["status"] == "PASS"
     assert refreshed_report["issues"] == []
+
+
+def test_run_pipeline_records_invalid_reference_png_as_gate_report(tmp_path: Path) -> None:
+    workspace = copy_full_workspace(tmp_path)
+    references = write_truncated_reference(workspace)
+
+    summary = run_pipeline(workspace, references=references)
+    reference_gate = summary["gates"]["reference-fidelity"]
+    report = json.loads(Path(reference_gate["report_path"]).read_text(encoding="utf-8"))
+
+    assert reference_gate["status"] == "FAIL"
+    assert reference_gate["exit"] == 1
+    assert report["status"] == "FAIL"
+    assert "reference.image.invalid" in {issue["code"] for issue in report["issues"]}
+    assert "Traceback" not in json.dumps(report)
 
 
 def test_run_pipeline_reports_missing_target_as_usage_error(tmp_path: Path, capsys) -> None:
