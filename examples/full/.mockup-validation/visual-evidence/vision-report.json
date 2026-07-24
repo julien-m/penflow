@@ -2,9 +2,10 @@
   "version": 1,
   "kind": "penflow-vision-report",
   "status": "PASS",
+  "runId": "run-c4-examples-full-20260724",
   "renderer": "pencil-mcp",
   "sourceFile": "examples/full/ui.pen",
-  "model": "claude-fable-5",
+  "model": "codex-gpt-5.6",
   "generated_by": "mockup-factory.visual-evidence",
   "inputs": [
     {
@@ -19,30 +20,74 @@
   "validatedAt": "2026-06-10",
   "coherence": {
     "contact_sheet_png": "contact-sheet.png",
+    "surface": "web",
+    "screen_id": "cross-screen",
+    "region_id": "coherence.grid",
+    "state": "composite",
     "criteria": [
       {
         "category": "cross_screen_rhythm",
         "result": "pass",
-      "evidence": "The single checkout screen on contact-sheet.png keeps one spacing rhythm; nothing diverges across the set.",
-        "blocking": false
+        "evidence": "The single checkout screen on contact-sheet.png keeps one spacing rhythm; nothing diverges across the set.",
+        "blocking": true,
+        "proof": {
+          "run_id": "run-c4-examples-full-20260724",
+          "surface": "web",
+          "screen_id": "cross-screen",
+          "region_id": "coherence.grid",
+          "state": "composite",
+          "assertion": "cross_screen_rhythm",
+          "measurement": {"expected": "pass", "actual": "pass", "unit": "result"},
+          "artifacts": [{"role": "contact_sheet", "file": "contact-sheet.png", "sha256": "3e7ce66cd7fc51a850490aea840954c26cff11086f0947ee271b6ceec6b7333a", "crop": {"x": 0, "y": 0, "width": 780, "height": 1688, "source_width": 780, "source_height": 1688}}]
+        }
       },
       {
         "category": "palette_coherence",
         "result": "pass",
-      "evidence": "contact-sheet.png reads as one neutral palette with a single primary accent on the pay button.",
-        "blocking": false
+        "evidence": "contact-sheet.png reads as one neutral palette with a single primary accent on the pay button.",
+        "blocking": true,
+        "proof": {
+          "run_id": "run-c4-examples-full-20260724",
+          "surface": "web",
+          "screen_id": "cross-screen",
+          "region_id": "coherence.grid",
+          "state": "composite",
+          "assertion": "palette_coherence",
+          "measurement": {"expected": "pass", "actual": "pass", "unit": "result"},
+          "artifacts": [{"role": "contact_sheet", "file": "contact-sheet.png", "sha256": "3e7ce66cd7fc51a850490aea840954c26cff11086f0947ee271b6ceec6b7333a", "crop": {"x": 0, "y": 0, "width": 780, "height": 1688, "source_width": 780, "source_height": 1688}}]
+        }
       },
       {
         "category": "typography_coherence",
         "result": "pass",
-      "evidence": "Title, body, and label sizes form one consistent type scale across contact-sheet.png.",
-        "blocking": false
+        "evidence": "Title, body, and label sizes form one consistent type scale across contact-sheet.png.",
+        "blocking": true,
+        "proof": {
+          "run_id": "run-c4-examples-full-20260724",
+          "surface": "web",
+          "screen_id": "cross-screen",
+          "region_id": "coherence.grid",
+          "state": "composite",
+          "assertion": "typography_coherence",
+          "measurement": {"expected": "pass", "actual": "pass", "unit": "result"},
+          "artifacts": [{"role": "contact_sheet", "file": "contact-sheet.png", "sha256": "3e7ce66cd7fc51a850490aea840954c26cff11086f0947ee271b6ceec6b7333a", "crop": {"x": 0, "y": 0, "width": 780, "height": 1688, "source_width": 780, "source_height": 1688}}]
+        }
       },
       {
         "category": "component_recognition",
         "result": "pass",
-      "evidence": "The button and summary card styles are recognizable as the same components throughout contact-sheet.png.",
-        "blocking": false
+        "evidence": "The button and summary card styles are recognizable as the same components throughout contact-sheet.png.",
+        "blocking": true,
+        "proof": {
+          "run_id": "run-c4-examples-full-20260724",
+          "surface": "web",
+          "screen_id": "cross-screen",
+          "region_id": "coherence.grid",
+          "state": "composite",
+          "assertion": "component_recognition",
+          "measurement": {"expected": "pass", "actual": "pass", "unit": "result"},
+          "artifacts": [{"role": "contact_sheet", "file": "contact-sheet.png", "sha256": "3e7ce66cd7fc51a850490aea840954c26cff11086f0947ee271b6ceec6b7333a", "crop": {"x": 0, "y": 0, "width": 780, "height": 1688, "source_width": 780, "source_height": 1688}}]
+        }
       }
     ]
   },
@@ -51,37 +96,90 @@
       "screen_id": "checkout",
       "semantic_id": "checkout",
       "pencil_node_id": "checkoutScreen",
+      "surface": "web",
+      "region_id": "checkout.main",
+      "state": "default",
       "png": "checkoutScreen.png",
       "criteria": [
         {
           "category": "visual_balance",
           "result": "pass",
           "evidence": "Content sits in a single left-aligned column in checkoutScreen.png with even vertical rhythm; the sparse lower half is intentional for this minimal fixture.",
-          "blocking": false
+          "blocking": true,
+          "proof": {
+            "run_id": "run-c4-examples-full-20260724",
+            "surface": "web",
+            "screen_id": "checkout",
+            "region_id": "checkout.main",
+            "state": "default",
+            "assertion": "visual_balance",
+            "measurement": {"expected": "pass", "actual": "pass", "unit": "result"},
+            "artifacts": [{"role": "actual", "file": "checkoutScreen.png", "sha256": "3e7ce66cd7fc51a850490aea840954c26cff11086f0947ee271b6ceec6b7333a", "crop": {"x": 0, "y": 0, "width": 780, "height": 1688, "source_width": 780, "source_height": 1688}}]
+          }
         },
         {
           "category": "rendering_artifacts",
           "result": "pass",
           "evidence": "The exported PNG checkoutScreen.png shows no clipping, missing glyphs, broken images, or stray frame borders.",
-          "blocking": false
+          "blocking": true,
+          "proof": {
+            "run_id": "run-c4-examples-full-20260724",
+            "surface": "web",
+            "screen_id": "checkout",
+            "region_id": "checkout.main",
+            "state": "default",
+            "assertion": "rendering_artifacts",
+            "measurement": {"expected": "pass", "actual": "pass", "unit": "result"},
+            "artifacts": [{"role": "actual", "file": "checkoutScreen.png", "sha256": "3e7ce66cd7fc51a850490aea840954c26cff11086f0947ee271b6ceec6b7333a", "crop": {"x": 0, "y": 0, "width": 780, "height": 1688, "source_width": 780, "source_height": 1688}}]
+          }
         },
         {
           "category": "readability",
           "result": "pass",
           "evidence": "Title, order summary, and payment label are legible in checkoutScreen.png at 1x scale with clear separation from the background.",
-          "blocking": false
+          "blocking": true,
+          "proof": {
+            "run_id": "run-c4-examples-full-20260724",
+            "surface": "web",
+            "screen_id": "checkout",
+            "region_id": "checkout.main",
+            "state": "default",
+            "assertion": "readability",
+            "measurement": {"expected": "pass", "actual": "pass", "unit": "result"},
+            "artifacts": [{"role": "actual", "file": "checkoutScreen.png", "sha256": "3e7ce66cd7fc51a850490aea840954c26cff11086f0947ee271b6ceec6b7333a", "crop": {"x": 0, "y": 0, "width": 780, "height": 1688, "source_width": 780, "source_height": 1688}}]
+          }
         },
         {
           "category": "perceived_hierarchy",
           "result": "pass",
           "evidence": "The eye lands on the checkout title in checkoutScreen.png, then the order summary, then the primary pay button, matching the intended task order.",
-          "blocking": false
+          "blocking": true,
+          "proof": {
+            "run_id": "run-c4-examples-full-20260724",
+            "surface": "web",
+            "screen_id": "checkout",
+            "region_id": "checkout.main",
+            "state": "default",
+            "assertion": "perceived_hierarchy",
+            "measurement": {"expected": "pass", "actual": "pass", "unit": "result"},
+            "artifacts": [{"role": "actual", "file": "checkoutScreen.png", "sha256": "3e7ce66cd7fc51a850490aea840954c26cff11086f0947ee271b6ceec6b7333a", "crop": {"x": 0, "y": 0, "width": 780, "height": 1688, "source_width": 780, "source_height": 1688}}]
+          }
         },
         {
           "category": "imagery_quality",
           "result": "pass",
           "evidence": "No raster imagery is used on checkoutScreen.png; vector shapes and text render crisply in the export.",
-          "blocking": false
+          "blocking": true,
+          "proof": {
+            "run_id": "run-c4-examples-full-20260724",
+            "surface": "web",
+            "screen_id": "checkout",
+            "region_id": "checkout.main",
+            "state": "default",
+            "assertion": "imagery_quality",
+            "measurement": {"expected": "pass", "actual": "pass", "unit": "result"},
+            "artifacts": [{"role": "actual", "file": "checkoutScreen.png", "sha256": "3e7ce66cd7fc51a850490aea840954c26cff11086f0947ee271b6ceec6b7333a", "crop": {"x": 0, "y": 0, "width": 780, "height": 1688, "source_width": 780, "source_height": 1688}}]
+          }
         }
       ]
     }

@@ -1,0 +1,21 @@
+{
+  "capturedAt": "2026-07-24T00:00:00Z",
+  "content": {
+    "path": "actual-ui-tree.json",
+    "sha256": "9c879055a8f6bbc9be99a2845da15091012b593384efc8261f5e290cd7394361"
+  },
+  "fixture": {
+    "reason": "Synthetic example data packaged with Penflow as an immutable static-demo-fixture; not fresh runtime evidence."
+  },
+  "kind": "penflow-actual-provenance",
+  "producer": {
+    "name": "penflow.demo",
+    "version": "static-demo-fixture"
+  },
+  "sourceKind": "static-demo-fixture",
+  "target": {
+    "screen_id": "checkout",
+    "surface": "web"
+  },
+  "version": 1
+}

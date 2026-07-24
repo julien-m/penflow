@@ -15,6 +15,7 @@ from pathlib import Path
 
 from penflow.compare import STRICT_THRESHOLD
 from penflow.demo import build_demo
+from penflow.evidence import validate_visual_evidence
 
 EXPECTED_FILES = {
     "flow-ui-contract/contract.json",
@@ -26,6 +27,11 @@ EXPECTED_FILES = {
     "pencil-context-map.json",
     "expected-ui-tree.json",
     "actual-ui-tree.json",
+    "actual-ui-tree.provenance.json",
+    ".mockup-validation/visual-evidence/checkoutScreen.png",
+    ".mockup-validation/visual-evidence/layout-snapshot.json",
+    ".mockup-validation/visual-evidence/manifest.json",
+    ".mockup-validation/visual-evidence/vision-report.json",
     "code-ir.json",
     "compare-report.json",
     "review-report.json",
@@ -63,6 +69,79 @@ def test_build_demo_actual_tree_keeps_the_external_runtime_shape(tmp_path: Path)
     assert actual["root"]["id"] == "checkout"
 
 
+def test_build_demo_actual_provenance_receipt_is_qualified_fixture(tmp_path: Path) -> None:
+    """Invariant: the demo actual is derived from expected, so its receipt must
+    be an explicitly qualified static-demo-fixture bound to the actual bytes and
+    accepted by the validator — but rejected the moment freshness is required."""
+    import hashlib
+
+    from penflow.actual_provenance import actual_provenance_path, validate_actual_provenance
+
+    build_demo(tmp_path)
+    actual_path = tmp_path / "actual-ui-tree.json"
+    receipt = json.loads(actual_provenance_path(actual_path).read_text(encoding="utf-8"))
+
+    assert receipt["kind"] == "penflow-actual-provenance"
+    assert receipt["sourceKind"] == "static-demo-fixture"
+    assert receipt["fixture"]["reason"]
+    assert receipt["producer"]["name"] == "penflow.demo"
+    assert receipt["target"]["surface"] == "web"
+    assert receipt["content"]["sha256"] == hashlib.sha256(actual_path.read_bytes()).hexdigest()
+
+    expected_path = tmp_path / "expected-ui-tree.json"
+    assert validate_actual_provenance(actual_path, expected_path=expected_path) == []
+    inadmissible = validate_actual_provenance(
+        actual_path, expected_path=expected_path, require_fresh=True
+    )
+    assert [issue["code"] for issue in inadmissible] == ["provenance.source_kind.inadmissible"]
+
+
+def test_build_demo_visual_evidence_packet_is_self_contained(tmp_path: Path) -> None:
+    build_demo(tmp_path)
+    evidence = tmp_path / ".mockup-validation" / "visual-evidence"
+    manifest = json.loads((evidence / "manifest.json").read_text(encoding="utf-8"))
+    vision = json.loads((evidence / "vision-report.json").read_text(encoding="utf-8"))
+
+    assert manifest["renderer"] == "static-demo-fixture"
+    assert "Synthetic example data" in manifest["screens"][0]["notes"]
+    assert vision["renderer"] == "static-demo-fixture"
+    assert vision["model"] == "static-demo-fixture"
+    assert vision["generated_by"] == "penflow.demo.static-demo-fixture"
+    issues = validate_visual_evidence(
+        evidence,
+        expected_tree_path=tmp_path / "expected-ui-tree.json",
+    )
+    assert issues == []
+
+
+def test_build_demo_visual_evidence_fails_when_packaged_png_is_missing(tmp_path: Path) -> None:
+    build_demo(tmp_path)
+    evidence = tmp_path / ".mockup-validation" / "visual-evidence"
+    (evidence / "checkoutScreen.png").unlink()
+
+    issues = validate_visual_evidence(
+        evidence,
+        expected_tree_path=tmp_path / "expected-ui-tree.json",
+    )
+
+    assert "evidence.png.missing" in {issue["code"] for issue in issues}
+    assert "evidence.vision_input.missing" in {issue["code"] for issue in issues}
+
+
+def test_build_demo_visual_evidence_fails_when_packaged_png_is_corrupt(tmp_path: Path) -> None:
+    build_demo(tmp_path)
+    evidence = tmp_path / ".mockup-validation" / "visual-evidence"
+    (evidence / "checkoutScreen.png").write_bytes(b"corrupt-static-demo-fixture")
+
+    issues = validate_visual_evidence(
+        evidence,
+        expected_tree_path=tmp_path / "expected-ui-tree.json",
+    )
+
+    assert "evidence.png.sha_mismatch" in {issue["code"] for issue in issues}
+    assert "evidence.vision_input.sha_mismatch" in {issue["code"] for issue in issues}
+
+
 def test_build_demo_codegen_files_target_the_checkout_screen(tmp_path: Path) -> None:
     build_demo(tmp_path)
     assert "export function Checkout()" in (tmp_path / "Checkout.jsx").read_text(encoding="utf-8")
@@ -79,10 +158,10 @@ def test_build_demo_is_deterministic_modulo_output_directory(tmp_path: Path) -> 
     files_second = build_demo(second)
     assert set(files_first) == set(files_second)
     for relative in files_first:
-        text_first = Path(files_first[relative]).read_text(encoding="utf-8")
-        text_second = Path(files_second[relative]).read_text(encoding="utf-8")
-        normalized = text_second.replace(str(second), str(first))
-        assert normalized == text_first, relative
+        bytes_first = Path(files_first[relative]).read_bytes()
+        bytes_second = Path(files_second[relative]).read_bytes()
+        normalized = bytes_second.replace(str(second).encode(), str(first).encode())
+        assert normalized == bytes_first, relative
 
 
 def test_build_demo_reruns_into_same_directory_are_byte_identical(tmp_path: Path) -> None:

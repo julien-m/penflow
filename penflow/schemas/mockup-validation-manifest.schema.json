@@ -1,17 +1,86 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$comment": "LiveSpec traceability anchors: @spec(FR-001) — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#fr-001",
+  "$comment": "LiveSpec traceability anchors: @spec(FR-001) — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#fr-001; @spec(FR-009, FR-010) — .specs/features/067-wp2-9-run-pipeline/spec.md",
   "$id": "https://penflow.dev/schemas/mockup-validation-manifest.schema.json",
   "title": "Penflow Mockup Validation Manifest",
+  "$defs": {
+    "crop": {
+      "type": "object",
+      "required": ["x", "y", "width", "height", "source_width", "source_height"],
+      "additionalProperties": false,
+      "properties": {
+        "x": {"type": "integer", "minimum": 0},
+        "y": {"type": "integer", "minimum": 0},
+        "width": {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1},
+        "source_width": {"type": "integer", "minimum": 1},
+        "source_height": {"type": "integer", "minimum": 1}
+      }
+    }
+  },
   "type": "object",
-  "required": ["renderer", "sourceFile", "status", "validatedAt", "screens"],
+  "required": ["renderer", "sourceFile", "status", "validatedAt", "runId", "screens"],
   "additionalProperties": false,
+  "dependentRequired": {
+    "version": ["runId", "lineage"],
+    "lineage": ["runId", "version"]
+  },
   "properties": {
     "renderer": {"type": "string"},
     "sourceFile": {"type": "string"},
     "status": {"type": "string"},
     "validatedAt": {"type": "string"},
     "runId": {"type": "string", "minLength": 1},
+    "version": {"type": "integer", "const": 1},
+    "lineage": {
+      "type": "object",
+      "required": ["version", "sha256", "digests", "missing"],
+      "additionalProperties": false,
+      "properties": {
+        "version": {"type": "integer", "const": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "ui.pen",
+              "contract",
+              "expected",
+              "actual",
+              "theme",
+              "references",
+              "renderer",
+              "exportTimestamp"
+            ]
+          }
+        },
+        "digests": {
+          "type": "object",
+          "required": [
+            "ui.pen",
+            "contract",
+            "expected",
+            "actual",
+            "theme",
+            "references",
+            "renderer",
+            "exportTimestamp"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "ui.pen": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "contract": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "expected": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "actual": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "theme": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "references": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "renderer": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "exportTimestamp": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+          }
+        }
+      }
+    },
     "references_manifest": {"type": "string", "minLength": 1},
     "theme": {
       "type": "object",
@@ -26,12 +95,27 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["screen_id", "semantic_id", "pencil_node_id", "png", "sha256", "layout_checked", "screenshot_checked"],
+        "required": ["screen_id", "semantic_id", "pencil_node_id", "surface", "state", "regions", "png", "sha256", "layout_checked", "screenshot_checked"],
         "additionalProperties": false,
         "properties": {
           "screen_id": {"type": "string"},
           "semantic_id": {"type": "string"},
           "pencil_node_id": {"type": "string"},
+          "surface": {"type": "string", "minLength": 1},
+          "state": {"type": "string", "minLength": 1},
+          "regions": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["region_id", "crop"],
+              "additionalProperties": false,
+              "properties": {
+                "region_id": {"type": "string", "minLength": 1},
+                "crop": {"$ref": "#/$defs/crop"}
+              }
+            }
+          },
           "png": {"type": "string"},
           "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
           "layout_checked": {"type": "boolean"},

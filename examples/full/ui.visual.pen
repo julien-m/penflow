@@ -5,6 +5,7 @@
       "children": [
         {
           "content": "Order summary",
+          "context": "variant=heading",
           "fill": "#111827",
           "fontSize": 24,
           "fontWeight": "600",
@@ -16,6 +17,7 @@
         },
         {
           "content": "Selected payment method",
+          "context": "variant=body",
           "fill": "#374151",
           "fontSize": 16,
           "fontWeight": "400",
@@ -30,6 +32,7 @@
           "children": [
             {
               "content": "Pay now",
+              "context": "variant=label",
               "fill": "#FFFFFF",
               "fontSize": 16,
               "fontWeight": "600",

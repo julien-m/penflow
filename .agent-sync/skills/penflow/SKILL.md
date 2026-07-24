@@ -56,7 +56,7 @@ For the semantic-tree formation rules, **Read** [`../flow-ui-contract/references
 - **Read** [`README.md`](../../../README.md) for project-level command examples when a user asks for the full workflow.
 - **Read** [`../../../docs/theme-contract.md`](../../../docs/theme-contract.md) before generating `theme.css` for `draft-pen-from-tree`, `lint-tokens`, or Brander-style handoff. It defines accepted `--pf-*` aliases, extended status/panel/font tokens, dynamic `palette-*` slots, dynamic `radius-*` slots, and the strict report inputs.
 - Before any UI flow, Pencil draft, mockup, or visual validation work, **Read** [`../../../.conventions/index.md`](../../../.conventions/index.md) and load all matching design domains. UI work must use the convention-defined view/component patterns, not only theme colors.
-- After every Pencil editor/MCP mutation (`batch_design`, manual edit, or equivalent) and before any Penflow CLI command that reads the `.pen`, run `penflow pencil-sync <ui.pen> --expect-screens <N> --json` or add `--expect-min-nodes <N>`. If the editor shows more screens/nodes than disk inspection, report `BLOCKED`; do not work around stale disk state.
+- After every Pencil editor/MCP mutation (`batch_design`, manual edit, or equivalent), run `penflow pencil-sync <ui.pen> --expect-screens <N> --json` or add `--expect-min-nodes <N>`. This trigger always remains `persistence_status: UNVERIFIED` with `closes_persistence: false`; mtime, trigger text, and inspection counts never close persistence. The operator must preserve distinct pre/post snapshots, write the C46 observation, run `penflow verify-pencil-persistence ... --out persistence-receipt.json --json`, then run `penflow validate-report persistence-receipt.json --schema --json`; before any Penflow CLI command that reads the `.pen`, require receipt PASS, otherwise report `BLOCKED`.
 
 ## Pencil Context Grammar
 
@@ -117,7 +117,16 @@ penflow validate-code-ir code-ir.json --json
 
 Use `--group-by role+intent+variant+size-class` on dense screens: `check-consistency` skips anonymous containers with no stable intent, variant, or human name; height buckets keep 56px headers out of 820px panel groups; repeated divergences are aggregated. `--lenient` downgrades non-`fill`/`fontFamily` divergences to warnings in the report; `fill` and `fontFamily` stay errors.
 
-`penflow run --target <workspace> [--theme-css f] [--references dir] [--strict] --json` is the single DX wrapper for an already authored workspace. It runs the deterministic gates in order: `validate-flow-contract`, `export-semantic-tree`, `pencil-sync` when explicitly armed (`PENFLOW_RUN_PENCIL_SYNC=1`), `map-pencil-context --strict-anchors`, `validate-pen`, `export-expected`, `lint-tokens`, `check-consistency`, `audit-visual`, `detect-drift`, `validate-visual-evidence`, optional `reference-fidelity`, and `code-ir`. The output is one JSON summary `{gate: {status, report_path, exit}}` plus an aggregate exit code; individual gate reports remain in the workspace.
+`penflow run --target <workspace> [--theme-css f] [--references dir] [--strict] --json` is the single DX wrapper for an already authored workspace. It runs the deterministic gates in order: `validate-flow-contract`, `export-semantic-tree`, `pencil-sync` when explicitly armed (`PENFLOW_RUN_PENCIL_SYNC=1`), `map-pencil-context --strict-anchors`, `validate-pen`, `export-expected`, `lint-tokens`, `check-consistency`, `audit-visual`, `detect-drift`, `validate-visual-evidence`, optional `reference-fidelity`, `code-ir`, and `validate-actual-provenance`. The output is one JSON summary plus an aggregate exit code; the summary and every gate cite the same `runId`, identity `version`, current-run provenance, and SHA-256 lineage for `ui.pen`, contract, expected/actual trees, theme, references, renderer, and export timestamp. Missing required inputs, explicitly requested missing optional paths, source mutation, or citation/provenance divergence exit nonzero; unarmed absent theme/reference inputs receive deterministic `not-provided` receipts. Individual gate reports remain in the workspace.
+
+Use `penflow run --target <workspace> --references <workspace>/references --strict-closure
+--json` only as the explicit C47 final check. It is read-only over evidence and writes only
+`.penflow-run/strict-closure.json`. PASS requires the revalidatable C46 persistence receipt,
+fresh independent `runtime-capture` actual provenance with `sessionId`, a declared
+homologous references manifest, PASS-only structured blocking C45 visual/reference proof,
+and one identical run id. Missing, SKIP, warning-only, stale, replayed, mismatched,
+non-blocking, generic, duplicated, or tampered evidence exits 1 with structured issues.
+Omitting `--strict-closure` preserves the existing pipeline.
 
 APEX integration rule: `penflow run` is the unite naturelle qu'une tache APEX encapsule cote orchestrateur. Penflow ne cree jamais de goal runtime propre: le goal appartient au run parent. Any APEX invocation that wraps Penflow must use `-G/--no-goal` so goal ownership is not nested or duplicated.
 
@@ -139,6 +148,10 @@ penflow validate-reference-fidelity .mockup-validation/visual-evidence --referen
 ```
 
 Checks: `manifest.json` validates, every manifest screen PNG exists non-empty, `vision-report.json` (`kind: penflow-vision-report`) validates against the locked category enum (`visual_balance`, `rendering_artifacts`, `readability`, `perceived_hierarchy`, `imagery_quality` — deterministic categories like contrast/touch targets/overflow are rejected by schema), every screen answers all five categories, every expected-tree screen is covered (`evidence.screen.uncovered`), an optional `layout-snapshot.json` matches expected root bboxes within ±4px (`evidence.snapshot.bbox_mismatch`), and — when the expected tree has ≥ 2 screens — the report carries a `coherence` section (`evidence.coherence.missing`) whose `contact_sheet_png` exists non-empty (`evidence.contact_sheet.missing`/`.empty`) and whose criteria answer all four coherence categories (`cross_screen_rhythm`, `palette_coherence`, `typography_coherence`, `component_recognition` — `evidence.coherence.category_missing`; numeric cross-screen facts stay with `check-consistency`). All issues are errors; exit 0 is the only PASS. The vision report also validates standalone via `penflow validate-report vision-report.json --schema --json`.
+
+Feature 070/C45 makes every required criterion explicitly `blocking: true` and PASS-only. `manifest.json` and `vision-report.json` share one exact `runId`; each criterion carries structured `proof` for surface/screen/hierarchical region/state/assertion/measurement plus hashed actual/reference/contact-sheet artifacts and in-bounds crops. Warning/SKIP/non-pass status, narrative-only proof, run mismatch, invalid or stretched crops, expected/reference copied into actual, mismatched homology, or artifact reuse across non-homologous mappings blocks with exit 1.
+
+Feature 071/C46 separates the Pencil trigger from persistence proof. `pencil-sync` never closes the gate. An operator-layer `penflow-pencil-persistence-observation` binds the exact run, document, requested operation, trigger, and distinct pre/post snapshot digests; `penflow verify-pencil-persistence <observation> --document <ui.pen> --run-id <run> --operation <operation> --out <receipt> --json` independently re-reads all bytes and writes the structured receipt. Run `penflow validate-report <receipt> --schema --json` to reject stale/tampered receipt content. Only `status: PASS`, verifier `result: pass`, and `closes_persistence: true` close persistence; no-op, trigger-only, stale, replayed, tampered, missing, or mismatched evidence exits nonzero.
 
 When references exist, `manifest.json` declares `references_manifest` pointing to `references/references-manifest.json` (`[{screen_id, file, sha256, source}]`, files relative to `references/`). `vision-report.json` must include `reference_fidelity` for every referenced screen, with one side-by-side contact sheet and exactly `layout_match`, `palette_match`, `component_parity`, and `density_match`; every evidence sentence cites both reference and export files. Run `penflow validate-reference-fidelity .mockup-validation/visual-evidence --references references --json` after `validate-visual-evidence`; copied exports (`reference.evidence_is_reference_copy`) and deterministic-vs-LLM disagreement (`reference.llm_metric_disagreement`) block PASS.
 
@@ -179,6 +192,7 @@ Use after an external runtime adapter writes `actual-ui-tree.json`.
 
 ```bash
 penflow validate-actual actual-ui-tree.json --schema --json
+penflow validate-actual-provenance <workspace> --expected expected-ui-tree.json --surface web --json
 penflow compare-tree expected-ui-tree.json actual-ui-tree.json --out compare-report.json --json
 penflow review-report compare-report.json --out review-report.json --json
 penflow fix-report compare-report.json --out fix-report.json --json
@@ -186,6 +200,23 @@ penflow validate-report compare-report.json --schema --json
 ```
 
 If `validate-actual` fails, fix the external adapter output first. Penflow does not inspect the running app.
+
+### Actual Provenance (P0-2 / C2)
+
+The runtime adapter writes a sidecar `actual-ui-tree.provenance.json` receipt next to `actual-ui-tree.json`, describing what produced those exact bytes. Penflow never captures a runtime; it only validates this receipt from local files, and it is the last `penflow run` gate (`validate-actual-provenance`). Required fields (`kind: penflow-actual-provenance`, `version: 1`): `sourceKind` (`runtime-capture` = fresh capture/export, or `static-demo-fixture` = explicitly qualified frozen example data), `producer` (`{name, version?}`), `capturedAt` (ISO-8601 UTC), `target` (`{surface, screen_id?, device?}`), and `content` (`{path, sha256}` = SHA-256 of the actual-tree bytes); optional `sessionId`; `fixture.reason` required for and only for a `static-demo-fixture`.
+
+`penflow validate-actual-provenance <workspace|actual.json> [--expected f] [--surface s] [--max-age-seconds N] [--require-fresh] --json` fails closed with a structured reason for each way an actual can lie:
+- `provenance.receipt.missing` / `provenance.receipt.invalid` — absent, non-JSON, or incomplete receipt (missing producer, bad field, unknown source kind, unqualified fixture, or a fixture block on a capture).
+- `provenance.digest.mismatch` — receipt `content.sha256` does not match the actual-tree bytes.
+- `provenance.content.path_mismatch` — receipt `content.path` basename does not name the validated actual file (the field is traceability, never an ignored/decoy value).
+- `provenance.timestamp.stale` / `.future` / `.invalid` — a `runtime-capture` older than the freshness window, in the future, or unparseable (a qualified fixture is exempt — it declares itself frozen).
+- `provenance.source_kind.inadmissible` — `--require-fresh` rejects a fixture; only fresh runtime captures qualify.
+- `provenance.target.incompatible` — capture `surface` not among the contract surfaces (`--surface`).
+- `provenance.actual.derived_from_expected` — a `runtime-capture` whose root is byte-identical to the design-derived expected tree; independence requires measured runtime geometry. A qualified `static-demo-fixture` may reuse expected bytes but can never masquerade as fresh (`--require-fresh` rejects it).
+
+The `penflow run` gate — not only the standalone CLI — arms this freshness policy: it evaluates `capturedAt` against the current run's export boundary with a documented default window `RUN_ACTUAL_FRESHNESS_MAX_AGE_SECONDS = 86400` (24h), overridable via `penflow run --actual-max-age-seconds N`. A `runtime-capture` with an invalid, future, or beyond-window `capturedAt` fails the gate; a `static-demo-fixture` is exempt and that exemption is impossible to obtain with `sourceKind=runtime-capture`. If the internal run boundary cannot be parsed, the run fails explicitly instead of disabling freshness.
+
+Any explicit max-age value — `penflow run --actual-max-age-seconds`, `penflow validate-actual-provenance --max-age-seconds`, or the programmatic `run_pipeline`/`validate_actual_provenance` calls — must be finite and strictly positive: `nan`, `inf`, `-inf`, overflowing literals like `1e999`, `0`, and negatives are rejected fail-closed with a structured `ProvenanceError` and a non-zero exit **before** any report is written (report writers use `allow_nan=False`, so `NaN`/`Infinity` JSON is never emitted). `run` applies the 86400s default; the standalone command applies a max-age only when provided. `content.path` must be a relative name without `..` traversal (`provenance.content.path_invalid` for absolute or traversal); the `content.sha256` digest — not the path — is the authority over the actual-tree bytes.
 
 `compare-tree` also checks layout properties (feature 048): `layout`/`alignItems` exact-match (`node.visual.layout`, `node.visual.alignItems`), `gap`/`padding` within ±2px (`spacing_px`, override via `context.tolerance.spacing_px`; `node.visual.gap`, `node.visual.padding`). Padding `16` ≡ `[16, 16]` ≡ `[16, 16, 16, 16]`. Absent keys emit no issues.
 
@@ -218,12 +249,12 @@ penflow fix-report /tmp/compare.json --out /tmp/fix.json --json
 Use for a reproducible local fixture.
 
 ```bash
-penflow demo --out examples/full --json
-penflow validate-semantic-tree examples/full/semantic-ui-tree.json --json
-penflow validate-pen examples/full/ui.pen --json
-penflow validate-actual examples/full/actual-ui-tree.json --schema --json
-penflow compare-tree examples/full/expected-ui-tree.json examples/full/actual-ui-tree.json --out /tmp/penflow-compare.json --json
+fresh=$(mktemp -d)
+penflow demo --out "$fresh" --json
+penflow run --target "$fresh" --json
 ```
+
+The demo deterministically derives its actual tree from the generated expected tree and writes package-owned synthetic example data labeled `static-demo-fixture`. This immutable packet is not a fresh runtime, renderer, or model verdict. It never launches or copies from a browser, simulator, runtime adapter, test helper, or `examples/full`; removing `actual-ui-tree.json` or deleting/corrupting load-bearing visual evidence must make the next run fail closed.
 
 ## Review Mode
 

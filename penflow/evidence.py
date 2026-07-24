@@ -20,7 +20,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, TypeGuard
+from typing import Any, TypeGuard, cast
 
 from .reference_fidelity import reference_fidelity_evidence_issues
 from .schema_cache import validator_for
@@ -62,6 +62,227 @@ LAYOUT_SNAPSHOT_FILENAME = "layout-snapshot.json"
 
 _MANIFEST_SCHEMA = "mockup-validation-manifest.schema.json"
 _VISION_REPORT_SCHEMA = "vision-report.schema.json"
+
+RUN_IDENTITY_VERSION = 1
+LINEAGE_DIGEST_KEYS = (
+    "ui.pen",
+    "contract",
+    "expected",
+    "actual",
+    "theme",
+    "references",
+    "renderer",
+    "exportTimestamp",
+)
+OPTIONAL_LINEAGE_STATE = "not-provided"
+
+
+# @spec(FR-009)
+# @spec(FR-010)
+# @spec(FR-013)
+def build_run_identity(
+    *,
+    ui_pen: str | Path,
+    contract: str | Path,
+    expected: str | Path,
+    actual: str | Path,
+    theme: str | Path | None,
+    references: str | Path | None,
+    renderer: str | None,
+    export_timestamp: str | None,
+) -> dict[str, Any]:
+    """Build one deterministic versioned identity for a Penflow run.
+
+    Required file sources are hashed byte-for-byte. An absent required source
+    receives a source-specific absence digest and is listed in
+    ``lineage.missing``. Optional theme and reference inputs use a canonical
+    ``not-provided`` receipt when the corresponding gate is not armed; an
+    explicitly provided but unreadable path still fails closed. Renderer and
+    export time are canonical UTF-8 value receipts rather than filesystem
+    inputs.
+    """
+    required_file_sources: dict[str, str | Path] = {
+        "ui.pen": ui_pen,
+        "contract": contract,
+        "expected": expected,
+        "actual": actual,
+    }
+    missing: list[str] = []
+    digests: dict[str, str] = {}
+    for key, source in required_file_sources.items():
+        digest, present = _lineage_file_digest(key, source)
+        digests[key] = digest
+        if not present:
+            missing.append(key)
+    for key, optional_source in (("theme", theme), ("references", references)):
+        if optional_source is None:
+            digests[key] = _lineage_value_digest(key, OPTIONAL_LINEAGE_STATE)
+            continue
+        digest, present = _lineage_file_digest(key, optional_source)
+        digests[key] = digest
+        if not present:
+            missing.append(key)
+    for key, value in (
+        ("renderer", renderer),
+        ("exportTimestamp", export_timestamp),
+    ):
+        digests[key] = _lineage_value_digest(key, value)
+        if value is None:
+            missing.append(key)
+    lineage_payload = {
+        "version": RUN_IDENTITY_VERSION,
+        "digests": digests,
+        "missing": missing,
+    }
+    lineage_sha = _canonical_sha256(lineage_payload)
+    lineage = lineage_payload | {"sha256": lineage_sha}
+    return {
+        "runId": f"penflow-v{RUN_IDENTITY_VERSION}-{lineage_sha[:24]}",
+        "version": RUN_IDENTITY_VERSION,
+        "lineage": lineage,
+        "provenance": {
+            "renderer": renderer,
+            "exportTimestamp": export_timestamp,
+        },
+    }
+
+
+# @spec(FR-012)
+def validate_run_identity(
+    candidate: dict[str, Any] | None,
+    expected: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Return fail-closed issues when a run or gate identity diverges."""
+    if not isinstance(candidate, dict):
+        return [
+            _issue(
+                "evidence.lineage.missing",
+                "$",
+                "run identity must be an object",
+            )
+        ]
+
+    issues: list[dict[str, Any]] = []
+    for key in ("runId", "version"):
+        if candidate.get(key) != expected.get(key):
+            issues.append(
+                _issue(
+                    "evidence.lineage.identity_mismatch",
+                    f"$.{key}",
+                    f"{key} does not match the canonical run identity",
+                )
+            )
+
+    if candidate.get("provenance") != expected.get("provenance"):
+        issues.append(
+            _issue(
+                "evidence.lineage.provenance_mismatch",
+                "$.provenance",
+                "renderer or export timestamp does not match the current run provenance",
+            )
+        )
+
+    candidate_lineage = candidate.get("lineage")
+    expected_lineage = expected.get("lineage")
+    if not isinstance(candidate_lineage, dict) or not isinstance(expected_lineage, dict):
+        issues.append(
+            _issue(
+                "evidence.lineage.missing",
+                "$.lineage",
+                "lineage must be an object",
+            )
+        )
+        issues.sort(key=_issue_sort_key)
+        return issues
+
+    if candidate_lineage.get("version") != RUN_IDENTITY_VERSION:
+        issues.append(
+            _issue(
+                "evidence.lineage.version_mismatch",
+                "$.lineage.version",
+                f"lineage version must be {RUN_IDENTITY_VERSION}",
+            )
+        )
+
+    candidate_digests = candidate_lineage.get("digests")
+    expected_digests = expected_lineage.get("digests")
+    if not isinstance(candidate_digests, dict) or not isinstance(expected_digests, dict):
+        issues.append(
+            _issue(
+                "evidence.lineage.digests_missing",
+                "$.lineage.digests",
+                "lineage digests must be an object",
+            )
+        )
+    else:
+        for key in LINEAGE_DIGEST_KEYS:
+            if candidate_digests.get(key) != expected_digests.get(key):
+                issues.append(
+                    _issue(
+                        "evidence.lineage.digest_mismatch",
+                        f"$.lineage.digests.{key}",
+                        f"{key} digest does not match the canonical run lineage",
+                    )
+                )
+        unexpected = sorted(set(candidate_digests) - set(LINEAGE_DIGEST_KEYS))
+        for key in unexpected:
+            issues.append(
+                _issue(
+                    "evidence.lineage.digest_unexpected",
+                    f"$.lineage.digests.{key}",
+                    f"unexpected lineage digest: {key}",
+                )
+            )
+        candidate_payload = {
+            "version": candidate_lineage.get("version"),
+            "digests": candidate_digests,
+            "missing": candidate_lineage.get("missing"),
+        }
+        if candidate_lineage.get("sha256") != _canonical_sha256(candidate_payload):
+            issues.append(
+                _issue(
+                    "evidence.lineage.sha_mismatch",
+                    "$.lineage.sha256",
+                    "lineage sha256 does not match its canonical payload",
+                )
+            )
+    candidate_missing = candidate_lineage.get("missing")
+    expected_missing = expected_lineage.get("missing")
+    if candidate_missing != expected_missing:
+        issues.append(
+            _issue(
+                "evidence.lineage.missing_mismatch",
+                "$.lineage.missing",
+                "missing lineage sources do not match the canonical run lineage",
+            )
+        )
+    if isinstance(candidate_missing, list):
+        for key in candidate_missing:
+            issues.append(
+                _issue(
+                    "evidence.lineage.source_missing",
+                    f"$.lineage.digests.{key}",
+                    f"lineage source is missing: {key}",
+                )
+            )
+    else:
+        issues.append(
+            _issue(
+                "evidence.lineage.missing_invalid",
+                "$.lineage.missing",
+                "lineage missing must be an array",
+            )
+        )
+    if candidate_lineage.get("sha256") != expected_lineage.get("sha256"):
+        issues.append(
+            _issue(
+                "evidence.lineage.sha_mismatch",
+                "$.lineage.sha256",
+                "lineage sha256 does not match the canonical run lineage",
+            )
+        )
+    issues.sort(key=_issue_sort_key)
+    return issues
 
 
 def validate_visual_evidence(
@@ -112,6 +333,7 @@ def validate_visual_evidence(
     issues.extend(_png_issues(directory, manifest))
     issues.extend(_vision_receipt_issues(directory, vision_report))
     issues.extend(_vision_manifest_screen_issues(manifest, vision_report))
+    issues.extend(_structured_criteria_issues(manifest, vision_report))
     issues.extend(_theme_issues(manifest, theme_fingerprint))
     issues.extend(_category_issues(vision_report))
     issues.extend(_coherence_issues(directory, vision_report, expected_screens))
@@ -427,6 +649,372 @@ def _criterion_file_evidence_issues(vision_report: dict[str, Any]) -> list[dict[
     return issues
 
 
+def _structured_criteria_issues(
+    manifest: dict[str, Any] | None,
+    vision_report: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    """Require run-bound, blocking, homologous proof for every locked criterion."""
+    if manifest is None or vision_report is None:
+        return []
+    issues: list[dict[str, Any]] = []
+    manifest_run_id = manifest.get("runId")
+    report_run_id = vision_report.get("runId")
+    if manifest_run_id != report_run_id:
+        issues.append(
+            _issue(
+                "evidence.run_id.mismatch",
+                "$.runId",
+                "manifest.json and vision-report.json must identify the same exact run",
+            )
+        )
+    if manifest.get("status") != "PASS":
+        issues.append(
+            _issue(
+                "evidence.manifest.status_not_pass",
+                "$.status",
+                "manifest status must be PASS; warning and SKIP do not close required evidence",
+            )
+        )
+    if vision_report.get("status") != "PASS":
+        issues.append(
+            _issue(
+                "evidence.vision.status_not_pass",
+                "$.status",
+                "vision status must be PASS; warning and SKIP do not close required evidence",
+            )
+        )
+
+    inputs: dict[str, str] = {}
+    for item in vision_report.get("inputs", []):
+        if not isinstance(item, dict):
+            continue
+        file_value = item.get("file")
+        digest = item.get("sha256")
+        if isinstance(file_value, str) and isinstance(digest, str):
+            inputs[file_value] = digest
+    manifest_regions: dict[tuple[Any, Any, Any, Any], dict[str, Any]] = {}
+    for screen in manifest.get("screens", []):
+        if not isinstance(screen, dict):
+            continue
+        for region in screen.get("regions", []):
+            if not isinstance(region, dict):
+                continue
+            mapping = (
+                screen.get("surface"),
+                screen.get("screen_id"),
+                region.get("region_id"),
+                screen.get("state"),
+            )
+            manifest_regions[mapping] = {
+                "crop": region.get("crop"),
+                "file": screen.get("png"),
+                "sha256": screen.get("sha256"),
+            }
+
+    usages: dict[tuple[str, str], set[tuple[Any, Any, Any, Any]]] = {}
+    for index, screen in enumerate(vision_report.get("screens", [])):
+        if not isinstance(screen, dict):
+            continue
+        mapping = _proof_mapping(screen)
+        manifest_region = manifest_regions.get(mapping)
+        if manifest_region is None:
+            issues.append(
+                _issue(
+                    "evidence.mapping.region_mismatch",
+                    f"$.screens[{index}]",
+                    "vision surface/screen/region/state has no homologous manifest region",
+                )
+            )
+        _criterion_proof_issues(
+            screen.get("criteria"),
+            f"$.screens[{index}].criteria",
+            mapping=mapping,
+            run_id=report_run_id,
+            expected_roles={"actual"},
+            expected_files={"actual": screen.get("png")},
+            expected_crops={
+                "actual": manifest_region.get("crop") if isinstance(manifest_region, dict) else None
+            },
+            inputs=inputs,
+            usages=usages,
+            issues=issues,
+        )
+
+    coherence = vision_report.get("coherence")
+    if isinstance(coherence, dict):
+        _criterion_proof_issues(
+            coherence.get("criteria"),
+            "$.coherence.criteria",
+            mapping=_proof_mapping(coherence),
+            run_id=report_run_id,
+            expected_roles={"contact_sheet"},
+            expected_files={"contact_sheet": coherence.get("contact_sheet_png")},
+            expected_crops={},
+            inputs=inputs,
+            usages=usages,
+            issues=issues,
+        )
+
+    for index, entry in enumerate(vision_report.get("reference_fidelity", [])):
+        if not isinstance(entry, dict):
+            continue
+        reference_mapping = entry.get("mapping")
+        mapping_tuple = _proof_mapping(reference_mapping)
+        _criterion_proof_issues(
+            entry.get("criteria"),
+            f"$.reference_fidelity[{index}].criteria",
+            mapping=mapping_tuple,
+            run_id=report_run_id,
+            expected_roles={"actual", "reference", "contact_sheet"},
+            expected_files={
+                "actual": entry.get("export"),
+                "reference": entry.get("reference"),
+                "contact_sheet": entry.get("contact_sheet"),
+            },
+            expected_crops={
+                "actual": (
+                    reference_mapping.get("actual_crop")
+                    if isinstance(reference_mapping, dict)
+                    else None
+                ),
+                "reference": (
+                    reference_mapping.get("reference_crop")
+                    if isinstance(reference_mapping, dict)
+                    else None
+                ),
+            },
+            inputs=inputs,
+            usages=usages,
+            issues=issues,
+        )
+
+    for (role, digest), mappings in sorted(usages.items()):
+        if role in {"actual", "reference"} and len(mappings) > 1:
+            issues.append(
+                _issue(
+                    "evidence.artifact.reused_non_homologous",
+                    "$.screens",
+                    f"{role} artifact sha256 {digest} is reused across non-homologous mappings",
+                )
+            )
+    return issues
+
+
+def _criterion_proof_issues(
+    criteria: Any,
+    path: str,
+    *,
+    mapping: tuple[Any, Any, Any, Any],
+    run_id: Any,
+    expected_roles: set[str],
+    expected_files: dict[str, Any],
+    expected_crops: dict[str, Any],
+    inputs: dict[str, str],
+    usages: dict[tuple[str, str], set[tuple[Any, Any, Any, Any]]],
+    issues: list[dict[str, Any]],
+) -> None:
+    if not isinstance(criteria, list):
+        return
+    seen: set[str] = set()
+    for index, criterion in enumerate(criteria):
+        if not isinstance(criterion, dict):
+            continue
+        criterion_path = f"{path}[{index}]"
+        category = criterion.get("category")
+        if isinstance(category, str) and category in seen:
+            issues.append(
+                _issue(
+                    "evidence.criterion.duplicate",
+                    criterion_path,
+                    f"required criterion {category!r} must be recorded exactly once",
+                )
+            )
+        if isinstance(category, str):
+            seen.add(category)
+        if criterion.get("result") != "pass":
+            issues.append(
+                _issue(
+                    "evidence.criterion.not_pass",
+                    f"{criterion_path}.result",
+                    "required criterion must pass; fail and warning never close the gate",
+                )
+            )
+        if criterion.get("blocking") is not True:
+            issues.append(
+                _issue(
+                    "evidence.criterion.non_blocking",
+                    f"{criterion_path}.blocking",
+                    "required criterion must be blocking",
+                )
+            )
+        proof = criterion.get("proof")
+        if not isinstance(proof, dict):
+            issues.append(
+                _issue(
+                    "evidence.criterion.proof_missing",
+                    f"{criterion_path}.proof",
+                    "narrative evidence cannot replace structured proof",
+                )
+            )
+            continue
+        if _proof_mapping(proof) != mapping:
+            issues.append(
+                _issue(
+                    "evidence.proof.mapping_mismatch",
+                    f"{criterion_path}.proof",
+                    "proof surface/screen/region/state must match its enclosing mapping",
+                )
+            )
+        if proof.get("run_id") != run_id:
+            issues.append(
+                _issue(
+                    "evidence.proof.run_mismatch",
+                    f"{criterion_path}.proof.run_id",
+                    "proof must cite the exact vision-report runId",
+                )
+            )
+        region_id = proof.get("region_id")
+        if not isinstance(region_id, str) or not any(mark in region_id for mark in (".", ":", "/")):
+            issues.append(
+                _issue(
+                    "evidence.proof.generic_region",
+                    f"{criterion_path}.proof.region_id",
+                    "region_id must be a specific hierarchical anchor",
+                )
+            )
+        if proof.get("assertion") != category:
+            issues.append(
+                _issue(
+                    "evidence.proof.assertion_mismatch",
+                    f"{criterion_path}.proof.assertion",
+                    "proof assertion must match its locked criterion category",
+                )
+            )
+        measurement = proof.get("measurement")
+        if not isinstance(measurement, dict) or (
+            measurement.get("expected") != "pass"
+            or measurement.get("actual") != criterion.get("result")
+            or measurement.get("unit") != "result"
+        ):
+            issues.append(
+                _issue(
+                    "evidence.proof.measurement_mismatch",
+                    f"{criterion_path}.proof.measurement",
+                    "measurement must record expected=pass and the independently observed result",
+                )
+            )
+        artifacts = proof.get("artifacts")
+        if not isinstance(artifacts, list):
+            continue
+        by_role: dict[str, dict[str, Any]] = {}
+        for artifact in artifacts:
+            if not isinstance(artifact, dict):
+                continue
+            role = artifact.get("role")
+            if isinstance(role, str):
+                by_role[role] = artifact
+        if set(by_role) != expected_roles:
+            issues.append(
+                _issue(
+                    "evidence.proof.artifact_roles_invalid",
+                    f"{criterion_path}.proof.artifacts",
+                    f"proof artifact roles must be exactly {sorted(expected_roles)}",
+                )
+            )
+        for role, artifact in by_role.items():
+            file_value = artifact.get("file")
+            digest = artifact.get("sha256")
+            if file_value != expected_files.get(role):
+                issues.append(
+                    _issue(
+                        "evidence.proof.artifact_mismatch",
+                        f"{criterion_path}.proof.artifacts",
+                        f"{role} artifact does not match the enclosing evaluated file",
+                    )
+                )
+            if role != "reference" and (
+                not isinstance(file_value, str)
+                or not isinstance(digest, str)
+                or inputs.get(file_value) != digest
+            ):
+                issues.append(
+                    _issue(
+                        "evidence.proof.input_receipt_mismatch",
+                        f"{criterion_path}.proof.artifacts",
+                        f"{role} artifact must match an exact input receipt",
+                    )
+                )
+            if role in expected_crops and artifact.get("crop") != expected_crops[role]:
+                issues.append(
+                    _issue(
+                        "evidence.proof.crop_mismatch",
+                        f"{criterion_path}.proof.artifacts",
+                        f"{role} crop does not match the declared homologous region",
+                    )
+                )
+            crop = artifact.get("crop")
+            if isinstance(crop, dict) and not _crop_is_valid(crop):
+                issues.append(
+                    _issue(
+                        "evidence.proof.crop_invalid",
+                        f"{criterion_path}.proof.artifacts",
+                        f"{role} crop is outside its declared source dimensions",
+                    )
+                )
+            if isinstance(digest, str):
+                usages.setdefault((role, digest), set()).add(mapping)
+        actual = by_role.get("actual")
+        reference = by_role.get("reference")
+        if (
+            isinstance(actual, dict)
+            and isinstance(reference, dict)
+            and (
+                actual.get("file") == reference.get("file")
+                or actual.get("sha256") == reference.get("sha256")
+            )
+        ):
+            issues.append(
+                _issue(
+                    "evidence.reference.actual_not_independent",
+                    f"{criterion_path}.proof.artifacts",
+                    "actual evidence must not copy expected/reference path or bytes",
+                )
+            )
+
+
+def _proof_mapping(value: Any) -> tuple[Any, Any, Any, Any]:
+    if not isinstance(value, dict):
+        return (None, None, None, None)
+    return (
+        value.get("surface"),
+        value.get("screen_id"),
+        value.get("region_id"),
+        value.get("state"),
+    )
+
+
+def _crop_is_valid(crop: dict[str, Any]) -> bool:
+    values = [
+        crop.get("x"),
+        crop.get("y"),
+        crop.get("width"),
+        crop.get("height"),
+        crop.get("source_width"),
+        crop.get("source_height"),
+    ]
+    if not all(isinstance(value, int) and not isinstance(value, bool) for value in values):
+        return False
+    x, y, width, height, source_width, source_height = (cast(int, value) for value in values)
+    return bool(
+        x >= 0
+        and y >= 0
+        and width > 0
+        and height > 0
+        and x + width <= source_width
+        and y + height <= source_height
+    )
+
+
 def _theme_issues(
     manifest: dict[str, Any] | None, fingerprint: dict[str, str] | None
 ) -> list[dict[str, Any]]:
@@ -709,6 +1297,27 @@ def _evidence_file_path(directory: Path, file_value: str) -> Path | None:
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _lineage_file_digest(key: str, source: str | Path | None) -> tuple[str, bool]:
+    path = Path(source) if source is not None else None
+    if path is not None and path.is_file():
+        return _sha256(path), True
+    return _canonical_sha256({"source": key, "state": "absent"}), False
+
+
+def _lineage_value_digest(key: str, value: str | None) -> str:
+    return _canonical_sha256({"source": key, "value": value})
+
+
+def _canonical_sha256(value: dict[str, Any]) -> str:
+    encoded = json.dumps(
+        value,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _issue(code: str, path: str, message: str) -> dict[str, Any]:

@@ -56,6 +56,11 @@ REQUIRED_COMMANDS = (
     "demo --out examples/full",
 )
 
+PENFLOW_DEMO_COMMANDS = (
+    'demo --out "$fresh"',
+    'run --target "$fresh" --json',
+)
+
 
 def test_penflow_skill_documents_llm_workflow_modes() -> None:
     skill = PENFLOW_SKILL.read_text(encoding="utf-8")
@@ -73,7 +78,7 @@ def test_penflow_skill_documents_llm_workflow_modes() -> None:
     ):
         assert heading in skill
 
-    for command in REQUIRED_COMMANDS:
+    for command in (*REQUIRED_COMMANDS[:-1], *PENFLOW_DEMO_COMMANDS):
         assert command in skill
 
     assert "semantic-ui-tree.json" in skill
@@ -97,6 +102,47 @@ def test_pencil_sync_gate_is_documented_for_stale_editor_state() -> None:
         "before any Penflow CLI command that reads",
         "BLOCKED",
         "fewer screens",
+    ):
+        assert phrase in combined
+
+
+def test_pencil_persistence_receipt_is_documented_as_the_only_closing_gate() -> None:
+    penflow_skill = PENFLOW_SKILL.read_text(encoding="utf-8")
+    readme = README.read_text(encoding="utf-8")
+    combined = "\n".join([penflow_skill, readme])
+
+    for phrase in (
+        "verify-pencil-persistence",
+        "persistence_status: UNVERIFIED",
+        "closes_persistence: false",
+        "distinct pre/post",
+        "validate-report",
+        "Only",
+        "PASS",
+        "stale",
+        "replayed",
+        "tampered",
+    ):
+        assert phrase in combined
+
+
+def test_strict_closure_is_explicit_read_only_and_fail_closed() -> None:
+    combined = "\n".join(
+        [
+            PENFLOW_SKILL.read_text(encoding="utf-8"),
+            README.read_text(encoding="utf-8"),
+        ]
+    )
+
+    for phrase in (
+        "--strict-closure",
+        ".penflow-run/strict-closure.json",
+        "fresh independent `runtime-capture`",
+        "homologous",
+        "structured blocking",
+        "one identical run id",
+        "read-only",
+        "Omitting `--strict-closure`",
     ):
         assert phrase in combined
 
@@ -354,6 +400,22 @@ def test_vision_report_schema_categories_unchanged() -> None:
     assert "Design taste" in advisory_notes
 
 
+def test_c45_structured_blocking_visual_proof_is_documented() -> None:
+    schema = json.loads((ROOT / "penflow" / "schemas" / "vision-report.schema.json").read_text())
+    criterion = schema["properties"]["screens"]["items"]["properties"]["criteria"]["items"]
+    docs = PENFLOW_SKILL.read_text(encoding="utf-8") + "\n" + README.read_text(encoding="utf-8")
+
+    assert "runId" in schema["required"]
+    assert "proof" in criterion["required"]
+    for phrase in (
+        "blocking: true",
+        "hierarchical region",
+        "in-bounds crops",
+        "non-homologous mappings",
+    ):
+        assert phrase in docs
+
+
 def test_semantic_tree_reference_documents_formation_contract() -> None:
     reference = SEMANTIC_TREE_REFERENCE.read_text(encoding="utf-8")
 
@@ -576,7 +638,7 @@ def test_examples_full_visual_evidence_packet_is_real_and_anchored() -> None:
 
     assert manifest["renderer"] == "pencil-mcp"
     assert manifest["sourceFile"] == "examples/full/ui.pen"
-    assert manifest["status"] == "PASSED_WITH_WARNINGS"
+    assert manifest["status"] == "PASS"
     screen = manifest["screens"][0]
     assert screen["screen_id"] == "checkout"
     assert screen["semantic_id"] == "checkout"
@@ -852,6 +914,38 @@ def test_mockup_factory_docs_bind_evidence_to_run_and_theme() -> None:
         assert "--theme-css" in document
         assert "penflow theme-fingerprint" in document
         assert "runId" in document
+
+
+# @spec AC-012: actual provenance receipt is documented — .specs/features/067-wp2-9-run-pipeline/spec.md#ac-012
+def test_actual_provenance_receipt_is_documented() -> None:
+    penflow_skill = PENFLOW_SKILL.read_text(encoding="utf-8")
+    readme = README.read_text(encoding="utf-8")
+
+    for document in (penflow_skill, readme):
+        for phrase in (
+            "validate-actual-provenance",
+            "actual-ui-tree.provenance.json",
+            "penflow-actual-provenance",
+            "sourceKind",
+            "runtime-capture",
+            "static-demo-fixture",
+            "provenance.digest.mismatch",
+            "provenance.actual.derived_from_expected",
+            "provenance.source_kind.inadmissible",
+            "provenance.content.path_mismatch",
+            "provenance.content.path_invalid",
+            "--require-fresh",
+            "--actual-max-age-seconds",
+            "86400",
+            "finite and strictly positive",
+            "1e999",
+            "allow_nan=False",
+            "SHA-256 of the actual-tree bytes",
+        ):
+            assert phrase in document
+
+    # The run gate list includes the provenance gate as the final step.
+    assert "and `validate-actual-provenance`" in penflow_skill
 
 
 def test_readme_documents_theme_fingerprint_and_armed_gate() -> None:

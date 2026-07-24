@@ -3,14 +3,23 @@
 # @spec(FR-003)
 # @spec(FR-004)
 # @spec(FR-011)
+# @spec(FR-013)
 """End-to-end flow UI contract demo generation."""
 
 from __future__ import annotations
 
+import hashlib
 import json
+from importlib import resources
 from pathlib import Path
 from typing import Any
 
+from .actual_provenance import (
+    RECEIPT_KIND,
+    RECEIPT_VERSION,
+    STATIC_DEMO_FIXTURE,
+    actual_provenance_path,
+)
 from .codegen import react, rust_dioxus, swiftui
 from .compare import STRICT_THRESHOLD, compare_tree_files
 from .contracts import code_ir_from_pen, validate_code_ir
@@ -57,7 +66,10 @@ def build_demo(out_dir: str | Path) -> dict[str, str]:
     _write_json(expected_path, expected)
 
     actual = _actual_tree_from_expected(expected)
-    _write_json(out / "actual-ui-tree.json", actual)
+    actual_path = out / "actual-ui-tree.json"
+    _write_json(actual_path, actual)
+    _write_actual_provenance_fixture(actual_path, expected)
+    _write_visual_evidence_fixture(out, expected)
 
     ir = code_ir_from_pen(
         enriched_pen_path,
@@ -92,6 +104,217 @@ def build_demo(out_dir: str | Path) -> dict[str, str]:
 
 def _write_json(path: Path, data: dict[str, Any]) -> None:
     path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _write_actual_provenance_fixture(actual_path: Path, expected: dict[str, Any]) -> None:
+    """Write the content-bound provenance receipt for the demo actual tree.
+
+    The demo actual tree is derived from the expected tree, so its receipt is an
+    explicitly qualified ``static-demo-fixture``: it declares a frozen capture
+    time and a fixture reason, binds to the written actual bytes by SHA-256, and
+    can never masquerade as a fresh runtime capture. ``content.path`` stays
+    relative so reruns into any directory are byte-identical.
+    """
+    screen = expected["screens"][0]
+    digest = hashlib.sha256(actual_path.read_bytes()).hexdigest()
+    _write_json(
+        actual_provenance_path(actual_path),
+        {
+            "kind": RECEIPT_KIND,
+            "version": RECEIPT_VERSION,
+            "sourceKind": STATIC_DEMO_FIXTURE,
+            "producer": {"name": "penflow.demo", "version": "static-demo-fixture"},
+            "capturedAt": "2026-07-24T00:00:00Z",
+            "target": {"surface": "web", "screen_id": screen["screen_id"]},
+            "content": {"path": actual_path.name, "sha256": digest},
+            "fixture": {
+                "reason": (
+                    "Synthetic example data packaged with Penflow as an immutable "
+                    "static-demo-fixture; not fresh runtime evidence."
+                )
+            },
+        },
+    )
+
+
+def _write_visual_evidence_fixture(out: Path, expected: dict[str, Any]) -> None:
+    """Write the static synthetic visual packet for the canonical demo.
+
+    The PNG is immutable package data captured once from the canonical Pencil
+    demo. Fresh demo generation copies those synthetic example bytes, then
+    derives every receipt from the copied bytes. The packet is explicitly a
+    ``static-demo-fixture``, not a fresh renderer, runtime, or model verdict.
+    No browser, simulator, vision model, or existing ``examples/full``
+    workspace is invoked at runtime.
+
+    Args:
+        out: Destination directory for the generated demo.
+        expected: Expected tree generated in the same demo run.
+    """
+    evidence_dir = out / ".mockup-validation" / "visual-evidence"
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    image_bytes = (
+        resources.files("penflow").joinpath("demo-assets", "checkout-screen.png").read_bytes()
+    )
+    image_path = evidence_dir / "checkoutScreen.png"
+    image_path.write_bytes(image_bytes)
+    image_digest = hashlib.sha256(image_bytes).hexdigest()
+
+    screen = expected["screens"][0]
+    root = screen["root"]
+    root_bbox = root["bbox"]
+    screen_id = screen["screen_id"]
+    pencil_node_id = screen["pencil_id"]
+    semantic_id = root["semantic_id"]
+    run_id = f"static-demo-{image_digest[:24]}"
+    region_id = f"{screen_id}.main"
+    crop = {
+        "x": 0,
+        "y": 0,
+        "width": int(root_bbox["width"]),
+        "height": int(root_bbox["height"]),
+        "source_width": int(root_bbox["width"]),
+        "source_height": int(root_bbox["height"]),
+    }
+
+    def proof(category: str) -> dict[str, Any]:
+        return {
+            "run_id": run_id,
+            "surface": "web",
+            "screen_id": screen_id,
+            "region_id": region_id,
+            "state": "default",
+            "assertion": category,
+            "measurement": {"expected": "pass", "actual": "pass", "unit": "result"},
+            "artifacts": [
+                {
+                    "role": "actual",
+                    "file": image_path.name,
+                    "sha256": image_digest,
+                    "crop": crop,
+                }
+            ],
+        }
+
+    _write_json(
+        evidence_dir / "manifest.json",
+        {
+            "renderer": "static-demo-fixture",
+            "sourceFile": "ui.pen",
+            "status": "PASS",
+            "validatedAt": "2026-07-24",
+            "runId": run_id,
+            "screens": [
+                {
+                    "screen_id": screen_id,
+                    "semantic_id": semantic_id,
+                    "pencil_node_id": pencil_node_id,
+                    "surface": "web",
+                    "state": "default",
+                    "regions": [{"region_id": region_id, "crop": crop}],
+                    "png": image_path.name,
+                    "sha256": image_digest,
+                    "layout_checked": True,
+                    "screenshot_checked": True,
+                    "notes": (
+                        "Synthetic example data packaged with Penflow as an "
+                        "immutable static-demo-fixture; not fresh runtime evidence."
+                    ),
+                }
+            ],
+        },
+    )
+    _write_json(
+        evidence_dir / "layout-snapshot.json",
+        {
+            "screens": [
+                {
+                    "screen_id": screen_id,
+                    "pencil_node_id": pencil_node_id,
+                    "width": root_bbox["width"],
+                    "height": root_bbox["height"],
+                }
+            ]
+        },
+    )
+    _write_json(
+        evidence_dir / "vision-report.json",
+        {
+            "version": 1,
+            "kind": "penflow-vision-report",
+            "status": "PASS",
+            "runId": run_id,
+            "renderer": "static-demo-fixture",
+            "sourceFile": "ui.pen",
+            "model": "static-demo-fixture",
+            "generated_by": "penflow.demo.static-demo-fixture",
+            "inputs": [{"file": image_path.name, "sha256": image_digest}],
+            "validatedAt": "2026-07-24",
+            "screens": [
+                {
+                    "screen_id": screen_id,
+                    "semantic_id": semantic_id,
+                    "pencil_node_id": pencil_node_id,
+                    "surface": "web",
+                    "region_id": region_id,
+                    "state": "default",
+                    "png": image_path.name,
+                    "criteria": [
+                        {
+                            "category": "visual_balance",
+                            "result": "pass",
+                            "evidence": (
+                                "checkoutScreen.png uses one left-aligned content "
+                                "column with consistent margins and whitespace."
+                            ),
+                            "blocking": True,
+                            "proof": proof("visual_balance"),
+                        },
+                        {
+                            "category": "rendering_artifacts",
+                            "result": "pass",
+                            "evidence": (
+                                "checkoutScreen.png has no clipping, missing glyphs, "
+                                "broken images, or stray frame borders."
+                            ),
+                            "blocking": True,
+                            "proof": proof("rendering_artifacts"),
+                        },
+                        {
+                            "category": "readability",
+                            "result": "pass",
+                            "evidence": (
+                                "All three visible labels in checkoutScreen.png are "
+                                "legible at one-to-one display scale."
+                            ),
+                            "blocking": True,
+                            "proof": proof("readability"),
+                        },
+                        {
+                            "category": "perceived_hierarchy",
+                            "result": "pass",
+                            "evidence": (
+                                "checkoutScreen.png presents the title, supporting "
+                                "payment text, then the bright primary action."
+                            ),
+                            "blocking": True,
+                            "proof": proof("perceived_hierarchy"),
+                        },
+                        {
+                            "category": "imagery_quality",
+                            "result": "pass",
+                            "evidence": (
+                                "checkoutScreen.png contains crisp text and vector-style "
+                                "shapes with no low-quality photographic imagery."
+                            ),
+                            "blocking": True,
+                            "proof": proof("imagery_quality"),
+                        },
+                    ],
+                }
+            ],
+        },
+    )
 
 
 def _flow_contract() -> dict[str, Any]:
@@ -389,6 +612,7 @@ def _visual_pen() -> dict[str, Any]:
                         "fontSize": 24,
                         "fontWeight": "600",
                         "fill": "#111827",
+                        "context": "variant=heading",
                     },
                     {
                         "id": "selectedPaymentMethod",
@@ -400,6 +624,7 @@ def _visual_pen() -> dict[str, Any]:
                         "fontSize": 16,
                         "fontWeight": "400",
                         "fill": "#374151",
+                        "context": "variant=body",
                     },
                     {
                         "id": "payNowButton",
@@ -422,6 +647,7 @@ def _visual_pen() -> dict[str, Any]:
                                 "fontSize": 16,
                                 "fontWeight": "600",
                                 "fill": "#FFFFFF",
+                                "context": "variant=label",
                             }
                         ],
                     },

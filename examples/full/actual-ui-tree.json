@@ -1,0 +1,147 @@
+{
+  "root": {
+    "bbox": {
+      "height": 844.0,
+      "width": 390.0,
+      "x": 0.0,
+      "y": 0.0
+    },
+    "children": [
+      {
+        "bbox": {
+          "height": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "children": [],
+        "context": {
+          "binding": "checkout.order_summary",
+          "entity": "checkout",
+          "role": "text",
+          "semantic_id": "checkout.order-summary",
+          "variant": "heading"
+        },
+        "id": "checkout.order-summary",
+        "name": "Order summary",
+        "pencil_id": "orderSummary",
+        "role": "text",
+        "semantic_id": "checkout.order-summary",
+        "text": "Order summary",
+        "visual": {
+          "fill": "#111827",
+          "fontSize": 24,
+          "fontWeight": "600"
+        }
+      },
+      {
+        "bbox": {
+          "height": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "children": [],
+        "context": {
+          "binding": "checkout.selected_payment_method",
+          "entity": "checkout",
+          "role": "text",
+          "semantic_id": "checkout.selected-payment-method",
+          "variant": "body"
+        },
+        "id": "checkout.selected-payment-method",
+        "name": "Selected payment method",
+        "pencil_id": "selectedPaymentMethod",
+        "role": "text",
+        "semantic_id": "checkout.selected-payment-method",
+        "text": "Selected payment method",
+        "visual": {
+          "fill": "#374151",
+          "fontSize": 16,
+          "fontWeight": "400"
+        }
+      },
+      {
+        "bbox": {
+          "height": 0,
+          "width": 0,
+          "x": 0,
+          "y": 0
+        },
+        "children": [
+          {
+            "bbox": {
+              "height": 0,
+              "width": 0,
+              "x": 0,
+              "y": 0
+            },
+            "children": [],
+            "context": {
+              "variant": "label"
+            },
+            "id": "payNowLabel",
+            "name": null,
+            "pencil_id": "payNowLabel",
+            "role": "text",
+            "semantic_id": null,
+            "text": "Pay now",
+            "visual": {
+              "fill": "#FFFFFF",
+              "fontSize": 16,
+              "fontWeight": "600"
+            }
+          }
+        ],
+        "context": {
+          "binding": "checkout.selected_payment_method",
+          "entity": "checkout",
+          "intent": "submit_payment",
+          "role": "button",
+          "semantic_id": "checkout.pay-now",
+          "test_id": "checkout-pay-now"
+        },
+        "id": "checkout.pay-now",
+        "name": "Pay now",
+        "pencil_id": "payNowButton",
+        "role": "button",
+        "semantic_id": "checkout.pay-now",
+        "text": null,
+        "visual": {
+          "alignItems": "center",
+          "cornerRadius": 8,
+          "fill": "#0057FF",
+          "gap": 8,
+          "layout": "horizontal",
+          "padding": [
+            12,
+            16
+          ]
+        }
+      }
+    ],
+    "context": {
+      "role": "screen",
+      "semantic_id": "checkout"
+    },
+    "id": "checkout",
+    "name": "checkout",
+    "pencil_id": "checkoutScreen",
+    "role": "screen",
+    "semantic_id": "checkout",
+    "text": null,
+    "visual": {
+      "alignItems": "stretch",
+      "fill": "#FFFFFF",
+      "gap": 16,
+      "layout": "vertical",
+      "padding": 24
+    }
+  },
+  "screen_id": "checkout",
+  "version": 1,
+  "viewport": {
+    "height": 844.0,
+    "width": 390.0
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.local/schemas/strict-closure-report.schema.json",
+  "title": "Penflow Strict Closure Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "version",
+    "strict_closure",
+    "status",
+    "exit",
+    "run_id",
+    "target",
+    "gates",
+    "inputs",
+    "filesystem",
+    "issues",
+    "integrity"
+  ],
+  "properties": {
+    "kind": {"const": "penflow-strict-closure-report"},
+    "version": {"const": 1},
+    "strict_closure": {"const": true},
+    "status": {"enum": ["PASS", "FAIL"]},
+    "exit": {"enum": [0, 1]},
+    "run_id": {"type": "string", "minLength": 1},
+    "target": {"type": "string", "minLength": 1},
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "persistence",
+        "actual_provenance",
+        "visual_evidence",
+        "reference_fidelity",
+        "same_run"
+      ],
+      "properties": {
+        "persistence": {"$ref": "#/$defs/gate"},
+        "actual_provenance": {"$ref": "#/$defs/gate"},
+        "visual_evidence": {"$ref": "#/$defs/gate"},
+        "reference_fidelity": {"$ref": "#/$defs/gate"},
+        "same_run": {"$ref": "#/$defs/gate"}
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "filesystem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["report_path", "outside_run_dir_unchanged"],
+      "properties": {
+        "report_path": {"type": "string", "minLength": 1},
+        "outside_run_dir_unchanged": {"type": "boolean"}
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/issue"}
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sha256"],
+      "properties": {
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  },
+  "$defs": {
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "issues"],
+      "properties": {
+        "status": {"enum": ["PASS", "FAIL"]},
+        "issues": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/issue"}
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["severity", "code", "path", "message"],
+      "properties": {
+        "severity": {"const": "error"},
+        "code": {"type": "string", "minLength": 1},
+        "path": {"type": "string", "minLength": 1},
+        "message": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

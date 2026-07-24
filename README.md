@@ -13,7 +13,7 @@ Penflow is a deterministic Python CLI for Pencil `.pen` design contracts. It par
 
 ## JSON-Only Contract v2
 
-`flow-ui-contract/contract.json` is the canonical strict v2 business contract. Markdown/YAML flow files are documentation or explicit migration input only; strict validation, semantic export, `.pen` contract checks, code IR, and report handoff use JSON artifacts.
+`flow-ui-contract/contract.json` is the canonical strict v2 business contract. Markdown/YAML flow files are documentation or explicit migration input only; strict validation, semantic export, `.pen` contract checks, code IR, and report handoff use JSON artifacts. Causal transitions bind a visible action to complete structured guards, an actual destination/state change, an outcome, and an exclusive or governed fan-out policy; runtime observations live in a separate run-bound evidence artifact whose receipts are closed identity-bound JSON payloads. Incompatible outcomes cannot reuse receipt bytes or SHA-256.
 
 ## Strict by Default (Breaking Change, Feature 049 / C24)
 
@@ -40,6 +40,7 @@ python3 -m pip install -e ".[dev]"
 penflow run --target <workspace> --theme-css <workspace>/theme.css --references <workspace>/references --strict --json
 penflow inspect examples/demo/ui.pen
 penflow pencil-sync ui.pen --expect-screens 8 --json
+penflow verify-pencil-persistence observation.json --document ui.pen --run-id run-001 --operation save-current-pencil-document --out persistence-receipt.json --json
 penflow validate-pen examples/demo/ui.pen
 penflow export-expected examples/demo/ui.pen -o expected-ui-tree.json
 penflow check-consistency expected-ui-tree.json --out consistency-report.json [--group-by role|role+intent|role+intent+variant|role+intent+variant+size-class]
@@ -49,6 +50,7 @@ penflow validate-visual-evidence .mockup-validation/visual-evidence --expected e
 penflow validate-reference-fidelity .mockup-validation/visual-evidence --references references --json
 penflow validate-actual examples/demo/actual-ui-tree.json [--schema]
 penflow validate-flow-contract examples/full/flow-ui-contract/contract.json --json
+penflow validate-causal-evidence flow-ui-contract/contract.json evidence/causal-evidence.json --json
 penflow export-semantic-tree path/to/flow-ui-contract/contract.json --out semantic-ui-tree.json
 penflow validate-semantic-tree semantic-ui-tree.json --json
 penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --theme-css theme.css --json
@@ -68,7 +70,18 @@ penflow validate-report review-report.json --schema --json
 penflow demo --out examples/full
 ```
 
-`penflow run --target <workspace> [--theme-css f] [--references dir] [--strict] --json` is the single-command CI/operator wrapper for an existing Penflow workspace. It preserves Penflow's runtime-agnostic boundary: no browser, simulator, Playwright, or Pencil MCP control is added to core; the optional `pencil-sync` gate only runs when explicitly armed with `PENFLOW_RUN_PENCIL_SYNC=1`, otherwise it is reported as `SKIP` in the aggregate JSON.
+`penflow run --target <workspace> [--theme-css f] [--references dir] [--strict] --json` is the single-command CI/operator wrapper for an existing Penflow workspace. Its summary and every gate carry the same `runId`, identity `version`, current-run provenance, and SHA-256 lineage for `ui.pen`, contract, expected/actual trees, theme, references, renderer, and export timestamp. Missing required inputs, explicitly requested missing optional paths, source mutation, or citation/provenance divergence make the run nonzero; unarmed absent theme/reference inputs receive deterministic `not-provided` receipts. The command preserves Penflow's runtime-agnostic boundary: no browser, simulator, Playwright, or Pencil MCP control is added to core; the optional `pencil-sync` trigger only runs when explicitly armed with `PENFLOW_RUN_PENCIL_SYNC=1`, otherwise it is reported as `SKIP`. That trigger never substitutes for the separate C46 persistence receipt.
+
+`penflow run --target <workspace> --references <workspace>/references --strict-closure --json`
+is the explicit C47 closure check. It does not run the mutating pipeline: it revalidates the
+existing `.penflow-run/pencil-persistence-receipt.json`, requires a fresh
+`runtime-capture` actual receipt with `sessionId`, validates the declared homologous
+references and PASS-only structured blocking visual proof, and requires every artifact to
+share one run id. It writes only `.penflow-run/strict-closure.json`, whose schema and
+integrity bind all workspace input bytes. Missing, `BLOCKED_VISUAL_NOT_RUN`,
+`PASSED_WITH_WARNINGS`, stale, replayed, mismatched, non-blocking, generic, duplicated, or
+tampered evidence exits 1 with structured issues. Without `--strict-closure`, existing
+`penflow run` behavior is unchanged.
 
 For dense multi-screen mockups, prefer `penflow check-consistency expected-ui-tree.json --group-by role+intent+variant+size-class --out consistency-report.json --json`. The size class buckets node height so compact headers are not compared with full-height panels; anonymous containers without stable intent, variant, or human name are skipped, and repeated divergences are aggregated per group.
 
@@ -78,7 +91,9 @@ For dense multi-screen mockups, prefer `penflow check-consistency expected-ui-tr
 
 ### Pencil Editor Sync
 
-Run `penflow pencil-sync <ui.pen> [--expect-min-nodes N] [--expect-screens N] --json` after any Pencil editor or MCP mutation and before any Penflow command that reads that `.pen`. The command triggers Pencil **File > Save**, then re-inspects the disk file; it exits 0 only when the file mtime advances and the disk inspection meets the expected node/screen counts. If the editor shows more screens than disk inspection, stop as `BLOCKED` instead of running downstream CLI commands on stale mockup data.
+Run `penflow pencil-sync <ui.pen> [--expect-min-nodes N] [--expect-screens N] --json` after any Pencil editor or MCP mutation. It is only an operator trigger: it reports pre/post SHA-256 plus inspection, always declares `persistence_status: UNVERIFIED` and `closes_persistence: false`, and never uses mtime, pane text, or trigger success to close persistence.
+
+The operator must preserve distinct pre/post snapshot files and write a `penflow-pencil-persistence-observation` containing the exact `run_id`, document path, requested `operation`, trigger provider/status, snapshot paths, and claimed SHA-256 values. Then run `penflow verify-pencil-persistence observation.json --document ui.pen --run-id <exact-run> --operation <exact-operation> --out persistence-receipt.json --json` followed by `penflow validate-report persistence-receipt.json --schema --json`. The verifier independently re-reads observation, pre/post/current bytes; only a PASS receipt with `closes_persistence: true` closes the gate. No-op/same-digest, trigger-only, stale, replayed, tampered, missing, or mismatched evidence exits nonzero.
 
 ### Three Trees
 
@@ -98,11 +113,21 @@ Agents normally should not hand-write `semantic-ui-tree.json`; they should autho
 
 ### Runtime Adapter Guides
 
-Adapter conformance docs (**contract C13**, feature 038) live under [`docs/adapters/`](docs/adapters/) and tell external producers in three target stacks — [Web DOM](docs/adapters/web-dom.md), [SwiftUI + XCTest](docs/adapters/swiftui-xctest.md), and [React Native](docs/adapters/react-native.md) — how to emit an `actual-ui-tree.json` (contract C12) that `penflow validate-actual --schema` accepts on the first try. Each guide ships a deterministic example fixture under [`examples/adapters/<stack>/actual-ui-tree.json`](examples/adapters/). Penflow ships **zero runtime code** for these stacks — it never launches a browser, a simulator, or the Metro bundler.
+Adapter conformance docs live under [`docs/adapters/`](docs/adapters/). The C13 guides tell external producers in three target stacks — [Web DOM](docs/adapters/web-dom.md), [SwiftUI + XCTest](docs/adapters/swiftui-xctest.md), and [React Native](docs/adapters/react-native.md) — how to emit an `actual-ui-tree.json` (contract C12) that `penflow validate-actual --schema` accepts on the first try. [Causal transition evidence](docs/adapters/causal-transition-evidence.md) defines the C44 pre/action/post, identity, receipt, and independent-outcome packet accepted by `validate-causal-evidence`. Penflow ships **zero runtime code** for these stacks — it never launches a browser, simulator, or application runtime.
 
 ### Full Demo
 
 Run `penflow demo --out examples/full` to regenerate the contract **C14/C20** fixture. Use [`examples/full/`](examples/full/) to inspect the complete chain: `contract.json`, documentation flow specs, semantic tree, enriched Pencil file, expected tree, code IR, actual-tree fixture, compare report, review report, and fix report.
+
+To prove the default Stage C1 bootstrap from an empty directory:
+
+```bash
+fresh=$(mktemp -d)
+penflow demo --out "$fresh" --json
+penflow run --target "$fresh" --json
+```
+
+`penflow demo` derives `actual-ui-tree.json` deterministically from its generated expected tree and installs package-owned synthetic example data labeled `static-demo-fixture`. This immutable packet is not a fresh runtime, renderer, or model verdict. The command does not launch or copy from a browser, simulator, runtime adapter, test helper, or `examples/full`; `penflow run` fails closed if the generated actual tree or load-bearing visual evidence is removed or corrupted.
 
 ### Existing Project Integration
 
@@ -118,7 +143,9 @@ Since feature 055 the contract-gate checklist is machine-seeded: `penflow checkl
 
 Before final PASS, Mockup Factory also runs the Visual Evidence Gate. **Read** [`.agent-sync/skills/mockup-factory/references/visual-validation.md`](.agent-sync/skills/mockup-factory/references/visual-validation.md) before applying it. When Pencil rendering is available, the gate must export PNGs, show every exported screen as a Markdown image with its absolute path, run `visual-preview url <absolute-path>` when available for browser annotation, dump a layout snapshot to `layout-snapshot.json`, run `audit-visual` with `--layout-snapshot` so overlap/overflow uses real Pencil bboxes, run a vision pass answering ONLY the five locked categories (`visual_balance`, `rendering_artifacts`, `readability`, `perceived_hierarchy`, `imagery_quality`), and write `.mockup-validation/visual-evidence/manifest.json` plus `vision-report.json` (`kind: penflow-vision-report`; legacy `visual-report.json` is deprecated). The verdict is `penflow validate-visual-evidence <dir> --expected expected-ui-tree.json` exiting 0 — the gate is the exit code, not prose; preview URLs are annotation-only and not canonical proof. The schema rejects deterministic categories (contrast, touch targets, overflow belong to `audit-visual`), so vision cannot hand-wave computable facts. Since feature 053, multi-screen sets also require a cross-mockup coherence pass: export all audited screens at a uniform scale, capture one `contact-sheet.png`, expose it through the same Markdown image + `visual-preview url` channels, and answer ONLY the four coherence categories (`cross_screen_rhythm`, `palette_coherence`, `typography_coherence`, `component_recognition`) in the vision report's `coherence` section — required when the expected tree has ≥ 2 screens (`evidence.coherence.missing`), with a non-empty contact-sheet PNG on disk; the numeric cross-screen anchor stays the feature 047 `check-consistency` report. If `visual-preview` is unavailable, operators keep the Markdown image and record browser preview unavailable without changing the deterministic evidence packet by itself. Without a renderer the status is `BLOCKED_VISUAL_NOT_RUN` or escalated rather than silently passing structural-only validation.
 
-When a workspace has `references/references-manifest.json`, each reference entry is `{screen_id, file, sha256, source}` and files resolve relative to `references/`. The evidence manifest declares that file via `references_manifest`; `vision-report.json` must add `reference_fidelity` entries for every referenced screen with the locked categories `layout_match`, `palette_match`, `component_parity`, and `density_match`, citing both reference and export files. The additional gate is `penflow validate-reference-fidelity .mockup-validation/visual-evidence --references references --json`: copied exports fail as `reference.evidence_is_reference_copy`, and strong deterministic-vs-LLM disagreement fails as `reference.llm_metric_disagreement`.
+When a workspace has `references/references-manifest.json`, each reference entry is `{screen_id, file, sha256, source, mapping: {surface, screen_id, region_id, state, crop}}` and files resolve relative to `references/`. The evidence manifest declares that file via `references_manifest`; `vision-report.json` must add `reference_fidelity` entries for every referenced screen with the locked categories `layout_match`, `palette_match`, `component_parity`, and `density_match`, citing both reference and export files. The additional gate is `penflow validate-reference-fidelity .mockup-validation/visual-evidence --references references --json`: copied exports fail as `reference.evidence_is_reference_copy`, and strong deterministic-vs-LLM disagreement fails as `reference.llm_metric_disagreement`.
+
+Since feature 070 (contract C45), `manifest.json` and `vision-report.json` must share one exact `runId`; every required screen, coherence, and reference criterion is `blocking: true`, has `result: pass`, and carries structured `proof` for surface, screen, hierarchical region, state, assertion, measurement, and hashed artifacts with in-bounds crops. Reference entries add an explicit homologous mapping. Narrative-only evidence, warning/SKIP status, invalid or stretched crops, reference bytes copied as actual, region drift, and one actual/reference SHA reused across non-homologous mappings all exit nonzero.
 
 Since feature 056 (contract C31), evidence packets are bindable to the exact theme bytes they were rendered against. `penflow theme-fingerprint theme.css --json` emits `{path, sha256}` — the SHA-256 of the file's raw bytes (no normalization, reproducible via `shasum -a 256`; missing/unreadable file exits 2). The skill layer writes that block plus an opaque `runId` (ISO-8601 timestamp + short slug recommended) into `manifest.json` — both fields are optional and backward compatible. Arming the gate with `penflow validate-visual-evidence <dir> --theme-css theme.css` requires the manifest stamp to match the current file: a missing stamp emits `evidence.theme.missing`, a mismatching one emits `evidence.theme.stale` (both error severity, exit 1), so any theme edit deterministically invalidates stale evidence and forces a re-run of the bounded loop; a `--theme-css` path missing on disk is a boundary error (exit 2). Without the flag, behavior and output are byte-identical to before — stamps stay inert.
 
@@ -181,11 +208,14 @@ After implementation, an external runtime adapter writes `actual-ui-tree.json`. 
 
 ```bash
 penflow validate-actual actual-ui-tree.json --schema --json
+penflow validate-actual-provenance <workspace> --expected expected-ui-tree.json --surface web --json
 penflow compare-tree expected-ui-tree.json actual-ui-tree.json --out compare-report.json --json
 penflow review-report compare-report.json --out review-report.json --json
 penflow fix-report compare-report.json --out fix-report.json --json
 penflow validate-report compare-report.json --schema --json
 ```
+
+Since P0-2 (contract C2), the adapter also writes a content-bound sidecar `actual-ui-tree.provenance.json` (`kind: penflow-actual-provenance`) next to the actual tree, and `validate-actual-provenance` is the final `penflow run` gate. The receipt records `sourceKind` (`runtime-capture` for a fresh capture/export, `static-demo-fixture` for explicitly qualified frozen example data), `producer`, `capturedAt` (ISO-8601 UTC), `target.surface`, and `content.sha256` (SHA-256 of the actual-tree bytes). Penflow never captures a runtime — it only validates this receipt from local files and rejects, fail-closed, a missing/incomplete receipt (`provenance.receipt.missing`/`.invalid`), a forged digest (`provenance.digest.mismatch`), a `content.path` naming another file (`provenance.content.path_mismatch`), a stale/future/unparseable `runtime-capture` timestamp (`provenance.timestamp.stale`/`.future`/`.invalid`; fixtures are exempt), an inadmissible source kind under `--require-fresh` (`provenance.source_kind.inadmissible`), an incompatible `--surface` (`provenance.target.incompatible`), and a `runtime-capture` whose root is byte-identical to the design-derived expected tree (`provenance.actual.derived_from_expected`). A qualified `static-demo-fixture` may reuse expected bytes but can never masquerade as fresh. The `penflow run` gate arms the runtime-capture freshness policy against the current run's export boundary with a documented default window of 86400s (24h), overridable via `penflow run --actual-max-age-seconds N`; a `static-demo-fixture` is exempt and that exemption is unreachable with `sourceKind=runtime-capture`. Any explicit max-age (`--actual-max-age-seconds`, `--max-age-seconds`, or programmatic) must be finite and strictly positive — `nan`, `inf`, `-inf`, overflowing `1e999`, `0`, and negatives are rejected fail-closed with a structured error and non-zero exit before any report is written (`allow_nan=False` guarantees no `NaN`/`Infinity` JSON), and an unparseable internal run boundary fails explicitly. `content.path` must be a relative name without `..` traversal (`provenance.content.path_invalid`); the `content.sha256` digest is the authority over the bytes.
 
 #### Regression
 

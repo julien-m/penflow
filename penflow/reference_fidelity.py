@@ -8,9 +8,10 @@ import json
 import math
 import struct
 import zlib
+from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 REFERENCE_REPORT_KIND = "penflow-reference-fidelity-report"
 REFERENCE_REPORT_VERSION = 1
@@ -73,7 +74,9 @@ def validate_reference_fidelity(
     llm_by_screen = _reference_fidelity_by_screen(vision_report)
 
     screens: list[dict[str, Any]] = []
-    issues: list[dict[str, Any]] = []
+    issues: list[dict[str, Any]] = _reference_contract_issues(
+        manifest, vision_report, reference_entries
+    )
     if not reference_entries:
         issues.append(_reference_manifest_empty_issue())
     for reference in reference_entries:
@@ -96,6 +99,7 @@ def validate_reference_fidelity(
     return {
         "version": REFERENCE_REPORT_VERSION,
         "kind": REFERENCE_REPORT_KIND,
+        "runId": vision_report.get("runId", "UNBOUND"),
         "status": "PASS" if not issues else "FAIL",
         "summary": {
             "screens_checked": len(screens),
@@ -112,7 +116,7 @@ def validate_reference_fidelity(
     }
 
 
-def load_references_manifest(references_dir: str | Path) -> list[dict[str, str]]:
+def load_references_manifest(references_dir: str | Path) -> list[dict[str, Any]]:
     """Load and validate `<references>/references-manifest.json`."""
     directory = Path(references_dir)
     root = directory.resolve()
@@ -120,17 +124,25 @@ def load_references_manifest(references_dir: str | Path) -> list[dict[str, str]]
     parsed = _load_json(path, "references manifest")
     if not isinstance(parsed, list):
         raise ValueError(f"{path} must be an array")
-    entries: list[dict[str, str]] = []
+    entries: list[dict[str, Any]] = []
     seen: set[str] = set()
+    digest_mappings: dict[str, tuple[Any, Any, Any, Any]] = {}
     for index, item in enumerate(parsed):
         if not isinstance(item, dict):
             raise ValueError(f"{path}[{index}] must be an object")
-        entry: dict[str, str] = {}
+        entry: dict[str, Any] = {}
         for key in ("screen_id", "file", "sha256", "source"):
             value = item.get(key)
             if not isinstance(value, str) or not value:
                 raise ValueError(f"{path}[{index}].{key} must be a non-empty string")
             entry[key] = value
+        mapping = item.get("mapping")
+        if not _valid_reference_mapping(mapping, entry["screen_id"]):
+            raise ValueError(
+                f"{path}[{index}].mapping must bind surface/screen/region/state"
+                " and a valid in-bounds crop"
+            )
+        entry["mapping"] = mapping
         if entry["screen_id"] in seen:
             raise ValueError(f"{path} contains duplicate screen_id: {entry['screen_id']}")
         seen.add(entry["screen_id"])
@@ -143,6 +155,13 @@ def load_references_manifest(references_dir: str | Path) -> list[dict[str, str]]
                 f"reference sha256 mismatch for {entry['file']}:"
                 f" expected {entry['sha256']} got {actual_sha}"
             )
+        mapping_identity = _mapping_tuple(mapping)
+        prior_mapping = digest_mappings.get(entry["sha256"])
+        if prior_mapping is not None and prior_mapping != mapping_identity:
+            raise ValueError(
+                f"{path} reuses reference sha256 across non-homologous mappings: {entry['sha256']}"
+            )
+        digest_mappings[entry["sha256"]] = mapping_identity
         entries.append(entry)
     return entries
 
@@ -217,6 +236,24 @@ def reference_fidelity_evidence_issues(
                 )
             )
             continue
+        mapping = llm_entry.get("mapping")
+        if not _mapping_is_homologous(reference, export, mapping):
+            issues.append(
+                _issue(
+                    "evidence.reference_fidelity.mapping_mismatch",
+                    "$.reference_fidelity",
+                    f"screen {screen_id!r} mapping is not homologous by"
+                    " surface/screen/region/state/crop",
+                )
+            )
+        if _crop_ratio_mismatch(mapping):
+            issues.append(
+                _issue(
+                    "evidence.reference_fidelity.crop_ratio_mismatch",
+                    "$.reference_fidelity",
+                    f"screen {screen_id!r} reference and actual crops would require stretching",
+                )
+            )
         criteria = llm_entry.get("criteria")
         if not isinstance(criteria, list):
             continue
@@ -258,13 +295,22 @@ def reference_fidelity_evidence_issues(
                         " must cite both reference and export files",
                     )
                 )
-            if criterion.get("result") == "fail" and criterion.get("blocking") is True:
+            if criterion.get("result") != "pass":
                 issues.append(
                     _issue(
                         "evidence.reference_fidelity.blocking_fail",
                         "$.reference_fidelity",
                         f"screen {screen_id!r} has blocking reference fidelity failure"
                         f" {criterion.get('category')!r}",
+                    )
+                )
+            if criterion.get("blocking") is not True:
+                issues.append(
+                    _issue(
+                        "evidence.reference_fidelity.non_blocking",
+                        "$.reference_fidelity",
+                        f"screen {screen_id!r} criterion {criterion.get('category')!r}"
+                        " is required but not blocking",
                     )
                 )
     issues.sort(key=_issue_sort_key)
@@ -336,6 +382,7 @@ def _screen_report(
     issues.sort(key=_issue_sort_key)
     return {
         "screen_id": screen_id,
+        "mapping": llm_entry.get("mapping") if isinstance(llm_entry, dict) else None,
         "reference": reference["file"],
         "export": export_png,
         "contact_sheet": contact_sheet,
@@ -350,7 +397,8 @@ def _screen_report(
                 "evidence": _metric_evidence(
                     category, reference["file"], export_png, contact_sheet
                 ),
-                "blocking": deterministic[category] == "fail",
+                "blocking": True,
+                "proof": _deterministic_proof(llm_entry, category, deterministic[category]),
             }
             for category in REFERENCE_CATEGORIES
         ],
@@ -713,6 +761,7 @@ def _empty_screen(
 ) -> dict[str, Any]:
     return {
         "screen_id": screen_id,
+        "mapping": None,
         "reference": reference["file"],
         "export": export_png,
         "contact_sheet": contact_sheet,
@@ -725,11 +774,170 @@ def _empty_screen(
                     category, reference["file"], export_png, contact_sheet
                 ),
                 "blocking": True,
+                "proof": None,
             }
             for category in REFERENCE_CATEGORIES
         ],
         "issues": sorted(issues, key=_issue_sort_key),
     }
+
+
+def _reference_contract_issues(
+    manifest: dict[str, Any],
+    vision_report: dict[str, Any],
+    references: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return closed-contract issues shared by the standalone reference gate."""
+    issues: list[dict[str, Any]] = []
+    exports = _export_by_screen(manifest)
+    entries = _reference_fidelity_by_screen(vision_report)
+    for reference in references:
+        screen_id = reference["screen_id"]
+        export = exports.get(screen_id)
+        entry = entries.get(screen_id)
+        if entry is None or not _mapping_is_homologous(
+            reference,
+            export,
+            entry.get("mapping") if isinstance(entry, dict) else None,
+        ):
+            issues.append(
+                _screen_issue(
+                    screen_id,
+                    "reference.mapping_mismatch",
+                    "reference mapping is not homologous by surface/screen/region/state/crop",
+                )
+            )
+        if isinstance(entry, dict) and _crop_ratio_mismatch(entry.get("mapping")):
+            issues.append(
+                _screen_issue(
+                    screen_id,
+                    "reference.crop_ratio_mismatch",
+                    "reference and actual crops would require stretching",
+                )
+            )
+    return issues
+
+
+def _mapping_is_homologous(
+    reference: dict[str, Any],
+    export: dict[str, Any] | None,
+    mapping: Any,
+) -> bool:
+    if not isinstance(export, dict) or not isinstance(mapping, dict):
+        return False
+    reference_mapping = reference.get("mapping")
+    if not isinstance(reference_mapping, dict):
+        return False
+    manifest_region = next(
+        (
+            region
+            for region in export.get("regions", [])
+            if isinstance(region, dict) and region.get("region_id") == mapping.get("region_id")
+        ),
+        None,
+    )
+    return bool(
+        _mapping_tuple(mapping) == _mapping_tuple(reference_mapping)
+        and mapping.get("screen_id") == reference.get("screen_id")
+        and mapping.get("reference_crop") == reference_mapping.get("crop")
+        and isinstance(manifest_region, dict)
+        and mapping.get("actual_crop") == manifest_region.get("crop")
+        and export.get("surface") == mapping.get("surface")
+        and export.get("state") == mapping.get("state")
+    )
+
+
+def _valid_reference_mapping(mapping: Any, screen_id: str) -> bool:
+    return bool(
+        isinstance(mapping, dict)
+        and set(mapping) == {"surface", "screen_id", "region_id", "state", "crop"}
+        and mapping.get("screen_id") == screen_id
+        and all(
+            isinstance(mapping.get(key), str) and mapping.get(key)
+            for key in ("surface", "screen_id", "region_id", "state")
+        )
+        and _crop_is_valid(mapping.get("crop"))
+    )
+
+
+def _mapping_tuple(mapping: Any) -> tuple[Any, Any, Any, Any]:
+    if not isinstance(mapping, dict):
+        return (None, None, None, None)
+    return (
+        mapping.get("surface"),
+        mapping.get("screen_id"),
+        mapping.get("region_id"),
+        mapping.get("state"),
+    )
+
+
+def _crop_is_valid(crop: Any) -> bool:
+    if not isinstance(crop, dict):
+        return False
+    values = [
+        crop.get("x"),
+        crop.get("y"),
+        crop.get("width"),
+        crop.get("height"),
+        crop.get("source_width"),
+        crop.get("source_height"),
+    ]
+    if not all(isinstance(value, int) and not isinstance(value, bool) for value in values):
+        return False
+    x, y, width, height, source_width, source_height = (cast(int, value) for value in values)
+    return bool(
+        x >= 0
+        and y >= 0
+        and width > 0
+        and height > 0
+        and x + width <= source_width
+        and y + height <= source_height
+    )
+
+
+def _crop_ratio_mismatch(mapping: Any) -> bool:
+    if not isinstance(mapping, dict):
+        return True
+    reference_crop = mapping.get("reference_crop")
+    actual_crop = mapping.get("actual_crop")
+    if not _crop_is_valid(reference_crop) or not _crop_is_valid(actual_crop):
+        return True
+    if not isinstance(reference_crop, dict) or not isinstance(actual_crop, dict):
+        return True
+    reference_width = reference_crop.get("width")
+    reference_height = reference_crop.get("height")
+    actual_width = actual_crop.get("width")
+    actual_height = actual_crop.get("height")
+    if not all(
+        isinstance(value, int) and not isinstance(value, bool) and value > 0
+        for value in (reference_width, reference_height, actual_width, actual_height)
+    ):
+        return True
+    reference_ratio = cast(int, reference_width) / cast(int, reference_height)
+    actual_ratio = cast(int, actual_width) / cast(int, actual_height)
+    return abs(reference_ratio - actual_ratio) > _RATIO_DELTA_FAIL
+
+
+def _deterministic_proof(
+    llm_entry: dict[str, Any] | None,
+    category: str,
+    result: str,
+) -> dict[str, Any] | None:
+    if not isinstance(llm_entry, dict) or not isinstance(llm_entry.get("criteria"), list):
+        return None
+    criterion = next(
+        (
+            candidate
+            for candidate in llm_entry["criteria"]
+            if isinstance(candidate, dict) and candidate.get("category") == category
+        ),
+        None,
+    )
+    proof = deepcopy(criterion.get("proof")) if isinstance(criterion, dict) else None
+    if not isinstance(proof, dict):
+        return None
+    proof["measurement"] = {"expected": "pass", "actual": result, "unit": "result"}
+    return proof
 
 
 def _sha256(path: Path) -> str:

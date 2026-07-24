@@ -128,9 +128,18 @@ def test_semantic_schema_does_not_add_feature_036_or_later_runtime_pipeline() ->
     # without browser, simulator, Pencil MCP, or UI runtime adapters. Feature
     # 068 is in scope — it ships skill/docs/tests for advisory design-read and
     # design-taste reporting only, with no Python runtime adapter, schema
-    # expansion, or gate promotion.
+    # expansion, or gate promotion. Feature 069 is in scope — it hardens
+    # isolated wheel validation. Feature 070 is in scope — it requires
+    # structured, blocking, homologous visual/reference evidence. Feature 071
+    # is in scope — it adds independent Pencil persistence byte receipts.
+    # Feature 072 is in scope — it composes existing local validators into an
+    # explicit, read-only strict closure report without a runtime adapter.
+    # Feature 073 is in scope — it adds the durable export operator receipt
+    # (C48): native export_nodes coverage bound to run/.pen SHA-256/C46
+    # persistence/document identity with homologous references, verified from
+    # local bytes only, without any Pencil MCP or runtime adapter.
     future_feature_dirs: list[Path] = []
-    for feature_number in range(69, 70):
+    for feature_number in range(74, 75):
         future_feature_dirs.extend((ROOT / ".specs" / "features").glob(f"{feature_number:03d}-*"))
     assert future_feature_dirs == []
     assert not (ROOT / "penflow" / "semantic_validator.py").exists()

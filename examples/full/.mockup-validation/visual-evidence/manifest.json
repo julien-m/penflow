@@ -1,13 +1,29 @@
 {
   "renderer": "pencil-mcp",
   "sourceFile": "examples/full/ui.pen",
-  "status": "PASSED_WITH_WARNINGS",
+  "status": "PASS",
   "validatedAt": "2026-05-21",
+  "runId": "run-c4-examples-full-20260724",
   "screens": [
     {
       "screen_id": "checkout",
       "semantic_id": "checkout",
       "pencil_node_id": "checkoutScreen",
+      "surface": "web",
+      "state": "default",
+      "regions": [
+        {
+          "region_id": "checkout.main",
+          "crop": {
+            "x": 0,
+            "y": 0,
+            "width": 780,
+            "height": 1688,
+            "source_width": 780,
+            "source_height": 1688
+          }
+        }
+      ],
       "png": "checkoutScreen.png",
       "sha256": "3e7ce66cd7fc51a850490aea840954c26cff11086f0947ee271b6ceec6b7333a",
       "layout_checked": true,

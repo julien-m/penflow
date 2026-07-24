@@ -10,6 +10,7 @@ import json
 import struct
 import zlib
 from pathlib import Path
+from typing import Any, TypeAlias
 
 import pytest
 
@@ -23,6 +24,12 @@ from penflow.reference_fidelity import REFERENCE_CATEGORIES, validate_reference_
 
 EXAMPLES_EVIDENCE = Path("examples/full/.mockup-validation/visual-evidence")
 EXAMPLES_EXPECTED = Path("examples/full/expected-ui-tree.json")
+TEST_RUN_ID = "run-c4-structured-proof"
+DEFAULT_PNG_BYTES = b"\x89PNG\r\n\x1a\nfake-but-non-empty"
+
+# Controlled fixture mutators operate on nested json.loads payloads whose shape
+# is established by _packet; Any is limited to that test-only mutation boundary.
+JsonObject: TypeAlias = dict[str, Any]
 
 
 def _expected_tree(path: Path, screen_ids: tuple[str, ...] = ("checkout",)) -> Path:
@@ -43,7 +50,26 @@ def _expected_tree(path: Path, screen_ids: tuple[str, ...] = ("checkout",)) -> P
     return path
 
 
-def _criteria(png: str = "checkoutScreen.png") -> list[dict[str, object]]:
+def _crop(width: int = 390, height: int = 844) -> dict[str, int]:
+    return {
+        "x": 0,
+        "y": 0,
+        "width": width,
+        "height": height,
+        "source_width": width,
+        "source_height": height,
+    }
+
+
+def _criteria(
+    png: str = "checkoutScreen.png",
+    *,
+    screen_id: str = "checkout",
+    sha256: str | None = None,
+    crop: dict[str, int] | None = None,
+) -> list[dict[str, object]]:
+    digest = sha256 or hashlib.sha256(DEFAULT_PNG_BYTES).hexdigest()
+    region = crop or _crop()
     return [
         {
             "category": category,
@@ -51,19 +77,57 @@ def _criteria(png: str = "checkoutScreen.png") -> list[dict[str, object]]:
             "evidence": (
                 f"Vision evidence sentence for {category} on the checkout screen evaluated in {png}."
             ),
-            "blocking": False,
+            "blocking": True,
+            "proof": {
+                "run_id": TEST_RUN_ID,
+                "surface": "web",
+                "screen_id": screen_id,
+                "region_id": f"{screen_id}.main",
+                "state": "default",
+                "assertion": category,
+                "measurement": {"expected": "pass", "actual": "pass", "unit": "result"},
+                "artifacts": [
+                    {
+                        "role": "actual",
+                        "file": png,
+                        "sha256": digest,
+                        "crop": region,
+                    }
+                ],
+            },
         }
         for category in VISION_CATEGORIES
     ]
 
 
-def _coherence_criteria() -> list[dict[str, object]]:
+def _coherence_criteria(
+    png: str = "contact-sheet.png",
+    sha256: str | None = None,
+) -> list[dict[str, object]]:
+    digest = sha256 or hashlib.sha256(b"\x89PNG\r\n\x1a\nfake-but-non-empty-sheet").hexdigest()
     return [
         {
             "category": category,
             "result": "pass",
             "evidence": f"Coherence evidence sentence for {category} across contact-sheet.png.",
-            "blocking": False,
+            "blocking": True,
+            "proof": {
+                "run_id": TEST_RUN_ID,
+                "surface": "web",
+                "screen_id": "cross-screen",
+                "region_id": "coherence.grid",
+                "state": "composite",
+                "assertion": category,
+                "measurement": {"expected": "pass", "actual": "pass", "unit": "result"},
+                "artifacts": [
+                    {
+                        "role": "contact_sheet",
+                        "file": png,
+                        "sha256": digest,
+                        "crop": _crop(1, 1),
+                    }
+                ],
+            },
         }
         for category in COHERENCE_CATEGORIES
     ]
@@ -72,14 +136,22 @@ def _coherence_criteria() -> list[dict[str, object]]:
 def _add_coherence(evidence: Path, png: str = "contact-sheet.png") -> None:
     """Inject a valid coherence section and a non-empty contact-sheet PNG."""
     (evidence / png).write_bytes(b"\x89PNG\r\n\x1a\nfake-but-non-empty-sheet")
+    digest = hashlib.sha256((evidence / png).read_bytes()).hexdigest()
     _mutate_vision_report(
         evidence,
         lambda report: (
-            report["inputs"].append(
-                {"file": png, "sha256": hashlib.sha256((evidence / png).read_bytes()).hexdigest()}
-            ),
+            report["inputs"].append({"file": png, "sha256": digest}),
             report.update(
-                {"coherence": {"contact_sheet_png": png, "criteria": _coherence_criteria()}}
+                {
+                    "coherence": {
+                        "contact_sheet_png": png,
+                        "surface": "web",
+                        "screen_id": "cross-screen",
+                        "region_id": "coherence.grid",
+                        "state": "composite",
+                        "criteria": _coherence_criteria(png, digest),
+                    }
+                }
             ),
         ),
     )
@@ -118,14 +190,24 @@ def _add_references(
     reference_png = references / "checkout-ref.png"
     _write_png(reference_png, 8, 8, reference_color)
     _write_png(evidence / "checkoutScreen.png", 8, 8, export_color)
+    reference_sha = hashlib.sha256(reference_png.read_bytes()).hexdigest()
+    export_sha = hashlib.sha256((evidence / "checkoutScreen.png").read_bytes()).hexdigest()
+    region_crop = _crop(8, 8)
     (references / "references-manifest.json").write_text(
         json.dumps(
             [
                 {
                     "screen_id": "checkout",
                     "file": "checkout-ref.png",
-                    "sha256": hashlib.sha256(reference_png.read_bytes()).hexdigest(),
+                    "sha256": reference_sha,
                     "source": "unit-test",
+                    "mapping": {
+                        "surface": "web",
+                        "screen_id": "checkout",
+                        "region_id": "checkout.main",
+                        "state": "default",
+                        "crop": region_crop,
+                    },
                 }
             ]
         ),
@@ -134,17 +216,26 @@ def _add_references(
     manifest_path = evidence / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["references_manifest"] = "../references/references-manifest.json"
-    manifest["screens"][0]["sha256"] = hashlib.sha256(
-        (evidence / "checkoutScreen.png").read_bytes()
-    ).hexdigest()
+    manifest["screens"][0]["sha256"] = export_sha
+    manifest["screens"][0]["regions"][0]["crop"] = region_crop
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    def sync_export_proof(report: JsonObject) -> None:
+        _replace_input_sha(report, evidence, "checkoutScreen.png")
+        screen = report["screens"][0]
+        for criterion in screen["criteria"]:
+            criterion["proof"]["artifacts"][0].update({"sha256": export_sha, "crop": region_crop})
+
+    _mutate_vision_report(evidence, sync_export_proof)
     if include_section:
         (evidence / "checkout-reference-contact-sheet.png").write_bytes(
             b"\x89PNG\r\n\x1a\nside-by-side-reference-export"
         )
+        contact_sha = hashlib.sha256(
+            (evidence / "checkout-reference-contact-sheet.png").read_bytes()
+        ).hexdigest()
 
         def add_reference_section(report: dict[str, object]) -> None:
-            _replace_input_sha(report, evidence, "checkoutScreen.png")
             _append_input(report, evidence, "checkout-reference-contact-sheet.png")
             report.update(
                 {
@@ -154,6 +245,14 @@ def _add_references(
                             "reference": "checkout-ref.png",
                             "export": "checkoutScreen.png",
                             "contact_sheet": "checkout-reference-contact-sheet.png",
+                            "mapping": {
+                                "surface": "web",
+                                "screen_id": "checkout",
+                                "region_id": "checkout.main",
+                                "state": "default",
+                                "reference_crop": region_crop,
+                                "actual_crop": region_crop,
+                            },
                             "criteria": [
                                 {
                                     "category": category,
@@ -163,7 +262,40 @@ def _add_references(
                                         " checkoutScreen.png in contact sheet"
                                         " checkout-reference-contact-sheet.png."
                                     ),
-                                    "blocking": False,
+                                    "blocking": True,
+                                    "proof": {
+                                        "run_id": TEST_RUN_ID,
+                                        "surface": "web",
+                                        "screen_id": "checkout",
+                                        "region_id": "checkout.main",
+                                        "state": "default",
+                                        "assertion": category,
+                                        "measurement": {
+                                            "expected": "pass",
+                                            "actual": "pass",
+                                            "unit": "result",
+                                        },
+                                        "artifacts": [
+                                            {
+                                                "role": "reference",
+                                                "file": "checkout-ref.png",
+                                                "sha256": reference_sha,
+                                                "crop": region_crop,
+                                            },
+                                            {
+                                                "role": "actual",
+                                                "file": "checkoutScreen.png",
+                                                "sha256": export_sha,
+                                                "crop": region_crop,
+                                            },
+                                            {
+                                                "role": "contact_sheet",
+                                                "file": "checkout-reference-contact-sheet.png",
+                                                "sha256": contact_sha,
+                                                "crop": _crop(1, 1),
+                                            },
+                                        ],
+                                    },
                                 }
                                 for category in REFERENCE_CATEGORIES
                             ],
@@ -194,13 +326,17 @@ def _packet(tmp_path: Path, screen_ids: tuple[str, ...] = ("checkout",)) -> tupl
     snapshot_screens = []
     for screen_id in screen_ids:
         png = f"{screen_id}Screen.png"
-        (evidence / png).write_bytes(b"\x89PNG\r\n\x1a\nfake-but-non-empty")
+        (evidence / png).write_bytes(DEFAULT_PNG_BYTES + screen_id.encode("utf-8"))
         png_sha = hashlib.sha256((evidence / png).read_bytes()).hexdigest()
+        region_crop = _crop()
         manifest_screens.append(
             {
                 "screen_id": screen_id,
                 "semantic_id": screen_id,
                 "pencil_node_id": f"{screen_id}Screen",
+                "surface": "web",
+                "state": "default",
+                "regions": [{"region_id": f"{screen_id}.main", "crop": region_crop}],
                 "png": png,
                 "sha256": png_sha,
                 "layout_checked": True,
@@ -212,8 +348,16 @@ def _packet(tmp_path: Path, screen_ids: tuple[str, ...] = ("checkout",)) -> tupl
                 "screen_id": screen_id,
                 "semantic_id": screen_id,
                 "pencil_node_id": f"{screen_id}Screen",
+                "surface": "web",
+                "region_id": f"{screen_id}.main",
+                "state": "default",
                 "png": png,
-                "criteria": _criteria(png),
+                "criteria": _criteria(
+                    png,
+                    screen_id=screen_id,
+                    sha256=png_sha,
+                    crop=region_crop,
+                ),
             }
         )
         snapshot_screens.append(
@@ -231,6 +375,7 @@ def _packet(tmp_path: Path, screen_ids: tuple[str, ...] = ("checkout",)) -> tupl
                 "sourceFile": "ui.pen",
                 "status": "PASS",
                 "validatedAt": "2026-06-10",
+                "runId": TEST_RUN_ID,
                 "screens": manifest_screens,
             }
         ),
@@ -242,6 +387,7 @@ def _packet(tmp_path: Path, screen_ids: tuple[str, ...] = ("checkout",)) -> tupl
                 "version": 1,
                 "kind": "penflow-vision-report",
                 "status": "PASS",
+                "runId": TEST_RUN_ID,
                 "renderer": "pencil-mcp",
                 "sourceFile": "ui.pen",
                 "model": "test-vision-model",
@@ -305,9 +451,113 @@ def test_complete_packet_passes(tmp_path: Path) -> None:
     evidence, expected = _packet(tmp_path)
 
     assert validate_visual_evidence(evidence, expected_tree_path=expected) == []
+    assert main(["validate-report", str(evidence / "manifest.json"), "--schema", "--json"]) == 0
+    assert (
+        main(["validate-report", str(evidence / "vision-report.json"), "--schema", "--json"]) == 0
+    )
     assert (
         main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
         == 0
+    )
+
+
+def test_c4_rejects_narrative_non_blocking_criteria(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    _mutate_vision_report(
+        evidence,
+        lambda report: [
+            (criterion.pop("proof"), criterion.update({"blocking": False}))
+            for criterion in report["screens"][0]["criteria"]
+        ],
+    )
+
+    issues = validate_visual_evidence(evidence, expected_tree_path=expected)
+
+    assert {issue["code"] for issue in issues} >= {
+        "evidence.criterion.non_blocking",
+        "evidence.criterion.proof_missing",
+    }
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 1
+    )
+
+
+def test_c4_rejects_invalid_crop(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    _mutate_vision_report(
+        evidence,
+        lambda report: report["screens"][0]["criteria"][0]["proof"]["artifacts"][0]["crop"].update(
+            {"width": 391}
+        ),
+    )
+
+    issues = validate_visual_evidence(evidence, expected_tree_path=expected)
+
+    assert "evidence.proof.crop_invalid" in {issue["code"] for issue in issues}
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 1
+    )
+
+
+def test_c4_rejects_actual_reused_across_non_homologous_screens(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path, ("checkout", "settings"))
+    _add_coherence(evidence)
+    checkout_sha = hashlib.sha256((evidence / "checkoutScreen.png").read_bytes()).hexdigest()
+
+    def reuse_checkout_export(report: JsonObject) -> None:
+        for criterion in report["screens"][1]["criteria"]:
+            criterion["proof"]["artifacts"][0].update(
+                {"file": "checkoutScreen.png", "sha256": checkout_sha}
+            )
+
+    _mutate_vision_report(evidence, reuse_checkout_export)
+
+    issues = validate_visual_evidence(evidence, expected_tree_path=expected)
+
+    assert "evidence.artifact.reused_non_homologous" in {issue["code"] for issue in issues}
+    assert (
+        main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
+        == 1
+    )
+
+
+def test_c4_rejects_non_homologous_reference_crop(tmp_path: Path) -> None:
+    evidence, expected = _packet(tmp_path)
+    references = _add_references(tmp_path, evidence)
+    stretched_crop = _crop(8, 8) | {"width": 4}
+
+    def stretch_actual_mapping(report: JsonObject) -> None:
+        entry = report["reference_fidelity"][0]
+        entry["mapping"]["actual_crop"] = stretched_crop
+        for criterion in entry["criteria"]:
+            actual = next(
+                artifact
+                for artifact in criterion["proof"]["artifacts"]
+                if artifact["role"] == "actual"
+            )
+            actual["crop"] = stretched_crop
+
+    _mutate_vision_report(evidence, stretch_actual_mapping)
+
+    issues = validate_visual_evidence(evidence, expected_tree_path=expected)
+    report = validate_reference_fidelity(evidence, references)
+
+    assert "evidence.reference_fidelity.mapping_mismatch" in {issue["code"] for issue in issues}
+    assert "reference.crop_ratio_mismatch" in {issue["code"] for issue in report["issues"]}
+    assert report["status"] == "FAIL"
+    assert (
+        main(
+            [
+                "validate-reference-fidelity",
+                str(evidence),
+                "--references",
+                str(references),
+                "--json",
+            ]
+        )
+        == 1
     )
 
 
@@ -996,6 +1246,29 @@ def _stamp_manifest(evidence: Path, theme: Path, run_id: str | None = None) -> N
     if run_id is not None:
         manifest["runId"] = run_id
     path.write_text(json.dumps(manifest), encoding="utf-8")
+    if run_id is not None:
+        _mutate_vision_report(
+            evidence,
+            lambda report: _set_report_run_id(report, run_id),
+        )
+
+
+def _set_report_run_id(report: JsonObject, run_id: str) -> None:
+    report["runId"] = run_id
+    criteria_groups = [
+        screen["criteria"] for screen in report.get("screens", []) if isinstance(screen, dict)
+    ]
+    coherence = report.get("coherence")
+    if isinstance(coherence, dict):
+        criteria_groups.append(coherence["criteria"])
+    criteria_groups.extend(
+        entry["criteria"]
+        for entry in report.get("reference_fidelity", [])
+        if isinstance(entry, dict)
+    )
+    for criteria in criteria_groups:
+        for criterion in criteria:
+            criterion["proof"]["run_id"] = run_id
 
 
 # @spec AC-005: Fresh theme fingerprint passes the armed gate — .specs/features/056-evidence-run-identity-theme-fingerprint/spec.md#ac-005
@@ -1282,7 +1555,7 @@ def test_manifest_schema_round_trips_runid_and_theme(tmp_path: Path) -> None:
         assert main(["validate-report", str(path), "--schema", "--json"]) == 1, filename
 
 
-def test_manifest_with_only_runid_validates_and_stays_inert(tmp_path: Path) -> None:
+def test_manifest_runid_must_match_vision_runid(tmp_path: Path) -> None:
     evidence, expected = _packet(tmp_path)
     path = evidence / "manifest.json"
     manifest = json.loads(path.read_text(encoding="utf-8"))
@@ -1292,7 +1565,7 @@ def test_manifest_with_only_runid_validates_and_stays_inert(tmp_path: Path) -> N
     assert main(["validate-report", str(path), "--schema", "--json"]) == 0
     assert (
         main(["validate-visual-evidence", str(evidence), "--expected", str(expected), "--json"])
-        == 0
+        == 1
     )
 
 
@@ -1438,6 +1711,13 @@ def test_reference_fidelity_rejects_cross_screen_reference_copy(tmp_path: Path) 
                         (references / reference_file).read_bytes()
                     ).hexdigest(),
                     "source": "unit-test",
+                    "mapping": {
+                        "surface": "web",
+                        "screen_id": screen_id,
+                        "region_id": f"{screen_id}.main",
+                        "state": "default",
+                        "crop": _crop(8, 8),
+                    },
                 }
                 for screen_id, reference_file in reference_files.items()
             ]
@@ -1447,6 +1727,12 @@ def test_reference_fidelity_rejects_cross_screen_reference_copy(tmp_path: Path) 
     manifest_path = evidence / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     manifest["references_manifest"] = "../references/references-manifest.json"
+    for screen in manifest["screens"]:
+        screen_id = screen["screen_id"]
+        screen["sha256"] = hashlib.sha256(
+            (evidence / export_files[screen_id]).read_bytes()
+        ).hexdigest()
+        screen["regions"][0]["crop"] = _crop(8, 8)
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     for screen_id in reference_files:
         (evidence / f"{screen_id}-reference-contact-sheet.png").write_bytes(
@@ -1463,6 +1749,14 @@ def test_reference_fidelity_rejects_cross_screen_reference_copy(tmp_path: Path) 
                         "reference": reference_file,
                         "export": export_files[screen_id],
                         "contact_sheet": f"{screen_id}-reference-contact-sheet.png",
+                        "mapping": {
+                            "surface": "web",
+                            "screen_id": screen_id,
+                            "region_id": f"{screen_id}.main",
+                            "state": "default",
+                            "reference_crop": _crop(8, 8),
+                            "actual_crop": _crop(8, 8),
+                        },
                         "criteria": [
                             {
                                 "category": category,

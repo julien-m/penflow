@@ -30,7 +30,7 @@
     "entities": {"type": "array", "items": {"$ref": "#/$defs/entity"}},
     "screens": {"type": "array", "items": {"$ref": "#/$defs/screen"}},
     "nodes": {"type": "array", "items": {"$ref": "#/$defs/node"}},
-    "guards": {"type": "array", "items": {"$ref": "#/$defs/usageObject"}},
+    "guards": {"type": "array", "items": {"$ref": "#/$defs/guard"}},
     "permissions": {"type": "array", "items": {"$ref": "#/$defs/permission"}},
     "mutations": {"type": "array", "items": {"$ref": "#/$defs/mutation"}},
     "actions": {"type": "array", "items": {"$ref": "#/$defs/action"}},
@@ -65,6 +65,46 @@
         "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
         "unused_allowed": {"type": "boolean"}
       }
+    },
+    "guard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "variable": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(?:[._-][a-z0-9_]+)*$"},
+        "operator": {"enum": ["equals", "not_equals", "in", "exists"]},
+        "value": {"type": "string"},
+        "source": {"enum": ["user_input", "runtime_result", "environment", "session"]},
+        "unused_allowed": {"type": "boolean"}
+      }
+    },
+    "causalTransition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "action_visibility", "outcome", "fanout"],
+      "properties": {
+        "version": {"const": 1},
+        "action_visibility": {"const": "user-visible"},
+        "outcome": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "fanout": {"$ref": "#/$defs/causalFanout"}
+      }
+    },
+    "causalFanout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["group", "policy"],
+      "properties": {
+        "group": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "policy": {"enum": ["exclusive", "governed"]},
+        "governance": {"type": "string", "pattern": ".*\\S.*"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"policy": {"const": "governed"}}, "required": ["policy"]},
+          "then": {"required": ["governance"]}
+        }
+      ]
     },
     "entity": {
       "type": "object",
@@ -191,7 +231,10 @@
         "to_state": {"type": "string"},
         "trigger": {"type": "string"},
         "action": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "guard": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"}
+        "guard": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "kind": {"enum": ["navigation", "state", "environment"]},
+        "label": {"type": "string", "pattern": ".*\\S.*"},
+        "causal": {"$ref": "#/$defs/causalTransition"}
       }
     }
   }

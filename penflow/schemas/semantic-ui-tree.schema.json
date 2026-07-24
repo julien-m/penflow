@@ -104,6 +104,9 @@
       "additionalProperties": false,
       "required": ["from", "to", "trigger"],
       "properties": {
+        "id": {
+          "type": "string"
+        },
         "from": {
           "type": "string"
         },
@@ -115,6 +118,39 @@
         },
         "condition": {
           "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "guard": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["navigation", "state", "environment"]
+        },
+        "label": {
+          "type": "string"
+        },
+        "causal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "action_visibility", "outcome", "fanout"],
+          "properties": {
+            "version": {"const": 1},
+            "action_visibility": {"const": "user-visible"},
+            "outcome": {"type": "string"},
+            "fanout": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["group", "policy"],
+              "properties": {
+                "group": {"type": "string"},
+                "policy": {"enum": ["exclusive", "governed"]},
+                "governance": {"type": "string"}
+              }
+            }
+          }
         }
       }
     },

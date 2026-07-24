@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.local/schemas/export-operator-receipt.schema.json",
+  "title": "Penflow Export Operator Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "version",
+    "status",
+    "closes_export",
+    "run_id",
+    "operation",
+    "request",
+    "source",
+    "document",
+    "persistence",
+    "contract",
+    "coverage",
+    "checks",
+    "verifier",
+    "issues",
+    "integrity"
+  ],
+  "properties": {
+    "kind": {"const": "penflow-export-operator-receipt"},
+    "version": {"const": 1},
+    "status": {"enum": ["PASS", "FAIL"]},
+    "closes_export": {"type": "boolean"},
+    "run_id": {"type": "string", "minLength": 1},
+    "operation": {"type": ["string", "null"], "minLength": 1},
+    "request": {"$ref": "#/$defs/hashedFile"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "declared_sha256", "current_sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "declared_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "current_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name"],
+      "properties": {
+        "id": {"type": ["string", "null"], "minLength": 1},
+        "name": {"type": ["string", "null"], "minLength": 1}
+      }
+    },
+    "persistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "status", "revalidated"],
+      "properties": {
+        "path": {"type": ["string", "null"], "minLength": 1},
+        "sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "status": {"type": ["string", "null"], "minLength": 1},
+        "revalidated": {"type": "boolean"}
+      }
+    },
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "declared_sha256", "current_sha256"],
+      "properties": {
+        "path": {"type": ["string", "null"], "minLength": 1},
+        "declared_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "current_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "coverage": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["surface", "screen", "state", "node_id", "export", "references"],
+        "properties": {
+          "surface": {"type": "string"},
+          "screen": {"type": "string"},
+          "state": {"type": "string"},
+          "node_id": {"type": ["string", "null"], "minLength": 1},
+          "export": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "declared_sha256", "actual_sha256", "width", "height", "scale", "format"],
+            "properties": {
+              "path": {"type": ["string", "null"], "minLength": 1},
+              "declared_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+              "actual_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+              "width": {"type": ["integer", "null"], "minimum": 1},
+              "height": {"type": ["integer", "null"], "minimum": 1},
+              "scale": {"type": ["number", "null"]},
+              "format": {"type": ["string", "null"], "minLength": 1}
+            }
+          },
+          "references": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["path", "declared_sha256", "actual_sha256", "surface", "role", "state", "region", "design_intent"],
+              "properties": {
+                "path": {"type": ["string", "null"], "minLength": 1},
+                "declared_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+                "actual_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+                "surface": {"type": ["string", "null"], "minLength": 1},
+                "role": {"type": ["string", "null"], "minLength": 1},
+                "state": {"type": ["string", "null"], "minLength": 1},
+                "region": {"type": ["string", "null"], "minLength": 1},
+                "design_intent": {"type": ["string", "null"], "minLength": 1}
+              }
+            }
+          }
+        }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": {"type": "boolean"}
+    },
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "method", "result"],
+      "properties": {
+        "name": {"const": "penflow"},
+        "method": {"const": "independent-byte-digest"},
+        "result": {"enum": ["pass", "fail"]}
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "code", "path", "message"],
+        "properties": {
+          "severity": {"const": "error"},
+          "code": {"type": "string", "minLength": 1},
+          "path": {"type": "string", "minLength": 1},
+          "message": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "sha256"],
+      "properties": {
+        "algorithm": {"const": "sha256"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  },
+  "$defs": {
+    "hashedFile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

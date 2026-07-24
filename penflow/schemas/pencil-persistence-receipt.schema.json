@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.local/schemas/pencil-persistence-receipt.schema.json",
+  "title": "Penflow Pencil Persistence Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "version",
+    "status",
+    "closes_persistence",
+    "run_id",
+    "operation",
+    "observation",
+    "document",
+    "checks",
+    "verifier",
+    "issues",
+    "integrity"
+  ],
+  "properties": {
+    "kind": {"const": "penflow-pencil-persistence-receipt"},
+    "version": {"const": 1},
+    "status": {"enum": ["PASS", "FAIL"]},
+    "closes_persistence": {"type": "boolean"},
+    "run_id": {"type": "string", "minLength": 1},
+    "operation": {"type": "string", "minLength": 1},
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "pre", "post", "current_sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "pre": {"$ref": "#/$defs/verifiedSnapshot"},
+        "post": {"$ref": "#/$defs/verifiedSnapshot"},
+        "current_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trigger_declared",
+        "run_matches",
+        "operation_matches",
+        "document_matches",
+        "snapshots_distinct",
+        "pre_digest_matches",
+        "post_digest_matches",
+        "content_changed",
+        "current_matches_post"
+      ],
+      "properties": {
+        "trigger_declared": {"type": "boolean"},
+        "run_matches": {"type": "boolean"},
+        "operation_matches": {"type": "boolean"},
+        "document_matches": {"type": "boolean"},
+        "snapshots_distinct": {"type": "boolean"},
+        "pre_digest_matches": {"type": "boolean"},
+        "post_digest_matches": {"type": "boolean"},
+        "content_changed": {"type": "boolean"},
+        "current_matches_post": {"type": "boolean"}
+      }
+    },
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "method", "result"],
+      "properties": {
+        "name": {"const": "penflow"},
+        "method": {"const": "independent-byte-digest"},
+        "result": {"enum": ["pass", "fail"]}
+      }
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "code", "path", "message"],
+        "properties": {
+          "severity": {"const": "error"},
+          "code": {"type": "string", "minLength": 1},
+          "path": {"type": "string", "minLength": 1},
+          "message": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "sha256"],
+      "properties": {
+        "algorithm": {"const": "sha256"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  },
+  "$defs": {
+    "verifiedSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "declared_sha256", "actual_sha256"],
+      "properties": {
+        "path": {"type": ["string", "null"], "minLength": 1},
+        "declared_sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "actual_sha256": {
+          "type": ["string", "null"],
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

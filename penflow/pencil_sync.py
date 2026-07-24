@@ -1,7 +1,12 @@
-"""Pencil editor-to-disk sync verification."""
+"""Operator-layer Pencil save trigger and disk observation.
+
+This module can trigger Pencil on macOS, but its report never closes
+persistence. The runtime-agnostic verifier lives in `pencil_persistence.py`.
+"""
 
 from __future__ import annotations
 
+import hashlib
 import platform
 import subprocess
 from dataclasses import asdict, dataclass
@@ -35,7 +40,7 @@ def sync_pencil_to_disk(
     expect_screens: int | None = None,
     save_runner: SaveRunner | None = None,
 ) -> dict[str, Any]:
-    """Save the open Pencil document, then verify the `.pen` persisted to disk."""
+    """Trigger save and report disk changes without closing persistence."""
     pen_path = Path(pen)
     if not pen_path.exists():
         raise PencilSyncError(f".pen file not found: {pen_path}")
@@ -45,14 +50,17 @@ def sync_pencil_to_disk(
         raise PencilSyncError("--expect-screens must be >= 0")
 
     before_stat = pen_path.stat()
+    before_sha256 = hashlib.sha256(pen_path.read_bytes()).hexdigest()
     before_inspect = inspect_pen(pen_path)
     runner = save_runner or run_pencil_save_via_osascript
     save = runner(pen_path)
     after_stat = pen_path.stat()
+    after_sha256 = hashlib.sha256(pen_path.read_bytes()).hexdigest()
     after_inspect = inspect_pen(pen_path)
 
     checks = {
         "mtime_advanced": after_stat.st_mtime_ns > before_stat.st_mtime_ns,
+        "content_changed": after_sha256 != before_sha256,
         "min_nodes": _expectation(
             actual=int(after_inspect["node_count"]),
             expected=expect_min_nodes,
@@ -63,16 +71,18 @@ def sync_pencil_to_disk(
         ),
     }
     status = (
-        "PASS" if save.ok and checks["mtime_advanced"] and _expectations_pass(checks) else "FAIL"
+        "PASS" if save.ok and checks["content_changed"] and _expectations_pass(checks) else "FAIL"
     )
     return {
         "kind": "penflow-pencil-sync",
         "status": status,
+        "persistence_status": "UNVERIFIED",
+        "closes_persistence": False,
         "pen": str(pen_path),
         "message": _message(status, save, checks),
         "save": asdict(save),
-        "before": _inspection_summary(before_stat.st_mtime_ns, before_inspect),
-        "after": _inspection_summary(after_stat.st_mtime_ns, after_inspect),
+        "before": _inspection_summary(before_stat.st_mtime_ns, before_sha256, before_inspect),
+        "after": _inspection_summary(after_stat.st_mtime_ns, after_sha256, after_inspect),
         "checks": checks,
     }
 
@@ -127,9 +137,14 @@ end tell
     )
 
 
-def _inspection_summary(mtime_ns: int, inspected: dict[str, Any]) -> dict[str, Any]:
+def _inspection_summary(
+    mtime_ns: int,
+    sha256: str,
+    inspected: dict[str, Any],
+) -> dict[str, Any]:
     return {
         "mtime_ns": mtime_ns,
+        "sha256": sha256,
         "node_count": inspected["node_count"],
         "screen_count": len(inspected["screens"]),
         "screens": inspected["screens"],
@@ -150,11 +165,14 @@ def _expectations_pass(checks: dict[str, Any]) -> bool:
 
 def _message(status: str, save: SaveOutcome, checks: dict[str, Any]) -> str:
     if status == "PASS":
-        return "Pencil editor state persisted and disk inspection met expectations."
+        return (
+            "Pencil save trigger changed disk bytes and inspection met expectations; "
+            "persistence remains UNVERIFIED until a persistence receipt passes."
+        )
     if not save.ok:
         return _not_persisted_message(f"save failed: {save.message}")
-    if not checks["mtime_advanced"]:
-        return _not_persisted_message("mtime did not advance after File > Save")
+    if not checks["content_changed"]:
+        return _not_persisted_message("document digest did not change after File > Save")
     failed = [
         name
         for name in ("min_nodes", "screens")

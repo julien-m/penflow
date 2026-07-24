@@ -16,9 +16,16 @@ import json
 import re
 import sys
 from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from .actual_provenance import (
+    ProvenanceError,
+    actual_provenance_path,
+    validate_actual_provenance,
+)
+from .causal_evidence import validate_causal_evidence
 from .checklist import ChecklistSeedError, seed_checklist_from_drift
 from .codegen import react, rust_dioxus, swiftui
 from .compare import LENIENT_THRESHOLD, STRICT_THRESHOLD, compare_tree_files
@@ -56,7 +63,15 @@ from .pen import (
     validate_pen_context,
     validate_pen_context_against_contract,
 )
+from .export_operator import (
+    validate_export_operation_receipt,
+    verify_export_operation,
+)
 from .pencil_sync import PencilSyncError, sync_pencil_to_disk
+from .pencil_persistence import (
+    validate_pencil_persistence_receipt,
+    verify_pencil_persistence,
+)
 from .reference_fidelity import validate_reference_fidelity
 from .reverse import reverse_pen
 from .run_pipeline import RunPipelineError, run_pipeline
@@ -65,7 +80,12 @@ from .semantic_draft import write_pen_draft_from_semantic_tree
 from .semantic_enrichment import enrich_pen_from_semantic_tree
 from .semantic_mapping import write_pencil_context_map
 from .semantic_validation import validate_semantic_tree, validate_semantic_tree_file
-from .schema_cache import load_schema
+from .schema_cache import load_schema, validator_for
+from .strict_closure import (
+    StrictClosureError,
+    validate_strict_closure,
+    validate_strict_closure_report,
+)
 from .theme import load_theme, theme_fingerprint
 from .token_lint import (
     DEFAULT_FONTSIZE_SCALE,
@@ -106,6 +126,19 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--theme-css", default=None, help="optional theme.css path")
     run.add_argument("--references", default=None, help="optional references directory")
     run.add_argument("--strict", action="store_true", help="fail on warning-only gates")
+    run.add_argument(
+        "--strict-closure",
+        action="store_true",
+        help="read-only fail-closed validation of same-run persistence, actual,"
+        " references, and blocking visual evidence",
+    )
+    run.add_argument(
+        "--actual-max-age-seconds",
+        type=float,
+        default=None,
+        help="freshness window (seconds) for a runtime-capture actual tree in the"
+        " provenance gate; default 86400 (24h). static-demo-fixture is exempt",
+    )
     run.add_argument("--json", action="store_true", help="print machine-readable JSON")
     run.set_defaults(func=cmd_run)
 
@@ -120,6 +153,31 @@ def build_parser() -> argparse.ArgumentParser:
     pencil_sync.add_argument("--expect-screens", type=int, default=None)
     pencil_sync.add_argument("--json", action="store_true", help="print machine-readable JSON")
     pencil_sync.set_defaults(func=cmd_pencil_sync)
+
+    pencil_persistence = sub.add_parser(
+        "verify-pencil-persistence",
+        help="verify operator-captured pre/post Pencil bytes and write a receipt",
+    )
+    pencil_persistence.add_argument("observation")
+    pencil_persistence.add_argument("--document", required=True)
+    pencil_persistence.add_argument("--run-id", required=True)
+    pencil_persistence.add_argument("--operation", required=True)
+    pencil_persistence.add_argument("--out", required=True)
+    pencil_persistence.add_argument(
+        "--json", action="store_true", help="print machine-readable JSON"
+    )
+    pencil_persistence.set_defaults(func=cmd_verify_pencil_persistence)
+
+    export_operation = sub.add_parser(
+        "verify-export-operation",
+        help="verify a durable native export_nodes operator request and write a receipt",
+    )
+    export_operation.add_argument("request")
+    export_operation.add_argument("--source-pen", required=True)
+    export_operation.add_argument("--run-id", required=True)
+    export_operation.add_argument("--out", required=True)
+    export_operation.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    export_operation.set_defaults(func=cmd_verify_export_operation)
 
     validate_pen = sub.add_parser(
         "validate-pen", aliases=["validate"], help="validate .pen context"
@@ -165,6 +223,17 @@ def build_parser() -> argparse.ArgumentParser:
     validate_flow_contract_cmd.add_argument("contract")
     _add_lenient(validate_flow_contract_cmd)
     validate_flow_contract_cmd.set_defaults(func=cmd_validate_flow_contract)
+
+    causal_evidence_cmd = sub.add_parser(
+        "validate-causal-evidence",
+        help="validate adapter-produced run-bound causal transition evidence",
+    )
+    causal_evidence_cmd.add_argument(
+        "--json", action="store_true", help="print machine-readable JSON"
+    )
+    causal_evidence_cmd.add_argument("contract", help="strict v2 flow contract JSON")
+    causal_evidence_cmd.add_argument("evidence", help="causal transition evidence JSON")
+    causal_evidence_cmd.set_defaults(func=cmd_validate_causal_evidence)
 
     migrate_flow_contract_cmd = sub.add_parser(
         "migrate-flow-md-to-contract-json",
@@ -263,6 +332,45 @@ def build_parser() -> argparse.ArgumentParser:
     actual.add_argument("actual")
     _add_lenient(actual)
     actual.set_defaults(func=cmd_validate_actual)
+
+    provenance = sub.add_parser(
+        "validate-actual-provenance",
+        help="validate the content-bound provenance receipt of an actual UI tree",
+    )
+    provenance.add_argument("--json", action="store_true", help="print machine-readable JSON")
+    provenance.add_argument(
+        "target",
+        help="workspace directory or actual-ui-tree.json path",
+    )
+    provenance.add_argument(
+        "--actual",
+        default=None,
+        help="explicit actual-ui-tree.json path (overrides directory resolution)",
+    )
+    provenance.add_argument(
+        "--expected",
+        default=None,
+        help="expected-ui-tree.json enabling the derived-from-expected independence check",
+    )
+    provenance.add_argument(
+        "--surface",
+        action="append",
+        default=None,
+        help="admissible capture surface; repeatable (e.g. --surface web)",
+    )
+    provenance.add_argument(
+        "--max-age-seconds",
+        type=float,
+        default=None,
+        help="reject a runtime-capture whose capturedAt is older than this window",
+    )
+    provenance.add_argument(
+        "--require-fresh",
+        action="store_true",
+        help="reject qualified fixtures; only fresh runtime captures are admissible",
+    )
+    _add_lenient(provenance)
+    provenance.set_defaults(func=cmd_validate_actual_provenance)
 
     compare = sub.add_parser("compare-tree", help="compare expected and actual UI trees")
     compare.add_argument("--json", action="store_true", help="print machine-readable JSON")
@@ -496,12 +604,25 @@ def cmd_inspect(args: argparse.Namespace) -> int:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
+    if args.strict_closure:
+        try:
+            summary = validate_strict_closure(
+                args.target,
+                theme_css=args.theme_css,
+                references=args.references,
+                actual_max_age_seconds=args.actual_max_age_seconds,
+            )
+        except StrictClosureError as error:
+            raise PenflowError(str(error)) from error
+        _print(summary, args.json)
+        return int(summary["exit"])
     try:
         summary = run_pipeline(
             args.target,
             theme_css=args.theme_css,
             references=args.references,
             strict=args.strict,
+            actual_max_age_seconds=args.actual_max_age_seconds,
         )
     except RunPipelineError as error:
         raise PenflowError(str(error)) from error
@@ -520,6 +641,35 @@ def cmd_pencil_sync(args: argparse.Namespace) -> int:
         raise PenflowError(str(error)) from error
     _print(result, args.json)
     return 0 if result["status"] == "PASS" else 1
+
+
+def cmd_verify_pencil_persistence(args: argparse.Namespace) -> int:
+    try:
+        receipt = verify_pencil_persistence(
+            args.observation,
+            document=args.document,
+            run_id=args.run_id,
+            operation=args.operation,
+            out=args.out,
+        )
+    except OSError as error:
+        raise PenflowError(f"could not write persistence receipt: {error}") from error
+    _print(receipt, args.json)
+    return 0 if receipt["status"] == "PASS" else 1
+
+
+def cmd_verify_export_operation(args: argparse.Namespace) -> int:
+    try:
+        receipt = verify_export_operation(
+            args.request,
+            source_pen=args.source_pen,
+            run_id=args.run_id,
+            out=args.out,
+        )
+    except OSError as error:
+        raise PenflowError(f"could not write export receipt: {error}") from error
+    _print(receipt, args.json)
+    return 0 if receipt["status"] == "PASS" else 1
 
 
 def cmd_validate_pen(args: argparse.Namespace) -> int:
@@ -595,6 +745,16 @@ def cmd_validate_flow_contract(args: argparse.Namespace) -> int:
         args.json,
     )
     return code
+
+
+def cmd_validate_causal_evidence(args: argparse.Namespace) -> int:
+    """Validate local adapter observations without executing a runtime."""
+    try:
+        report = validate_causal_evidence(args.contract, args.evidence)
+    except (FileNotFoundError, json.JSONDecodeError, ValueError, OSError) as error:
+        raise PenflowError(str(error)) from error
+    _print(report, args.json)
+    return 0 if report["status"] == "PASS" else 1
 
 
 def cmd_migrate_flow_contract(args: argparse.Namespace) -> int:
@@ -712,6 +872,48 @@ def cmd_validate_actual(args: argparse.Namespace) -> int:
     issues = validate_actual_tree(load_tree(args.actual), schema=args.schema)
     code = _exit_code(issues, _is_lenient(args))
     _print({"status": _status(code), "issues": issues}, args.json)
+    return code
+
+
+# @spec(FR-016)
+# @spec(FR-017)
+def cmd_validate_actual_provenance(args: argparse.Namespace) -> int:
+    target = Path(args.target)
+    if args.actual is not None:
+        actual_path = Path(args.actual)
+    elif target.is_dir():
+        actual_path = target / "actual-ui-tree.json"
+    else:
+        actual_path = target
+    if args.expected is not None:
+        expected_path: Path | None = Path(args.expected)
+    elif target.is_dir():
+        candidate = target / "expected-ui-tree.json"
+        expected_path = candidate if candidate.is_file() else None
+    else:
+        expected_path = None
+    try:
+        issues = validate_actual_provenance(
+            actual_path,
+            expected_path=expected_path,
+            now=datetime.now(timezone.utc),
+            max_age_seconds=args.max_age_seconds,
+            require_fresh=args.require_fresh,
+            allowed_surfaces=args.surface,
+        )
+    except ProvenanceError as error:
+        # Structured, non-zero exit before any JSON body is printed.
+        raise PenflowError(str(error)) from error
+    code = _exit_code(issues, _is_lenient(args))
+    _print(
+        {
+            "status": _status(code),
+            "actual": str(actual_path),
+            "receipt": str(actual_provenance_path(actual_path)),
+            "issues": issues,
+        },
+        args.json,
+    )
     return code
 
 
@@ -1095,7 +1297,8 @@ def _status(exit_code: int) -> str:
 
 def _print(data: dict[str, Any], as_json: bool) -> None:
     if as_json:
-        print(json.dumps(data, indent=2, sort_keys=True))
+        # allow_nan=False: never print non-standard JSON (NaN/Infinity).
+        print(json.dumps(data, indent=2, sort_keys=True, allow_nan=False))
         return
     if "status" in data:
         print(f"Status: {data['status']}")
@@ -1119,14 +1322,19 @@ def _resolve_threshold(explicit: float | None, lenient: bool) -> float:
 _SUPPORTED_REPORT_SCHEMA_KEYWORDS = frozenset(
     {
         "$comment",
+        "$defs",
         "$id",
+        "$ref",
         "$schema",
         "additionalProperties",
         "const",
+        "dependentRequired",
         "description",
         "enum",
         "items",
+        "minItems",
         "minLength",
+        "minimum",
         "pattern",
         "properties",
         "required",
@@ -1141,10 +1349,31 @@ def _validate_report_schema(report: Any, report_path: str | Path) -> list[dict[s
         return [{"severity": "error", "path": "$", "message": "report must be an object"}]
     schema_name = _report_schema_name(report, Path(report_path).name)
     schema = load_schema(schema_name)
-    issues = _validate_json_schema_subset(report, schema, "$")
+    issues = _unsupported_schema_keyword_issues(schema, "$")
+    if not issues:
+        issues = [
+            {
+                "severity": "error",
+                "path": _json_schema_error_path(error.absolute_path),
+                "message": error.message,
+            }
+            for error in validator_for(schema_name).iter_errors(report)
+        ]
     if report.get("kind") == "penflow-mockup-audit":
         issues.extend(_validate_mockup_audit_receipts(report, Path(report_path)))
+    if report.get("kind") == "penflow-pencil-persistence-receipt":
+        issues.extend(validate_pencil_persistence_receipt(report))
+    if report.get("kind") == "penflow-export-operator-receipt":
+        issues.extend(validate_export_operation_receipt(report))
+    if report.get("kind") == "penflow-strict-closure-report":
+        issues.extend(validate_strict_closure_report(report, report_path))
     return sorted(issues, key=lambda item: (item["path"], item["message"]))
+
+
+def _json_schema_error_path(absolute_path: Any) -> str:
+    return "$" + "".join(
+        f".{part}" if isinstance(part, str) else f"[{part}]" for part in absolute_path
+    )
 
 
 def _validate_mockup_audit_receipts(
@@ -1276,6 +1505,22 @@ def _validate_json_schema_subset(
                         }
                     )
     if isinstance(value, dict):
+        # @spec FR-009: A lineage stamp is one atomic versioned identity —
+        # .specs/features/067-wp2-9-run-pipeline/spec.md#fr-009
+        dependent_required = schema.get("dependentRequired")
+        if isinstance(dependent_required, dict):
+            for trigger, dependencies in dependent_required.items():
+                if trigger not in value or not isinstance(dependencies, list):
+                    continue
+                for dependency in dependencies:
+                    if isinstance(dependency, str) and dependency not in value:
+                        issues.append(
+                            {
+                                "severity": "error",
+                                "path": f"{path}.{dependency}",
+                                "message": f"{dependency} is required when {trigger} is present",
+                            }
+                        )
         for key in schema.get("required", []) or []:
             if key not in value:
                 issues.append(
@@ -1371,6 +1616,12 @@ def _report_schema_name(report: dict[str, Any], filename: str) -> str:
     if kind == "penflow-mockup-checklist":
         # @spec FR-003: Hardened checklist schema registration — .specs/features/052-prescriptive-rubric-bounded-fix-loop/spec.md#fr-003
         return "mockup-validation-checklist.schema.json"
+    if kind == "penflow-pencil-persistence-receipt":
+        return "pencil-persistence-receipt.schema.json"
+    if kind == "penflow-export-operator-receipt":
+        return "export-operator-receipt.schema.json"
+    if kind == "penflow-strict-closure-report":
+        return "strict-closure-report.schema.json"
     if "compare" in filename or {"score", "summary", "issues"}.issubset(report):
         return "compare-report.schema.json"
     if "visual" in filename:

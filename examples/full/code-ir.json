@@ -231,7 +231,8 @@
                 "binding": "checkout.order_summary",
                 "entity": "checkout",
                 "role": "text",
-                "semantic_id": "checkout.order-summary"
+                "semantic_id": "checkout.order-summary",
+                "variant": "heading"
               },
               "contract": "examples/full/flow-ui-contract/contract.json",
               "contract_path": "$.nodes[1]",
@@ -256,7 +257,8 @@
                 "binding": "checkout.selected_payment_method",
                 "entity": "checkout",
                 "role": "text",
-                "semantic_id": "checkout.selected-payment-method"
+                "semantic_id": "checkout.selected-payment-method",
+                "variant": "body"
               },
               "contract": "examples/full/flow-ui-contract/contract.json",
               "contract_path": "$.nodes[2]",
@@ -282,6 +284,9 @@
                 "pencil_node_id": "payNowLabel",
                 "role": "text",
                 "source_map": {
+                  "context": {
+                    "variant": "label"
+                  },
                   "pencil_node_id": "payNowLabel",
                   "pencil_path": "0.2.0"
                 },

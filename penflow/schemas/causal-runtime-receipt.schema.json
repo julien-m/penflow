@@ -1,0 +1,101 @@
+{
+  "$comment": "Feature 069 / C44: closed payload emitted by an external runtime adapter.",
+  "$id": "https://penflow.dev/schemas/causal-runtime-receipt.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Penflow Causal Runtime Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "version",
+    "run_id",
+    "transition_id",
+    "observation_id",
+    "outcome",
+    "adapter",
+    "surface",
+    "capture"
+  ],
+  "properties": {
+    "kind": {"const": "penflow-causal-runtime-receipt"},
+    "version": {"const": 1},
+    "run_id": {"$ref": "#/$defs/identifier"},
+    "transition_id": {"$ref": "#/$defs/identifier"},
+    "observation_id": {"$ref": "#/$defs/identifier"},
+    "outcome": {"$ref": "#/$defs/identifier"},
+    "adapter": {"$ref": "#/$defs/adapter"},
+    "surface": {"$ref": "#/$defs/nonEmptyString"},
+    "capture": {"$ref": "#/$defs/capture"}
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]*$"
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "pattern": ".*\\S.*"
+    },
+    "adapter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version"],
+      "properties": {
+        "name": {"$ref": "#/$defs/nonEmptyString"},
+        "version": {"$ref": "#/$defs/nonEmptyString"}
+      }
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "action",
+        "pre_state",
+        "post_state",
+        "destination",
+        "outcome"
+      ],
+      "properties": {
+        "kind": {
+          "enum": ["runtime-event", "runtime-state", "runtime-screenshot"]
+        },
+        "action": {"$ref": "#/$defs/actionObservation"},
+        "pre_state": {"$ref": "#/$defs/stateObservation"},
+        "post_state": {"$ref": "#/$defs/stateObservation"},
+        "destination": {"$ref": "#/$defs/destination"},
+        "outcome": {"$ref": "#/$defs/identifier"}
+      }
+    },
+    "actionObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "test_id", "visible", "event"],
+      "properties": {
+        "id": {"$ref": "#/$defs/identifier"},
+        "test_id": {"$ref": "#/$defs/nonEmptyString"},
+        "visible": {"const": true},
+        "event": {"$ref": "#/$defs/nonEmptyString"}
+      }
+    },
+    "stateObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["screen", "state", "value"],
+      "properties": {
+        "screen": {"$ref": "#/$defs/nonEmptyString"},
+        "state": {"$ref": "#/$defs/nonEmptyString"},
+        "value": {"$ref": "#/$defs/nonEmptyString"}
+      }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["screen", "state"],
+      "properties": {
+        "screen": {"$ref": "#/$defs/nonEmptyString"},
+        "state": {"$ref": "#/$defs/nonEmptyString"}
+      }
+    }
+  }
+}

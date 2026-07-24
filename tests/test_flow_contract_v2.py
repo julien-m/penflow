@@ -73,7 +73,22 @@ def valid_contract() -> dict:
                 "action": "submit_payment",
             },
         ],
-        "guards": [{"id": "payment_ready"}],
+        "guards": [
+            {
+                "id": "payment_ready",
+                "variable": "payment_result",
+                "operator": "equals",
+                "value": "success",
+                "source": "runtime_result",
+            },
+            {
+                "id": "payment_failed",
+                "variable": "payment_result",
+                "operator": "equals",
+                "value": "error",
+                "source": "runtime_result",
+            },
+        ],
         "permissions": [
             {
                 "id": "buyer_can_pay",
@@ -117,6 +132,15 @@ def valid_contract() -> dict:
                 "to_state": "success",
                 "trigger": "submit_payment",
                 "action": "submit_payment",
+                "guard": "payment_ready",
+                "kind": "state",
+                "label": "Payment succeeds",
+                "causal": {
+                    "version": 1,
+                    "action_visibility": "user-visible",
+                    "outcome": "success",
+                    "fanout": {"group": "payment_result", "policy": "exclusive"},
+                },
             },
             {
                 "id": "payment_error",
@@ -127,6 +151,15 @@ def valid_contract() -> dict:
                 "to_state": "error",
                 "trigger": "submit_payment",
                 "action": "submit_payment",
+                "guard": "payment_failed",
+                "kind": "state",
+                "label": "Payment fails",
+                "causal": {
+                    "version": 1,
+                    "action_visibility": "user-visible",
+                    "outcome": "error",
+                    "fanout": {"group": "payment_result", "policy": "exclusive"},
+                },
             },
         ],
         "needs_review": False,
@@ -168,6 +201,100 @@ def test_contract_referential_validation_is_fail_closed(tmp_path: Path) -> None:
 
     assert any(issue["code"] == "contract.reference.missing_mutation" for issue in issues)
     assert main(["validate-flow-contract", str(contract_path), "--json"]) == 1
+
+
+def test_contract_accepts_structured_guards_and_causal_transition_metadata() -> None:
+    contract = valid_contract()
+
+    assert validate_flow_contract_v2(contract) == []
+    assert contract["guards"][0]["source"] == "runtime_result"
+    assert contract["transitions"][0]["causal"]["fanout"]["policy"] == "exclusive"
+
+
+def test_contract_rejects_incomplete_and_destination_derived_guards() -> None:
+    incomplete = valid_contract()
+    del incomplete["guards"][0]["source"]
+    circular = valid_contract()
+    circular["guards"][0]["variable"] = "destination"
+
+    assert "contract.guard.incomplete" in {
+        issue["code"] for issue in validate_flow_contract_v2(incomplete)
+    }
+    assert "contract.guard.non_causal_variable" in {
+        issue["code"] for issue in validate_flow_contract_v2(circular)
+    }
+
+
+def test_contract_rejects_default_to_default_state_transition() -> None:
+    contract = valid_contract()
+    contract["transitions"][0]["to_state"] = "default"
+
+    codes = {issue["code"] for issue in validate_flow_contract_v2(contract)}
+
+    assert "contract.transition.default_unchanged" in codes
+
+
+def test_contract_rejects_causal_action_without_visible_test_id() -> None:
+    contract = valid_contract()
+    del contract["nodes"][2]["test_id"]
+
+    codes = {issue["code"] for issue in validate_flow_contract_v2(contract)}
+
+    assert "contract.transition.action_not_observable" in codes
+
+
+def test_contract_rejects_ungoverned_and_duplicate_fanout() -> None:
+    ungoverned = valid_contract()
+    del ungoverned["transitions"][1]["causal"]
+    duplicate = valid_contract()
+    duplicate["transitions"][1]["guard"] = "payment_ready"
+    duplicate["transitions"][1]["causal"]["outcome"] = "success"
+
+    ungoverned_codes = {issue["code"] for issue in validate_flow_contract_v2(ungoverned)}
+    duplicate_codes = {issue["code"] for issue in validate_flow_contract_v2(duplicate)}
+
+    assert "contract.transition.fanout_ungoverned" in ungoverned_codes
+    assert "contract.transition.fanout_outcome_duplicate" in duplicate_codes
+    assert "contract.transition.non_exclusive_fanout" in duplicate_codes
+
+
+def test_contract_accepts_explicitly_governed_fanout() -> None:
+    contract = valid_contract()
+    for transition in contract["transitions"]:
+        transition["causal"]["fanout"] = {
+            "group": "payment_result",
+            "policy": "governed",
+            "governance": "Adapter executes each outcome in an isolated run.",
+        }
+
+    assert validate_flow_contract_v2(contract) == []
+
+
+def test_contract_rejects_governed_causal_fanout_without_structured_guards() -> None:
+    contract = valid_contract()
+    for guard in contract["guards"]:
+        for field in ("variable", "operator", "value", "source"):
+            guard.pop(field)
+    for transition in contract["transitions"]:
+        transition["causal"]["fanout"] = {
+            "group": "payment_result",
+            "policy": "governed",
+            "governance": "Adapter executes each outcome in an isolated run.",
+        }
+
+    codes = {issue["code"] for issue in validate_flow_contract_v2(contract)}
+
+    assert "contract.transition.causal_guard_incomplete" in codes
+
+
+def test_contract_keeps_legacy_metadata_free_fanout_compatible() -> None:
+    contract = valid_contract()
+    for transition in contract["transitions"]:
+        transition.pop("kind")
+        transition.pop("label")
+        transition.pop("causal")
+
+    assert validate_flow_contract_v2(contract) == []
 
 
 def test_contract_schema_rejects_nested_unknown_properties() -> None:
@@ -335,3 +462,7 @@ def test_export_semantic_tree_reads_contract_json_only(tmp_path: Path) -> None:
     assert tree["screens"][0]["root"]["children"][1]["actions"][0]["id"] == "submit_payment"
     assert tree["screens"][0]["validations"]
     assert tree["screens"][0]["side_effects"]
+    assert tree["flows"][0]["transitions"][0]["kind"] == "state"
+    assert tree["flows"][0]["transitions"][0]["label"] == "Payment succeeds"
+    assert tree["flows"][0]["transitions"][0]["condition"] == "payment_ready"
+    assert tree["flows"][0]["transitions"][0]["causal"]["outcome"] == "success"

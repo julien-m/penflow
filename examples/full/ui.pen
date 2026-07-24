@@ -5,7 +5,7 @@
       "children": [
         {
           "content": "Order summary",
-          "context": "binding=checkout.order_summary; entity=checkout; role=text; semantic_id=checkout.order-summary",
+          "context": "binding=checkout.order_summary; entity=checkout; role=text; semantic_id=checkout.order-summary; variant=heading",
           "fill": "#111827",
           "fontSize": 24,
           "fontWeight": "600",
@@ -21,7 +21,7 @@
         },
         {
           "content": "Selected payment method",
-          "context": "binding=checkout.selected_payment_method; entity=checkout; role=text; semantic_id=checkout.selected-payment-method",
+          "context": "binding=checkout.selected_payment_method; entity=checkout; role=text; semantic_id=checkout.selected-payment-method; variant=body",
           "fill": "#374151",
           "fontSize": 16,
           "fontWeight": "400",
@@ -40,6 +40,7 @@
           "children": [
             {
               "content": "Pay now",
+              "context": "variant=label",
               "fill": "#FFFFFF",
               "fontSize": 16,
               "fontWeight": "600",

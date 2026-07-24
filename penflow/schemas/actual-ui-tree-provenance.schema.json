@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.dev/schemas/actual-ui-tree-provenance.schema.json",
+  "title": "Penflow Actual UI Tree Provenance Receipt",
+  "description": "Independent, content-bound provenance receipt for an `actual-ui-tree.json` (contract C12). Emitted by the external runtime adapter that captured or exported the tree, and validated by `penflow validate-actual-provenance`. Penflow never captures a runtime; it only checks this receipt against the actual-tree bytes on disk.",
+  "type": "object",
+  "required": ["kind", "version", "sourceKind", "producer", "capturedAt", "target", "content"],
+  "additionalProperties": false,
+  "properties": {
+    "kind": {"const": "penflow-actual-provenance"},
+    "version": {"const": 1},
+    "sourceKind": {
+      "description": "runtime-capture = fresh capture/export from a live runtime adapter; static-demo-fixture = explicitly qualified frozen example data that must never masquerade as a fresh capture.",
+      "enum": ["runtime-capture", "static-demo-fixture"]
+    },
+    "producer": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1}
+      }
+    },
+    "capturedAt": {
+      "description": "ISO-8601 UTC timestamp of the current capture/export boundary for this actual tree.",
+      "type": "string",
+      "minLength": 1
+    },
+    "target": {
+      "type": "object",
+      "required": ["surface"],
+      "additionalProperties": false,
+      "properties": {
+        "surface": {"type": "string", "minLength": 1},
+        "screen_id": {"type": "string", "minLength": 1},
+        "device": {"type": "string", "minLength": 1}
+      }
+    },
+    "content": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "sessionId": {"type": "string", "minLength": 1},
+    "fixture": {
+      "type": "object",
+      "required": ["reason"],
+      "additionalProperties": false,
+      "properties": {
+        "reason": {"type": "string", "minLength": 1}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"sourceKind": {"const": "static-demo-fixture"}}},
+      "then": {"required": ["fixture"]},
+      "else": {"not": {"required": ["fixture"]}}
+    }
+  ]
+}

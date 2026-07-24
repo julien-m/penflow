@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.local/schemas/pencil-persistence-observation.schema.json",
+  "title": "Penflow Pencil Persistence Observation",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "version", "run_id", "document", "operation", "trigger"],
+  "properties": {
+    "kind": {"const": "penflow-pencil-persistence-observation"},
+    "version": {"const": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "pre", "post"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "pre": {"$ref": "#/$defs/snapshot"},
+        "post": {"$ref": "#/$defs/snapshot"}
+      }
+    },
+    "operation": {"type": "string", "minLength": 1},
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "status"],
+      "properties": {
+        "provider": {"type": "string", "minLength": 1},
+        "status": {"const": "triggered"}
+      }
+    }
+  },
+  "$defs": {
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

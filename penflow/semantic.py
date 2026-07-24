@@ -252,6 +252,7 @@ def _screen_behaviors(contract: dict[str, Any]) -> dict[str, dict[str, list[dict
 
 
 def _contract_transition(transition: dict[str, Any]) -> dict[str, Any]:
+    condition = str(transition["guard"]) if transition.get("guard") else None
     return {
         "id": transition["id"],
         "from": transition.get("from_screen"),
@@ -259,6 +260,10 @@ def _contract_transition(transition: dict[str, Any]) -> dict[str, Any]:
         "trigger": transition.get("trigger"),
         **({"action": transition["action"]} if transition.get("action") else {}),
         **({"guard": transition["guard"]} if transition.get("guard") else {}),
+        **({"condition": condition} if condition else {}),
+        **({"kind": transition["kind"]} if transition.get("kind") else {}),
+        **({"label": transition["label"]} if transition.get("label") else {}),
+        **({"causal": transition["causal"]} if transition.get("causal") else {}),
     }
 
 

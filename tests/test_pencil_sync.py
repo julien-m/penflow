@@ -60,9 +60,12 @@ def test_pencil_sync_passes_after_save_persists_expected_screens(tmp_path: Path)
     assert result["after"]["screen_count"] == 8
     assert result["after"]["node_count"] == 16
     assert result["checks"]["mtime_advanced"] is True
+    assert result["checks"]["content_changed"] is True
+    assert result["persistence_status"] == "UNVERIFIED"
+    assert result["closes_persistence"] is False
 
 
-def test_pencil_sync_fails_when_file_mtime_does_not_advance(tmp_path: Path) -> None:
+def test_pencil_sync_fails_when_save_is_same_digest_noop(tmp_path: Path) -> None:
     pen_path = write_json(tmp_path / "ui.pen", pen_with_screens(8))
 
     result = sync_pencil_to_disk(
@@ -72,8 +75,25 @@ def test_pencil_sync_fails_when_file_mtime_does_not_advance(tmp_path: Path) -> N
     )
 
     assert result["status"] == "FAIL"
-    assert result["checks"]["mtime_advanced"] is False
+    assert result["checks"]["content_changed"] is False
     assert "did not persist" in result["message"]
+
+
+def test_pencil_sync_does_not_use_mtime_as_persistence_proof(tmp_path: Path) -> None:
+    pen_path = write_json(tmp_path / "ui.pen", pen_with_screens(1))
+    original_mtime = pen_path.stat().st_mtime_ns
+
+    def save(path: Path) -> SaveOutcome:
+        write_json(path, pen_with_screens(2))
+        os.utime(path, ns=(original_mtime, original_mtime))
+        return SaveOutcome(ok=True, method="fake", message="saved")
+
+    result = sync_pencil_to_disk(pen_path, expect_screens=2, save_runner=save)
+
+    assert result["status"] == "PASS"
+    assert result["checks"]["mtime_advanced"] is False
+    assert result["checks"]["content_changed"] is True
+    assert result["closes_persistence"] is False
 
 
 def test_pencil_sync_fails_when_disk_inspection_is_below_expectation(tmp_path: Path) -> None:

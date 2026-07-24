@@ -4,13 +4,80 @@
   "$id": "https://penflow.dev/schemas/vision-report.schema.json",
   "title": "Penflow Vision Report",
   "description": "Skill-layer vision pass results locked to vision-only categories. Deterministic categories (contrast, touch targets, overlap/overflow, tokens, consistency) belong to penflow audit-visual / lint-tokens / check-consistency and are rejected here.",
+  "$defs": {
+    "crop": {
+      "type": "object",
+      "required": ["x", "y", "width", "height", "source_width", "source_height"],
+      "additionalProperties": false,
+      "properties": {
+        "x": {"type": "integer", "minimum": 0},
+        "y": {"type": "integer", "minimum": 0},
+        "width": {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1},
+        "source_width": {"type": "integer", "minimum": 1},
+        "source_height": {"type": "integer", "minimum": 1}
+      }
+    },
+    "proof": {
+      "type": "object",
+      "required": ["run_id", "surface", "screen_id", "region_id", "state", "assertion", "measurement", "artifacts"],
+      "additionalProperties": false,
+      "properties": {
+        "run_id": {"type": "string", "minLength": 1},
+        "surface": {"type": "string", "minLength": 1},
+        "screen_id": {"type": "string", "minLength": 1},
+        "region_id": {"type": "string", "minLength": 1},
+        "state": {"type": "string", "minLength": 1},
+        "assertion": {"type": "string", "minLength": 1},
+        "measurement": {
+          "type": "object",
+          "required": ["expected", "actual", "unit"],
+          "additionalProperties": false,
+          "properties": {
+            "expected": {"type": ["string", "number", "boolean"]},
+            "actual": {"type": ["string", "number", "boolean"]},
+            "unit": {"type": "string", "minLength": 1}
+          }
+        },
+        "artifacts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["role", "file", "sha256", "crop"],
+            "additionalProperties": false,
+            "properties": {
+              "role": {"enum": ["actual", "reference", "contact_sheet"]},
+              "file": {"type": "string", "minLength": 1},
+              "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+              "crop": {"$ref": "#/$defs/crop"}
+            }
+          }
+        }
+      }
+    },
+    "referenceMapping": {
+      "type": "object",
+      "required": ["surface", "screen_id", "region_id", "state", "reference_crop", "actual_crop"],
+      "additionalProperties": false,
+      "properties": {
+        "surface": {"type": "string", "minLength": 1},
+        "screen_id": {"type": "string", "minLength": 1},
+        "region_id": {"type": "string", "minLength": 1},
+        "state": {"type": "string", "minLength": 1},
+        "reference_crop": {"$ref": "#/$defs/crop"},
+        "actual_crop": {"$ref": "#/$defs/crop"}
+      }
+    }
+  },
   "type": "object",
-  "required": ["version", "kind", "status", "renderer", "sourceFile", "model", "generated_by", "inputs", "screens"],
+  "required": ["version", "kind", "status", "runId", "renderer", "sourceFile", "model", "generated_by", "inputs", "screens"],
   "additionalProperties": false,
   "properties": {
     "version": {"type": "integer"},
     "kind": {"const": "penflow-vision-report"},
     "status": {"enum": ["PASS", "PASSED_WITH_WARNINGS", "FAIL", "BLOCKED_VISUAL_NOT_RUN"]},
+    "runId": {"type": "string", "minLength": 1},
     "renderer": {"type": "string"},
     "sourceFile": {"type": "string"},
     "model": {"type": "string"},
@@ -33,18 +100,19 @@
       "description": "Optional per-reference-screen fidelity pass. Required by validate-visual-evidence when manifest.json declares references_manifest.",
       "items": {
         "type": "object",
-        "required": ["screen_id", "reference", "export", "contact_sheet", "criteria"],
+        "required": ["screen_id", "reference", "export", "contact_sheet", "mapping", "criteria"],
         "additionalProperties": false,
         "properties": {
           "screen_id": {"type": "string"},
           "reference": {"type": "string"},
           "export": {"type": "string"},
           "contact_sheet": {"type": "string"},
+          "mapping": {"$ref": "#/$defs/referenceMapping"},
           "criteria": {
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["category", "result", "evidence", "blocking"],
+              "required": ["category", "result", "evidence", "blocking", "proof"],
               "additionalProperties": false,
               "properties": {
                 "category": {
@@ -57,7 +125,8 @@
                 },
                 "result": {"enum": ["pass", "fail", "warning"]},
                 "evidence": {"type": "string", "minLength": 10},
-                "blocking": {"type": "boolean"}
+                "blocking": {"type": "boolean"},
+                "proof": {"$ref": "#/$defs/proof"}
               }
             }
           }
@@ -67,15 +136,19 @@
     "coherence": {
       "type": "object",
       "description": "Optional cross-mockup coherence pass over one uniform-scale contact sheet. Required by validate-visual-evidence when the expected tree has >= 2 screens. Numeric cross-screen facts belong to penflow check-consistency and are rejected here.",
-      "required": ["contact_sheet_png", "criteria"],
+      "required": ["contact_sheet_png", "surface", "screen_id", "region_id", "state", "criteria"],
       "additionalProperties": false,
       "properties": {
         "contact_sheet_png": {"type": "string"},
+        "surface": {"type": "string", "minLength": 1},
+        "screen_id": {"type": "string", "minLength": 1},
+        "region_id": {"type": "string", "minLength": 1},
+        "state": {"type": "string", "minLength": 1},
         "criteria": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["category", "result", "evidence", "blocking"],
+            "required": ["category", "result", "evidence", "blocking", "proof"],
             "additionalProperties": false,
             "properties": {
               "category": {
@@ -88,7 +161,8 @@
               },
               "result": {"enum": ["pass", "fail", "warning"]},
               "evidence": {"type": "string", "minLength": 10},
-              "blocking": {"type": "boolean"}
+              "blocking": {"type": "boolean"},
+              "proof": {"$ref": "#/$defs/proof"}
             }
           }
         }
@@ -98,10 +172,13 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["screen_id", "png", "criteria"],
+        "required": ["screen_id", "surface", "region_id", "state", "png", "criteria"],
         "additionalProperties": false,
         "properties": {
           "screen_id": {"type": "string"},
+          "surface": {"type": "string", "minLength": 1},
+          "region_id": {"type": "string", "minLength": 1},
+          "state": {"type": "string", "minLength": 1},
           "semantic_id": {"type": "string"},
           "pencil_node_id": {"type": "string"},
           "png": {"type": "string"},
@@ -109,7 +186,7 @@
             "type": "array",
             "items": {
               "type": "object",
-              "required": ["category", "result", "evidence", "blocking"],
+              "required": ["category", "result", "evidence", "blocking", "proof"],
               "additionalProperties": false,
               "properties": {
                 "category": {
@@ -123,7 +200,8 @@
                 },
                 "result": {"enum": ["pass", "fail", "warning"]},
                 "evidence": {"type": "string", "minLength": 10},
-                "blocking": {"type": "boolean"}
+                "blocking": {"type": "boolean"},
+                "proof": {"$ref": "#/$defs/proof"}
               }
             }
           }
