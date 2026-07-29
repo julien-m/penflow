@@ -5,7 +5,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -87,7 +87,7 @@ def validate_strict_closure(
             *validate_actual_provenance(
                 actual_path,
                 expected_path=expected_path,
-                now=now or datetime.now(timezone.utc),
+                now=now or datetime.now(UTC),
                 max_age_seconds=(
                     DEFAULT_ACTUAL_MAX_AGE_SECONDS
                     if actual_max_age_seconds is None

@@ -16,7 +16,7 @@ import json
 import re
 import sys
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -46,6 +46,10 @@ from .contracts import (
 from .demo import build_demo
 from .drift import detect_drift
 from .evidence import validate_visual_evidence
+from .export_operator import (
+    validate_export_operation_receipt,
+    verify_export_operation,
+)
 from .flow_contract import (
     FlowContractValidationError,
     interactive_coverage_report,
@@ -63,24 +67,20 @@ from .pen import (
     validate_pen_context,
     validate_pen_context_against_contract,
 )
-from .export_operator import (
-    validate_export_operation_receipt,
-    verify_export_operation,
-)
-from .pencil_sync import PencilSyncError, sync_pencil_to_disk
 from .pencil_persistence import (
     validate_pencil_persistence_receipt,
     verify_pencil_persistence,
 )
+from .pencil_sync import PencilSyncError, sync_pencil_to_disk
 from .reference_fidelity import validate_reference_fidelity
 from .reverse import reverse_pen
 from .run_pipeline import RunPipelineError, run_pipeline
+from .schema_cache import load_schema, validator_for
 from .semantic import write_semantic_tree
 from .semantic_draft import write_pen_draft_from_semantic_tree
 from .semantic_enrichment import enrich_pen_from_semantic_tree
 from .semantic_mapping import write_pencil_context_map
 from .semantic_validation import validate_semantic_tree, validate_semantic_tree_file
-from .schema_cache import load_schema, validator_for
 from .strict_closure import (
     StrictClosureError,
     validate_strict_closure,
@@ -896,7 +896,7 @@ def cmd_validate_actual_provenance(args: argparse.Namespace) -> int:
         issues = validate_actual_provenance(
             actual_path,
             expected_path=expected_path,
-            now=datetime.now(timezone.utc),
+            now=datetime.now(UTC),
             max_age_seconds=args.max_age_seconds,
             require_fresh=args.require_fresh,
             allowed_surfaces=args.surface,
@@ -1021,7 +1021,7 @@ def cmd_validate_visual_evidence(args: argparse.Namespace) -> int:
         )
     except json.JSONDecodeError as error:
         raise PenflowError(f"expected tree is not valid JSON: {args.expected}: {error}") from error
-    except ValueError as error:
+    except (TypeError, ValueError) as error:
         raise PenflowError(str(error)) from error
     code = _exit_code(issues, _is_lenient(args))
     _print(

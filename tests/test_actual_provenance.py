@@ -17,7 +17,7 @@ from __future__ import annotations
 import ast
 import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -35,7 +35,7 @@ from penflow.actual_provenance import (
     validate_actual_provenance,
 )
 
-NOW = datetime(2026, 7, 24, 12, 0, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 7, 24, 12, 0, 0, tzinfo=UTC)
 
 # Values that must never arm a freshness window: they either fail-open (nan/inf
 # make every stale check false) or crash / invert the check (-inf, 0, negatives).

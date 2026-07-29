@@ -16,7 +16,6 @@ from .flow_contract import (
     validate_flow_contract_v2,
 )
 
-
 FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 SECTION_RE = re.compile(r"^(## .+)$", re.MULTILINE)
 HEADING_RE = re.compile(r"^# .+$", re.MULTILINE)
@@ -345,7 +344,7 @@ def _parse_markdown(path: Path) -> tuple[dict[str, Any], str]:
         raise ValueError(f"missing YAML frontmatter: {path}")
     frontmatter = yaml.safe_load(match.group(1))
     if not isinstance(frontmatter, dict):
-        raise ValueError(f"frontmatter must be a mapping: {path}")
+        raise TypeError(f"frontmatter must be a mapping: {path}")
     return frontmatter, content
 
 

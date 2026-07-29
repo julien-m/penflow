@@ -9,7 +9,6 @@ import ast
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parent.parent
 PENFLOW_SKILL = ROOT / ".agent-sync" / "skills" / "penflow" / "SKILL.md"
 FLOW_SKILL = ROOT / ".agent-sync" / "skills" / "flow-ui-contract" / "SKILL.md"
@@ -93,7 +92,7 @@ def test_pencil_sync_gate_is_documented_for_stale_editor_state() -> None:
     penflow_skill = PENFLOW_SKILL.read_text(encoding="utf-8")
     mockup_skill = MOCKUP_SKILL.read_text(encoding="utf-8")
     readme = README.read_text(encoding="utf-8")
-    combined = "\n".join([penflow_skill, mockup_skill, readme])
+    combined = f"{penflow_skill}\n{mockup_skill}\n{readme}"
 
     for phrase in (
         "penflow pencil-sync",
@@ -109,7 +108,7 @@ def test_pencil_sync_gate_is_documented_for_stale_editor_state() -> None:
 def test_pencil_persistence_receipt_is_documented_as_the_only_closing_gate() -> None:
     penflow_skill = PENFLOW_SKILL.read_text(encoding="utf-8")
     readme = README.read_text(encoding="utf-8")
-    combined = "\n".join([penflow_skill, readme])
+    combined = f"{penflow_skill}\n{readme}"
 
     for phrase in (
         "verify-pencil-persistence",
@@ -152,7 +151,7 @@ def test_draft_pen_from_tree_is_documented_as_wireframe_not_final_mockup() -> No
     flow_skill = FLOW_SKILL.read_text(encoding="utf-8")
     mockup_skill = MOCKUP_SKILL.read_text(encoding="utf-8")
     readme = README.read_text(encoding="utf-8")
-    combined = "\n".join([penflow_skill, flow_skill, mockup_skill, readme])
+    combined = f"{penflow_skill}\n{flow_skill}\n{mockup_skill}\n{readme}"
 
     for phrase in (
         'fidelity: "wireframe"',
@@ -196,7 +195,7 @@ def test_theme_contract_documents_extended_token_lint_surface() -> None:
     contract = THEME_CONTRACT.read_text(encoding="utf-8")
     penflow_skill = PENFLOW_SKILL.read_text(encoding="utf-8")
     readme = README.read_text(encoding="utf-8")
-    combined = "\n".join([contract, penflow_skill, readme])
+    combined = f"{contract}\n{penflow_skill}\n{readme}"
 
     for phrase in (
         "docs/theme-contract.md",
@@ -222,7 +221,7 @@ def test_context_grammar_and_strict_anchor_mapping_are_documented() -> None:
     flow_skill = FLOW_SKILL.read_text(encoding="utf-8")
     mockup_skill = MOCKUP_SKILL.read_text(encoding="utf-8")
     readme = README.read_text(encoding="utf-8")
-    combined = "\n".join([penflow_skill, flow_skill, mockup_skill, readme])
+    combined = f"{penflow_skill}\n{flow_skill}\n{mockup_skill}\n{readme}"
 
     for phrase in (
         "Pencil Context Grammar",
@@ -242,7 +241,7 @@ def test_dense_consistency_grouping_is_documented() -> None:
     mockup_skill = MOCKUP_SKILL.read_text(encoding="utf-8")
     rubric = MOCKUP_RUBRIC.read_text(encoding="utf-8")
     readme = README.read_text(encoding="utf-8")
-    combined = "\n".join([penflow_skill, mockup_skill, rubric, readme])
+    combined = f"{penflow_skill}\n{mockup_skill}\n{rubric}\n{readme}"
 
     for phrase in (
         "role+intent+variant+size-class",
@@ -261,7 +260,7 @@ def test_audit_visual_layout_snapshot_gate_is_documented() -> None:
     rubric = MOCKUP_RUBRIC.read_text(encoding="utf-8")
     workflow = MOCKUP_WORKFLOW.read_text(encoding="utf-8")
     readme = README.read_text(encoding="utf-8")
-    combined = "\n".join([penflow_skill, mockup_skill, rubric, workflow, readme])
+    combined = f"{penflow_skill}\n{mockup_skill}\n{rubric}\n{workflow}\n{readme}"
 
     for phrase in (
         "--layout-snapshot",
@@ -522,7 +521,7 @@ def test_mockup_factory_skill_is_penflow_local_and_tree_aware() -> None:
     readme = MOCKUP_README.read_text(encoding="utf-8")
     penflow_skill = PENFLOW_SKILL.read_text(encoding="utf-8")
     root_readme = README.read_text(encoding="utf-8")
-    combined = "\n".join([skill, readme, penflow_skill, root_readme])
+    combined = f"{skill}\n{readme}\n{penflow_skill}\n{root_readme}"
 
     for phrase in (
         "name: mockup-factory",
@@ -557,9 +556,7 @@ def test_mockup_factory_visual_evidence_gate_is_documented() -> None:
     penflow_skill = PENFLOW_SKILL.read_text(encoding="utf-8")
     root_readme = README.read_text(encoding="utf-8")
     project_guide = PROJECT_INTEGRATION.read_text(encoding="utf-8")
-    combined = "\n".join(
-        [skill, readme, workflow, rubric, visual, penflow_skill, root_readme, project_guide]
-    )
+    combined = f"{skill}\n{readme}\n{workflow}\n{rubric}\n{visual}\n{penflow_skill}\n{root_readme}\n{project_guide}"
 
     for phrase in (
         "Visual Evidence Gate",
@@ -764,7 +761,7 @@ def test_mockup_factory_docs_expose_pngs_through_visual_preview_channel() -> Non
     skill = MOCKUP_SKILL.read_text(encoding="utf-8")
     mockup_readme = MOCKUP_README.read_text(encoding="utf-8")
     root_readme = README.read_text(encoding="utf-8")
-    combined = "\n".join([visual, skill, mockup_readme, root_readme])
+    combined = f"{visual}\n{skill}\n{mockup_readme}\n{root_readme}"
 
     for phrase in (
         "visual-preview url",
@@ -828,7 +825,7 @@ def test_mockup_factory_skill_preconditions_include_the_three_gate_commands() ->
 def test_mockup_factory_docs_require_receipts_before_visual_pass() -> None:
     skill = MOCKUP_SKILL.read_text(encoding="utf-8")
     visual = MOCKUP_VISUAL.read_text(encoding="utf-8")
-    combined = "\n".join([skill, visual])
+    combined = f"{skill}\n{visual}"
 
     for phrase in (
         "before writing `vision-report.json`",

@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 
+import penflow.run_pipeline as pipeline_module
 from penflow.cli import main
 from penflow.evidence import (
     LINEAGE_DIGEST_KEYS,
@@ -19,7 +20,6 @@ from penflow.evidence import (
     build_run_identity,
     validate_run_identity,
 )
-import penflow.run_pipeline as pipeline_module
 from penflow.run_pipeline import RunPipelineError, run_pipeline
 
 PATHOLOGICAL_MAX_AGE_TOKENS = ["nan", "inf", "-inf", "1e999", "0", "-1"]

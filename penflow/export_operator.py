@@ -773,16 +773,15 @@ def _reference_results(
                 and ch
                 and not isinstance(cw, bool)
                 and not isinstance(ch, bool)
-            ):
-                if abs((cw / ch) - (export_w / export_h)) > _CROP_RATIO_TOLERANCE:
-                    checks["reference_not_stretched"] = False
-                    issues.append(
-                        _issue(
-                            "export.reference.stretched",
-                            f"{ipref}.crop",
-                            "reference crop aspect ratio would require stretching the export",
-                        )
+            ) and abs((cw / ch) - (export_w / export_h)) > _CROP_RATIO_TOLERANCE:
+                checks["reference_not_stretched"] = False
+                issues.append(
+                    _issue(
+                        "export.reference.stretched",
+                        f"{ipref}.crop",
+                        "reference crop aspect ratio would require stretching the export",
                     )
+                )
 
     if refs and (len(roles) > 1 or len(regions) > 1 or len(intents) > 1):
         checks["reference_homologous"] = False

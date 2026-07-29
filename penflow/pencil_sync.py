@@ -9,9 +9,10 @@ from __future__ import annotations
 import hashlib
 import platform
 import subprocess
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from .pen import inspect_pen
 

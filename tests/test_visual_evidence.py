@@ -10,7 +10,7 @@ import json
 import struct
 import zlib
 from pathlib import Path
-from typing import Any, TypeAlias
+from typing import Any
 
 import pytest
 
@@ -29,7 +29,7 @@ DEFAULT_PNG_BYTES = b"\x89PNG\r\n\x1a\nfake-but-non-empty"
 
 # Controlled fixture mutators operate on nested json.loads payloads whose shape
 # is established by _packet; Any is limited to that test-only mutation boundary.
-JsonObject: TypeAlias = dict[str, Any]
+type JsonObject = dict[str, Any]
 
 
 def _expected_tree(path: Path, screen_ids: tuple[str, ...] = ("checkout",)) -> Path:

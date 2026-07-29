@@ -43,16 +43,16 @@ def validate_causal_evidence(
     Raises:
         FileNotFoundError: If either input file is absent.
         json.JSONDecodeError: If either input is not valid JSON.
-        ValueError: If either JSON root is not an object.
+        TypeError: If either JSON root is not an object.
     """
     contract_file = Path(contract_path)
     evidence_file = Path(evidence_path)
     contract = load_flow_contract_v2(contract_file)
     evidence = json.loads(evidence_file.read_text(encoding="utf-8"))
     if not isinstance(contract, dict):
-        raise ValueError("flow contract must be a JSON object")
+        raise TypeError("flow contract must be a JSON object")
     if not isinstance(evidence, dict):
-        raise ValueError("causal evidence must be a JSON object")
+        raise TypeError("causal evidence must be a JSON object")
 
     issues = _schema_issues(evidence)
     contract_issues = validate_flow_contract_v2(contract)

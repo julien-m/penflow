@@ -123,13 +123,13 @@ def load_references_manifest(references_dir: str | Path) -> list[dict[str, Any]]
     path = directory / REFERENCES_MANIFEST
     parsed = _load_json(path, "references manifest")
     if not isinstance(parsed, list):
-        raise ValueError(f"{path} must be an array")
+        raise TypeError(f"{path} must be an array")
     entries: list[dict[str, Any]] = []
     seen: set[str] = set()
     digest_mappings: dict[str, tuple[Any, Any, Any, Any]] = {}
     for index, item in enumerate(parsed):
         if not isinstance(item, dict):
-            raise ValueError(f"{path}[{index}] must be an object")
+            raise TypeError(f"{path}[{index}] must be an object")
         entry: dict[str, Any] = {}
         for key in ("screen_id", "file", "sha256", "source"):
             value = item.get(key)
@@ -690,7 +690,7 @@ def _luma(pixel: tuple[int, int, int, int]) -> float:
 def _load_json_object(path: Path, label: str) -> dict[str, Any]:
     parsed = _load_json(path, label)
     if not isinstance(parsed, dict):
-        raise ValueError(f"{path} must be a JSON object")
+        raise TypeError(f"{path} must be a JSON object")
     return parsed
 
 

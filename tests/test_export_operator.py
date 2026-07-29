@@ -222,6 +222,7 @@ def test_installed_cli_flow_passes(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
         cwd=str(Path(__file__).resolve().parents[1]),
+        check=False,
     )
     assert result.returncode == 0, result.stderr
     assert _load(out)["status"] == "PASS"
@@ -231,6 +232,7 @@ def test_installed_cli_flow_passes(tmp_path: Path) -> None:
         capture_output=True,
         text=True,
         cwd=str(Path(__file__).resolve().parents[1]),
+        check=False,
     )
     assert revalidate.returncode == 0, revalidate.stdout + revalidate.stderr
 

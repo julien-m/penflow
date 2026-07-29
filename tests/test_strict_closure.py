@@ -11,9 +11,10 @@ import hashlib
 import json
 import struct
 import zlib
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import pytest
 
@@ -25,7 +26,7 @@ from penflow.reference_fidelity import REFERENCE_CATEGORIES
 from penflow.strict_closure import validate_strict_closure
 
 RUN_ID = "run-c6-strict-closure"
-NOW = datetime(2026, 7, 24, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 7, 24, 12, 0, tzinfo=UTC)
 
 
 def _json(path: Path, data: Any) -> None:
@@ -330,7 +331,9 @@ def _codes(report: dict[str, Any]) -> set[str]:
     return {issue["code"] for issue in report["issues"]}
 
 
-def test_strict_closure_passes_and_writes_only_selected_run_dir(tmp_path: Path) -> None:
+def test_strict_closure_passes_and_writes_only_selected_run_dir(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     workspace, references = _workspace(tmp_path / "workspace")
     before = {path: _sha(path) for path in workspace.rglob("*") if path.is_file()}
 
@@ -352,6 +355,12 @@ def test_strict_closure_passes_and_writes_only_selected_run_dir(tmp_path: Path) 
         path: _sha(path) for path in workspace.rglob("*") if path.is_file() and path != report_path
     } == before
     assert main(["validate-report", str(report_path), "--schema", "--json"]) == 0
+
+    def validate_with_frozen_clock(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        """Keep the CLI assertion on the same deterministic capture boundary."""
+        return validate_strict_closure(*args, now=NOW, **kwargs)
+
+    monkeypatch.setattr("penflow.cli.validate_strict_closure", validate_with_frozen_clock)
     assert (
         main(
             [

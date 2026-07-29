@@ -6,7 +6,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_PATH = ROOT / "penflow" / "schemas" / "semantic-ui-tree.schema.json"
 EXAMPLE_PATH = ROOT / "examples" / "demo" / "semantic-ui-tree.json"

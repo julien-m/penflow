@@ -174,9 +174,8 @@ def _validate_references(contract: dict[str, Any], issues: list[dict[str, Any]])
                 )
             elif binding not in registries["fields"]:
                 _missing("binding_field", binding, f"{path}.binding", issues)
-        if entity := node.get("entity"):
-            if entity not in registries["entities"]:
-                _missing("entity", entity, f"{path}.entity", issues)
+        if (entity := node.get("entity")) and entity not in registries["entities"]:
+            _missing("entity", entity, f"{path}.entity", issues)
         if action := node.get("action"):
             if action not in registries["actions"]:
                 _missing("action", action, f"{path}.action", issues)
@@ -716,11 +715,14 @@ def _validate_schema_subset(
         issues.append(
             _issue("error", "contract.schema.enum", path, f"expected one of {schema['enum']}")
         )
-    if isinstance(value, str) and isinstance(schema.get("pattern"), str):
-        if re.fullmatch(str(schema["pattern"]), value) is None:
-            issues.append(
-                _issue("error", "contract.schema.pattern", path, "value does not match pattern")
-            )
+    if (
+        isinstance(value, str)
+        and isinstance(schema.get("pattern"), str)
+        and re.fullmatch(str(schema["pattern"]), value) is None
+    ):
+        issues.append(
+            _issue("error", "contract.schema.pattern", path, "value does not match pattern")
+        )
     if isinstance(value, dict):
         required = schema.get("required", []) if isinstance(schema.get("required"), list) else []
         for key in required:

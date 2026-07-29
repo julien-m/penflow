@@ -349,13 +349,13 @@ def validate_visual_evidence(
 def _load_expected_screens(expected_tree_path: str | Path) -> list[dict[str, Any]]:
     tree = load_tree(expected_tree_path)
     if not isinstance(tree, dict) or not isinstance(tree.get("screens"), list):
-        raise ValueError(
+        raise TypeError(
             f"expected tree must be an object with a screens list: {expected_tree_path}"
         )
     screens: list[dict[str, Any]] = []
     for index, screen in enumerate(tree["screens"]):
         if not isinstance(screen, dict):
-            raise ValueError(f"screens[{index}] must be an object: {expected_tree_path}")
+            raise TypeError(f"screens[{index}] must be an object: {expected_tree_path}")
         screens.append(screen)
     return screens
 

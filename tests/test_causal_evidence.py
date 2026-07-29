@@ -7,15 +7,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from copy import deepcopy
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import pytest
+from test_flow_contract_v2 import valid_contract, write_json
 
 from penflow.causal_evidence import validate_causal_evidence
 from penflow.cli import main
-from test_flow_contract_v2 import valid_contract, write_json
 
 
 def _write_proof(

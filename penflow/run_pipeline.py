@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import asdict
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from .actual_provenance import (
     ProvenanceError,
@@ -49,7 +50,6 @@ from .theme import theme_fingerprint
 from .token_lint import lint_tokens
 from .tree import write_expected_tree
 from .visual_metrics import audit_visual, write_visual_metrics_report
-
 
 REPORT_DIR = ".penflow-run"
 RUN_REPORT = "run-report.json"
@@ -368,7 +368,7 @@ def _optional_lineage_path(explicit: Path | None, conventional: Path) -> Path | 
 # @spec(FR-014)
 def _current_export_timestamp() -> str:
     """Return the UTC timestamp for the current expected-tree export run."""
-    return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    return datetime.now(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
 def _references_manifest_path(references_path: Path | None) -> Path | None:
@@ -785,8 +785,8 @@ def _parse_run_boundary(export_timestamp: str) -> datetime | None:
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=timezone.utc)
-    return parsed.astimezone(timezone.utc)
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
 
 
 def _contract_surfaces(contract_path: Path) -> list[str] | None:
