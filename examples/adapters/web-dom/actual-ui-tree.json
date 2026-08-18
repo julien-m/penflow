@@ -1,0 +1,55 @@
+{
+  "screens": [
+    {
+      "root": {
+        "bbox": {
+          "height": 800,
+          "width": 1280,
+          "x": 0,
+          "y": 0
+        },
+        "children": [
+          {
+            "bbox": {
+              "height": 48,
+              "width": 320,
+              "x": 480,
+              "y": 240
+            },
+            "children": [],
+            "id": "checkout-title",
+            "name": "Checkout",
+            "role": "heading",
+            "semantic_id": "checkout.title",
+            "text": "Checkout"
+          },
+          {
+            "bbox": {
+              "height": 48,
+              "width": 320,
+              "x": 480,
+              "y": 336
+            },
+            "children": [],
+            "id": "checkout-pay",
+            "name": "Pay now",
+            "role": "button",
+            "semantic_id": "checkout.pay",
+            "text": "Pay now"
+          }
+        ],
+        "id": "checkout-screen",
+        "name": "Checkout",
+        "role": "main",
+        "semantic_id": "checkout.screen",
+        "text": null
+      },
+      "screen_id": "checkout",
+      "viewport": {
+        "height": 800,
+        "width": 1280
+      }
+    }
+  ],
+  "version": 1
+}

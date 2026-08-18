@@ -30,25 +30,16 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Cache pip
-        uses: actions/cache@v4
+      - name: Setup uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
-          path: ~/.cache/pip
-          key: pip-${{ hashFiles('**/requirements*.txt', '**/pyproject.toml') }}
-          restore-keys: pip-
+          version: "0.12.5"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
 
       - name: Install dependencies
         shell: bash
-        run: |
-          python -m pip install --upgrade pip
-          pip install ruff
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          elif [ -f pyproject.toml ]; then
-            pip install .
-          else
-            echo "No supported Python dependency file found."
-          fi
+        run: uv sync --extra dev --frozen
 
       - name: Get changed Python files
         id: changed-src
@@ -74,10 +65,10 @@ jobs:
           SRC_FILES: ${{ steps.changed-src.outputs.all_changed_files }}
         run: |
           if [ "$CFG_CHANGED" = "true" ]; then
-            ruff format --check .
+            uv run ruff format --check .
           elif [ -n "$SRC_FILES" ]; then
             read -r -a files <<< "$SRC_FILES"
-            ruff format --check "${files[@]}"
+            uv run ruff format --check "${files[@]}"
           else
             echo "No Python changes, skipping format check."
           fi
@@ -89,10 +80,10 @@ jobs:
           SRC_FILES: ${{ steps.changed-src.outputs.all_changed_files }}
         run: |
           if [ "$CFG_CHANGED" = "true" ]; then
-            ruff check .
+            uv run ruff check .
           elif [ -n "$SRC_FILES" ]; then
             read -r -a files <<< "$SRC_FILES"
-            ruff check "${files[@]}"
+            uv run ruff check "${files[@]}"
           else
             echo "No Python changes, skipping lint."
           fi
@@ -101,20 +92,13 @@ jobs:
         shell: bash
         run: |
           if grep -qE '^\[tool\.mypy' pyproject.toml 2>/dev/null || test -f mypy.ini || test -f .mypy.ini; then
-            pip show mypy >/dev/null 2>&1 || pip install mypy -q
-            mypy .
+            uv run mypy .
           elif grep -qE '^\[tool\.pyright' pyproject.toml 2>/dev/null || test -f pyrightconfig.json; then
-            pip show pyright >/dev/null 2>&1 || pip install pyright -q
-            pyright
+            uv run pyright
           else
             echo "No type checker configured - skipping"
           fi
 
       - name: Run tests
         shell: bash
-        run: |
-          if command -v pytest >/dev/null 2>&1; then
-            python -m pytest
-          else
-            echo "pytest not installed, skipping tests."
-          fi
+        run: uv run python -m pytest
