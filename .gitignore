@@ -39,6 +39,9 @@ reports/
 actual-ui-tree.json
 expected-ui-tree.json
 !tests/fixtures/claude-pilot/expected-ui-tree.json
+!examples/adapters/web-dom/actual-ui-tree.json
+!examples/adapters/swiftui-xctest/actual-ui-tree.json
+!examples/adapters/react-native/actual-ui-tree.json
 compare-report.json
 compare-report.md
 !examples/demo/actual-ui-tree.json
@@ -46,5 +49,6 @@ compare-report.md
 !examples/demo/compare-report.json
 !examples/demo/compare-report.md
 !examples/full/actual-ui-tree.json
+!examples/full/expected-ui-tree.json
 !examples/full/.mockup-validation/compare-report.json
 .idea
