@@ -58,10 +58,10 @@ def _codes(receipt: dict[str, Any]) -> set[str]:
 
 def _c46_receipt(tmp_path: Path) -> Path:
     """Build a valid C46 PASS persistence receipt bound to ui.pen."""
-    pre = tmp_path / "pre.pen"
-    pre.write_bytes(b'{"v":1,"children":[]}')
-    post = tmp_path / "post.pen"
-    post.write_bytes(b'{"v":1,"children":[{"id":"welcome"}]}')
+    pre = tmp_path / "pre.snapshot.json"
+    pre.write_bytes(b'{"version":"0.9","children":[]}')
+    post = tmp_path / "post.snapshot.json"
+    post.write_bytes(b'{"version":"1.0","children":[]}')
     document = tmp_path / "ui.pen"
     document.write_bytes(post.read_bytes())
     observation = {
@@ -204,12 +204,17 @@ def test_source_flow_passes_and_revalidates(tmp_path: Path) -> None:
 def test_installed_cli_flow_passes(tmp_path: Path) -> None:
     request_path, document = _packet(tmp_path)
     out = tmp_path / "receipt.json"
+    # Installed-flow process boundaries are hard-bounded to prevent CI hangs.
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True, timeout=10)
+    assert main(["doctor", "--project", str(tmp_path), "--fix", "--json"]) == 0
     result = subprocess.run(
         [
             sys.executable,
             "-m",
             "penflow",
             "verify-export-operation",
+            "--project",
+            str(tmp_path),
             str(request_path),
             "--source-pen",
             str(document),
@@ -223,16 +228,28 @@ def test_installed_cli_flow_passes(tmp_path: Path) -> None:
         text=True,
         cwd=str(Path(__file__).resolve().parents[1]),
         check=False,
+        timeout=10,
     )
     assert result.returncode == 0, result.stderr
     assert _load(out)["status"] == "PASS"
     # validate-report re-reads and revalidates the receipt kind.
     revalidate = subprocess.run(
-        [sys.executable, "-m", "penflow", "validate-report", str(out), "--schema", "--json"],
+        [
+            sys.executable,
+            "-m",
+            "penflow",
+            "validate-report",
+            str(out),
+            "--schema",
+            "--project",
+            str(tmp_path),
+            "--json",
+        ],
         capture_output=True,
         text=True,
         cwd=str(Path(__file__).resolve().parents[1]),
         check=False,
+        timeout=10,
     )
     assert revalidate.returncode == 0, revalidate.stdout + revalidate.stderr
 

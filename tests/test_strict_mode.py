@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import penflow.contracts
@@ -190,12 +191,21 @@ def test_inspect_includes_bbox_invalid_warning(tmp_path: Path) -> None:
     assert report["errors"] == []
 
 
-def test_compare_tree_threshold_resolution(tmp_path: Path) -> None:
+def test_compare_tree_threshold_resolution(tmp_path: Path, governed_consumer_project) -> None:
     expected, actual = expected_actual_pair(text_drift=False)
     expected_path = write_json(tmp_path / "expected.json", expected)
     actual_path = write_json(tmp_path / "actual.json", actual)
     report_path = tmp_path / "report.json"
-    base = ["compare-tree", str(expected_path), str(actual_path), "--out", str(report_path)]
+    governed_consumer_project(tmp_path)
+    base = [
+        "compare-tree",
+        str(expected_path),
+        str(actual_path),
+        "--out",
+        str(report_path),
+        "--project",
+        str(tmp_path),
+    ]
 
     assert main([*base, "--json"]) == 0
     assert json.loads(report_path.read_text())["threshold"] == STRICT_THRESHOLD
@@ -210,12 +220,23 @@ def test_compare_tree_threshold_resolution(tmp_path: Path) -> None:
     assert json.loads(report_path.read_text())["threshold"] == 0.5
 
 
-def test_compare_tree_warnings_promote_to_exit_one(tmp_path: Path) -> None:
+def test_compare_tree_warnings_promote_to_exit_one(
+    tmp_path: Path, governed_consumer_project
+) -> None:
     expected, actual = expected_actual_pair(text_drift=True)
     expected_path = write_json(tmp_path / "expected.json", expected)
     actual_path = write_json(tmp_path / "actual.json", actual)
     report_path = tmp_path / "report.json"
-    base = ["compare-tree", str(expected_path), str(actual_path), "--out", str(report_path)]
+    governed_consumer_project(tmp_path)
+    base = [
+        "compare-tree",
+        str(expected_path),
+        str(actual_path),
+        "--out",
+        str(report_path),
+        "--project",
+        str(tmp_path),
+    ]
 
     # Permissive threshold keeps the report PASS, but the warning still fails strict.
     assert main([*base, "--threshold", "0.5", "--json"]) == 1
@@ -225,11 +246,14 @@ def test_compare_tree_warnings_promote_to_exit_one(tmp_path: Path) -> None:
     assert main([*base, "--threshold", "0.5", "--lenient", "--json"]) == 0
 
 
-def test_detect_drift_blocking_fails_even_lenient(tmp_path: Path) -> None:
+def test_detect_drift_blocking_fails_even_lenient(
+    tmp_path: Path, governed_consumer_project
+) -> None:
     specs_dir = specs_with_flow(tmp_path, marker="[NEEDS CLARIFICATION]")
     tree_path = write_json(tmp_path / "semantic-ui-tree.json", aligned_semantic_tree())
     pen_path = write_json(tmp_path / "ui.pen", minimal_pen())
     report_path = tmp_path / "drift-report.json"
+    governed_consumer_project(tmp_path, pen_path)
     base = [
         "detect-drift",
         str(specs_dir),
@@ -237,6 +261,8 @@ def test_detect_drift_blocking_fails_even_lenient(tmp_path: Path) -> None:
         str(pen_path),
         "--out",
         str(report_path),
+        "--project",
+        str(tmp_path),
     ]
 
     assert main([*base, "--json"]) == 1
@@ -250,11 +276,14 @@ def test_detect_drift_blocking_fails_even_lenient(tmp_path: Path) -> None:
     assert all(issue["code"] in BLOCKING_DRIFT_CODES for issue in blocked)
 
 
-def test_detect_drift_warning_only_is_lenient_forgivable(tmp_path: Path) -> None:
+def test_detect_drift_warning_only_is_lenient_forgivable(
+    tmp_path: Path, governed_consumer_project
+) -> None:
     specs_dir = specs_with_flow(tmp_path, marker="submit_payment", extra_flow="billing")
     tree_path = write_json(tmp_path / "semantic-ui-tree.json", aligned_semantic_tree())
     pen_path = write_json(tmp_path / "ui.pen", minimal_pen())
     report_path = tmp_path / "drift-report.json"
+    governed_consumer_project(tmp_path, pen_path)
     base = [
         "detect-drift",
         str(specs_dir),
@@ -262,6 +291,8 @@ def test_detect_drift_warning_only_is_lenient_forgivable(tmp_path: Path) -> None
         str(pen_path),
         "--out",
         str(report_path),
+        "--project",
+        str(tmp_path),
     ]
 
     assert main([*base, "--json"]) == 1
@@ -272,26 +303,56 @@ def test_detect_drift_warning_only_is_lenient_forgivable(tmp_path: Path) -> None
     assert all(issue["blocking"] is False for issue in report["issues"])
 
 
-def test_drift_report_schema_validates_and_fails_closed(tmp_path: Path) -> None:
+def test_drift_report_schema_validates_and_fails_closed(
+    tmp_path: Path, governed_consumer_project
+) -> None:
     specs_dir = specs_with_flow(tmp_path, marker="[NEEDS CLARIFICATION]")
     tree_path = write_json(tmp_path / "semantic-ui-tree.json", aligned_semantic_tree())
     pen_path = write_json(tmp_path / "ui.pen", minimal_pen())
     report_path = tmp_path / "drift-report.json"
+    governed_consumer_project(tmp_path, pen_path)
     detect_drift(specs_dir, tree_path, pen_path, report_path)
 
-    assert main(["validate-report", str(report_path), "--schema", "--json"]) == 0
+    assert (
+        main(
+            [
+                "validate-report",
+                str(report_path),
+                "--schema",
+                "--project",
+                str(tmp_path),
+                "--json",
+            ]
+        )
+        == 0
+    )
 
     report = json.loads(report_path.read_text())
     report["unexpected"] = True
     bad_path = write_json(tmp_path / "drift-report.bad.json", report)
-    assert main(["validate-report", str(bad_path), "--schema", "--json"]) == 1
+    assert (
+        main(
+            [
+                "validate-report",
+                str(bad_path),
+                "--schema",
+                "--project",
+                str(tmp_path),
+                "--json",
+            ]
+        )
+        == 1
+    )
 
 
-def test_lint_tokens_reports_unparsable_theme_dimension(tmp_path: Path) -> None:
+def test_lint_tokens_reports_unparsable_theme_dimension(
+    tmp_path: Path, governed_consumer_project
+) -> None:
     theme_path = tmp_path / "theme.css"
     theme_path.write_text(":root { --radius: 0.5banana; }", encoding="utf-8")
     pen_path = write_json(tmp_path / "ui.pen", minimal_pen())
     report_path = tmp_path / "token-lint-report.json"
+    governed_consumer_project(tmp_path, pen_path)
     base = [
         "lint-tokens",
         str(pen_path),
@@ -299,6 +360,8 @@ def test_lint_tokens_reports_unparsable_theme_dimension(tmp_path: Path) -> None:
         str(theme_path),
         "--out",
         str(report_path),
+        "--project",
+        str(tmp_path),
     ]
 
     assert main([*base, "--json"]) == 1
@@ -308,19 +371,38 @@ def test_lint_tokens_reports_unparsable_theme_dimension(tmp_path: Path) -> None:
     assert violation["severity"] == "warning"
     assert violation["property"] == "pf-radius"
     assert violation["value"] == "0.5banana"
-    assert main(["validate-report", str(report_path), "--schema", "--json"]) == 0
+    assert (
+        main(
+            [
+                "validate-report",
+                str(report_path),
+                "--schema",
+                "--project",
+                str(tmp_path),
+                "--json",
+            ]
+        )
+        == 0
+    )
 
 
-def test_extract_tokens_reports_unparsed_values(tmp_path: Path) -> None:
+def test_extract_tokens_reports_unparsed_values(tmp_path: Path, governed_consumer_project) -> None:
     pen = minimal_pen()
     pen["children"][0]["gap"] = "stretch"
     pen_path = write_json(tmp_path / "ui.pen", pen)
     out_path = tmp_path / "tokens.json"
+    governed_consumer_project(tmp_path, pen_path)
 
-    assert main(["extract-tokens", str(pen_path), "--out", str(out_path), "--json"]) == 1
-    assert (
-        main(["extract-tokens", str(pen_path), "--out", str(out_path), "--lenient", "--json"]) == 0
-    )
+    base = [
+        "extract-tokens",
+        str(pen_path),
+        "--out",
+        str(out_path),
+        "--project",
+        str(tmp_path),
+    ]
+    assert main([*base, "--json"]) == 1
+    assert main([*base, "--lenient", "--json"]) == 0
     tokens = json.loads(out_path.read_text())
     [issue] = tokens["issues"]
     assert issue["code"] == "tokens.value.unparsed"
@@ -328,20 +410,39 @@ def test_extract_tokens_reports_unparsed_values(tmp_path: Path) -> None:
     assert issue["path"] == "screen.gap"
 
 
-def test_extract_tokens_clean_pen_has_no_issues(tmp_path: Path) -> None:
+def test_extract_tokens_clean_pen_has_no_issues(tmp_path: Path, governed_consumer_project) -> None:
     pen_path = write_json(tmp_path / "ui.pen", minimal_pen())
-    assert main(["extract-tokens", str(pen_path), "--json"]) == 0
+    governed_consumer_project(tmp_path, pen_path)
+    assert (
+        main(
+            [
+                "extract-tokens",
+                str(pen_path),
+                "--project",
+                str(tmp_path),
+                "--json",
+            ]
+        )
+        == 0
+    )
     assert extract_design_tokens(pen_path)["issues"] == []
 
 
-def test_export_semantic_tree_validates_output(tmp_path: Path, capsys) -> None:
+def test_export_semantic_tree_validates_output(
+    tmp_path: Path, capsys, governed_consumer_project
+) -> None:
+    contract_dir = tmp_path / "flow-ui-contract"
+    shutil.copytree(ROOT / "examples" / "demo" / "flow-ui-contract", contract_dir)
     out_path = tmp_path / "semantic-ui-tree.json"
+    governed_consumer_project(tmp_path)
     code = main(
         [
             "export-semantic-tree",
-            str(ROOT / "examples" / "demo" / "flow-ui-contract" / "contract.json"),
+            str(contract_dir / "contract.json"),
             "--out",
             str(out_path),
+            "--project",
+            str(tmp_path),
             "--json",
         ]
     )

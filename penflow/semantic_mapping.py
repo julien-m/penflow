@@ -8,13 +8,14 @@ from pathlib import Path
 from typing import Any
 
 from .context import Context, infer_role
+from .json_filesystem import write_json_atomically
 from .semantic_enrichment import (
     PenRecord,
     SemanticRecord,
+    active_pen_records,
     _enrich_node,
     _is_candidate_in_scope,
     _labels_match,
-    _pen_records,
     _pen_records_by_semantic_id,
     _role_is_compatible,
     _semantic_records,
@@ -25,6 +26,7 @@ from .semantic_validation import validate_semantic_tree
 MAP_VERSION = 1
 
 
+# @spec FR-005: Canonical producer migration — .specs/features/074-penflow-doctor-consumer-project-hygiene/spec.md#fr-005
 def pencil_context_map(
     pen: dict[str, Any],
     tree: dict[str, Any],
@@ -49,7 +51,7 @@ def pencil_context_map(
         raise ValueError(f"semantic UI tree is invalid: {issues[0]['code']}")
 
     semantic_records = _semantic_records(tree)
-    pen_records = _pen_records(pen)
+    pen_records = active_pen_records(pen)
     matched: list[dict[str, Any]] = []
     created: list[dict[str, Any]] = []
     ambiguous: list[dict[str, Any]] = []
@@ -82,6 +84,7 @@ def pencil_context_map(
     }
 
 
+# @spec FR-005: Canonical producer migration — .specs/features/074-penflow-doctor-consumer-project-hygiene/spec.md#fr-005
 def write_pencil_context_map(
     pen_path: str | Path,
     tree_path: str | Path,
@@ -96,23 +99,36 @@ def write_pencil_context_map(
         pen_path: Existing Pencil `.pen` file.
         tree_path: Valid `semantic-ui-tree.json`.
         out_path: Destination context-map JSON file.
-        pen_out: Optional destination for a Pencil copy enriched only on matched nodes.
+        pen_out: Optional canonical Pencil destination enriched only on matched
+            active nodes. When provided, it must resolve to ``pen_path``.
         create_placeholders: When true, unresolved semantic nodes are recorded as placeholders.
 
     Returns:
         The generated mapping artifact.
+
+    Raises:
+        ValueError: If ``pen_out`` is a peer Pencil path, if ``out_path``
+            resolves to the canonical Pencil input, or if the semantic tree is invalid.
+
+    Side Effects:
+        When ``pen_out`` is provided, atomically replaces the canonical Pencil
+        document before atomically writing the context map.
     """
-    pen = json.loads(Path(pen_path).read_text(encoding="utf-8"))
-    tree = json.loads(Path(tree_path).read_text(encoding="utf-8"))
+    canonical_path = Path(pen_path).resolve()
+    tree_input_path = Path(tree_path).resolve()
+    map_path = Path(out_path).resolve()
+    if pen_out is not None and Path(pen_out).resolve() != canonical_path:
+        raise ValueError("mapped Pencil output must resolve to the canonical input ui.pen")
+    if map_path == canonical_path:
+        raise ValueError("context-map output must not overwrite canonical input ui.pen")
+    pen = json.loads(canonical_path.read_text(encoding="utf-8"))
+    tree = json.loads(tree_input_path.read_text(encoding="utf-8"))
     context_map = pencil_context_map(pen, tree, create_missing=create_placeholders)
-    Path(out_path).write_text(
-        json.dumps(context_map, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
     if pen_out is not None:
-        mapped_pen = _mapped_pen_copy(pen, tree, context_map)
-        Path(pen_out).write_text(
-            json.dumps(mapped_pen, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
+        write_json_atomically(canonical_path, _mapped_pen_copy(pen, tree, context_map))
+    # The canonical Pencil bytes must be durable before the map advertises
+    # their semantic bindings; a stale map is safer than a map for unwritten UI.
+    write_json_atomically(map_path, context_map)
     return context_map
 
 
@@ -181,10 +197,12 @@ def _mapped_pen_copy(
     pen: dict[str, Any], tree: dict[str, Any], context_map: dict[str, Any]
 ) -> dict[str, Any]:
     mapped_pen = copy.deepcopy(pen)
-    records_by_id = {record.node.get("id"): record.node for record in _pen_records(mapped_pen)}
+    records_by_path = {
+        _path_string(record.path): record.node for record in active_pen_records(mapped_pen)
+    }
     semantic_by_id = {record.semantic_id: record.node for record in _semantic_records(tree)}
     for item in context_map["matched"]:
-        node = records_by_id.get(item["pencil_node_id"])
+        node = records_by_path.get(item["pencil_path"])
         semantic = semantic_by_id.get(item["semantic_id"])
         if node is not None and semantic is not None:
             _enrich_node(node, semantic)

@@ -10,6 +10,8 @@ description: >
 <!-- @spec(FR-005) -->
 <!-- @spec(FR-006) -->
 <!-- @spec(FR-007) -->
+<!-- @spec(FR-013) -->
+<!-- @spec(FR-014) -->
 
 # Mockup Factory — Penflow Guided Optimizer
 
@@ -19,6 +21,14 @@ Use this skill when a user asks for `/mockup-factory`, mockup generation, mockup
 
 Mockup Factory is a tree-aware, guided optimizer for Pencil mockups. It may orchestrate external design/audit tools from the skill layer, but Penflow Python remains runtime-agnostic and never imports Pencil MCP, cc-hub, browsers, simulators, Playwright, or UI runtimes.
 
+## Consumer Hygiene Gate
+
+At task start, run `penflow doctor --project <consumer-project-root> --check --json` and retain the read-only receipt. Work only below that exact selected project; Doctor never widens it to the enclosing Git worktree, whose internal `git_root` is used only for scoped Git interrogation and transient metadata coordination. Run the same Doctor check again at task end.
+
+- Optimize the sole regular `ui.pen` in each selected project. A collective Git worktree may contain several independent projects. Keep one active revision per logical screen plus optional draft/archive revisions as top-level `penflow.lifecycle` regions inside that canvas; never create a peer `.pen` for an iteration.
+- Penflow-managed technical working data belongs under ignored `.penflow-tmp/`, `.penflow-run/`, and `.mockup-validation/`; producer preflight/postflight clean only catalogued, cleanup-eligible runs after durable outputs finalize. Preserve and report live, unknown, linked, escaped, tracked/staged or referenced paths.
+- Doctor never picks among multiple `.pen` files or rewrites Git index/history. On `multiple_pen_files`, manually consolidate intended regions into `ui.pen` and deliberately migrate/remove extras. Manually review and unstage/untrack reported temporary leaks, then rerun Doctor.
+
 ## Canonical Inputs
 
 Treat these artifacts as first-class inputs, not optional notes:
@@ -26,7 +36,7 @@ Treat these artifacts as first-class inputs, not optional notes:
 - `flow-ui-contract/contract.json` — canonical product behavior source.
 - `semantic-ui-tree.json` — before-code semantic anchor exported from flow specs.
 - `theme.css` — product theme input for canonical forward Pencil composition.
-- `ui.pen` or `ui.enriched.pen` — Pencil visual contract to optimize.
+- `ui.pen` — the only Pencil visual contract; lifecycle regions hold active, draft and archive revisions.
 - `pencil-context-map.json` — `screen_id` / `semantic_id` / `pencil_node_id` linkage and ambiguity buckets.
 - `expected-ui-tree.json` — design-derived structural baseline.
 - `drift-report.json` from `penflow detect-drift` — deterministic contract drift report.
@@ -92,7 +102,7 @@ A themed but structurally generic output is a failure. Reject screens that ignor
    - Stale theme: a modified theme.css deterministically invalidates stale packets (`evidence.theme.missing`/`evidence.theme.stale`) and forces a re-run of the bounded loop.
    - Renderer coupling: when `layout-snapshot.json` is available from the renderer, rerun the `accessibility_alignment` gate with `--layout-snapshot` so overlap/overflow uses real Pencil bboxes, not theoretical flex positions.
 8. **Run Design Taste Advisory:** <!-- @spec(FR-004) --> <!-- @spec(FR-005) --> <!-- @spec(FR-006) --> after computing the scripted gates and before final proof, read `<target>/design-read.json` when present, then follow [`references/design-taste-advisory.md`](references/design-taste-advisory.md) to write `<target>/.mockup-validation/design-taste-advisory.md`. This report is advisory only: it never decides PASS/FAIL, never adds checklist items, and never changes gate status.
-9. **Decide final state and prove it:** PASS requires valid anchors, every rubric gate clean on the final run, and complete visual evidence when a renderer is available. Write `audit-report.json` (`kind: penflow-mockup-audit`) recording `iterations`, per-gate `{gate, command, exit_code, report_path, result}`, and `residual_issues[]`; every executed gate must cite an existing `report_path`, and `result` must match `exit_code` (`pass` => 0, `fail` => non-zero, `not_run` => null/null). Validate it with `penflow validate-report .mockup-validation/audit-report.json --schema --json` — the single CI-able final check.
+9. **Decide final state and prove it:** PASS requires valid anchors, every rubric gate clean on the final run, and complete visual evidence when a renderer is available. Write `audit-report.json` (`kind: penflow-mockup-audit`) recording `iterations`, per-gate `{gate, command, exit_code, report_path, result}`, and `residual_issues[]`; every executed gate must cite an existing `report_path`, and `result` must match `exit_code` (`pass` => 0, `fail` => non-zero, `not_run` => null/null). Validate it with `penflow validate-report .mockup-validation/audit-report.json --schema --json` — the single CI-able final check — then run `penflow doctor --project <consumer-project-root> --check --json` and retain the final read-only receipt.
 
 ## Quality Gate
 

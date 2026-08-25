@@ -10,10 +10,13 @@ from pathlib import Path
 from typing import Any
 
 from .context import Context, format_context_string, infer_role
+from .json_filesystem import write_json_atomically
+from .pen_lifecycle import select_active_canvas_region_entries
 
 CLARIFICATION = "[NEEDS CLARIFICATION]"
 
 
+# @spec FR-005: Canonical producer migration — .specs/features/074-penflow-doctor-consumer-project-hygiene/spec.md#fr-005
 def reverse_pen(
     pen_path: str | Path, out_dir: str | Path, *, enrich: bool = False
 ) -> dict[str, Any]:
@@ -22,7 +25,8 @@ def reverse_pen(
     Args:
         pen_path: Source Pencil `.pen` path.
         out_dir: Destination reverse output directory.
-        enrich: Whether to also write `ui.enriched.pen` with context metadata only.
+        enrich: Whether to enrich the canonical input document in place with
+            context metadata only.
 
     Returns:
         Scriptable report containing generated file paths, screen count, and
@@ -30,6 +34,7 @@ def reverse_pen(
         still contains a `[NEEDS CLARIFICATION]` marker (feature 049). Outputs
         are written even when issues exist — the issues signal "review
         required", not "no artifact".
+
     """
     pen = json.loads(Path(pen_path).read_text(encoding="utf-8"))
     out = Path(out_dir)
@@ -39,7 +44,10 @@ def reverse_pen(
     flows_dir.mkdir(parents=True, exist_ok=True)
     screens_dir.mkdir(parents=True, exist_ok=True)
 
-    screen_specs = [_screen_from_pen_node(node, (index,)) for index, node in _root_nodes(pen)]
+    screen_specs = [
+        _screen_from_pen_node(dict(region.raw_node), (region.source_index,))
+        for region in select_active_canvas_region_entries(pen)
+    ]
     flow_specs = [_flow_from_screen(screen) for screen in screen_specs]
     semantic_tree = _semantic_tree(screen_specs, flow_specs, pen_path, Path("flow-ui-contract"))
 
@@ -48,18 +56,13 @@ def reverse_pen(
     for screen in screen_specs:
         (screens_dir / f"{screen['id']}.md").write_text(_screen_markdown(screen), encoding="utf-8")
     semantic_path = out / "semantic-ui-tree.json"
-    semantic_path.write_text(
-        json.dumps(semantic_tree, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    write_json_atomically(semantic_path, semantic_tree)
     files = [str(semantic_path), *(str(path) for path in sorted(specs_dir.rglob("*.md")))]
-
     if enrich:
         enriched = _enriched_pen(pen, semantic_tree)
-        enriched_path = out / "ui.enriched.pen"
-        enriched_path.write_text(
-            json.dumps(enriched, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-        )
-        files.append(str(enriched_path))
+        canonical_path = Path(pen_path)
+        write_json_atomically(canonical_path, enriched)
+        files.append(str(canonical_path))
 
     issues = _clarification_issues(files)
     return {
@@ -82,14 +85,6 @@ def _clarification_issues(files: list[str]) -> list[dict[str, Any]]:
         }
         for file in files
         if CLARIFICATION in Path(file).read_text(encoding="utf-8")
-    ]
-
-
-def _root_nodes(pen: dict[str, Any]) -> list[tuple[int, dict[str, Any]]]:
-    return [
-        (index, child)
-        for index, child in enumerate(pen.get("children", []) or [])
-        if isinstance(child, dict)
     ]
 
 
@@ -298,7 +293,8 @@ def _enriched_pen(pen: dict[str, Any], tree: dict[str, Any]) -> dict[str, Any]:
             if isinstance(child, dict):
                 visit(child)
 
-    for child in enriched.get("children", []) or []:
+    for region in select_active_canvas_region_entries(enriched):
+        child = region.raw_node
         if isinstance(child, dict):
             visit(child)
     return enriched

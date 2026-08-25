@@ -3,7 +3,7 @@ name: flow-ui-contract
 description: >
   Penflow project-local skill for specifying flow/screen behavior before semantic UI tree
   generation. Recognizes legacy specify flows wording while positioning artifacts for
-  forward flow -> semantic tree -> Pencil draft/enrichment workflows, reverse Pencil ->
+  forward flow to semantic tree to Pencil draft/enrichment workflows, reverse Pencil to
   flow workflows, and post-implementation runtime comparison.
   Triggers on: flow-ui-contract, flow ui contract, specify flows, génère les flow specs,
   flow specs, spec flows.
@@ -15,6 +15,8 @@ description: >
 <!-- @spec(FR-003) -->
 <!-- @spec(FR-004) -->
 <!-- @spec(FR-012) -->
+<!-- @spec(FR-013) -->
+<!-- @spec(FR-014) -->
 
 # flow-ui-contract — Skill Posture
 
@@ -26,6 +28,16 @@ Use this skill before Penflow needs a `semantic-ui-tree.json`. It turns product 
 
 This skill prepares inputs. It does **not** run browser, Xcode, simulator, Playwright, React Native, Metro, app builds, or runtime adapters.
 
+## Consumer Hygiene Gate
+
+At task start, run `penflow doctor --project <consumer-project-root> --check --json` and retain the read-only receipt; run it again at task end. Work only below that exact selected project. Doctor never widens it to the enclosing Git worktree; the internal `git_root` serves only scoped Git interrogation and transient metadata coordination.
+
+For a new project, continue from a failing start receipt only when every issue code belongs to the exact bootstrap allowlist: `pen.missing`, `gitignore.managed_block_missing`, `gitignore.managed_block_outdated`, or `gitignore.managed_block_duplicate`. Run `doctor --fix`, require a passing `doctor --check`, then author the canvas. Every other start finding blocks and requires manual resolution. The final read-only Doctor check must pass.
+
+- Keep exactly one regular `ui.pen` per selected project. A collective Git worktree may contain several independent project canvases. Store one active revision per logical screen plus optional draft/archive revisions as top-level `penflow.lifecycle` regions inside the same canvas; unmarked legacy regions are active.
+- Route technical intermediates through producer-managed, ignored `.penflow-tmp/`, `.penflow-run/`, and `.mockup-validation/`; preflight/postflight reconcile cleanup-eligible runs after durable outputs finalize.
+- Doctor never chooses among multiple `.pen` files or rewrites Git index/history. Resolve `multiple_pen_files` by manually consolidating intended regions into `ui.pen` and deliberately migrating/removing extras. Manually review and unstage/untrack reported tracked/staged temporary leaks before rerunning Doctor.
+
 ## Pencil Context Grammar
 
 When a contract is consumed by Pencil authoring, every screen/section/interactive/repeated element must map to Pencil `context` at insertion time. The shorthand string is `key=value` pairs separated by `;`; allowed keys come from [`../../../penflow/context.py`](../../../penflow/context.py): `semantic_id`, `role`, `intent`, `binding`, `repeat`, `entity`, `variant`, `test_id`, `action`, `permission`, `mask`, `mask_text`, `tolerance`.
@@ -36,7 +48,7 @@ Examples:
 - Button: `semantic_id=cockpit-live.stop-worker; role=button; intent=stop-worker; action=stop_worker`
 - List: `semantic_id=cockpit-live.workers; role=list; repeat=worker in workers`
 
-After authoring/enrichment, run `penflow map-pencil-context <ui.pen> <semantic-ui-tree.json> --out pencil-context-map.json --strict-anchors --json`. Any `ambiguous` or `unmapped` anchor blocks downstream work; `--create-placeholders` is explicit repair scaffolding and yields `PARTIAL`, never PASS.
+After authoring/enrichment, run `penflow map-pencil-context <target>/ui.pen <target>/semantic-ui-tree.json --project <consumer-project-root> --out <target>/pencil-context-map.json --strict-anchors --json`. Any `ambiguous` or `unmapped` anchor blocks downstream work; `--create-placeholders` is explicit repair scaffolding and yields `PARTIAL`, never PASS.
 
 ## Invocation
 
@@ -152,10 +164,11 @@ Expected `semantic-ui-tree.json` excerpt:
 ## Hard Constraints
 
 - Keep all outputs inside the target directory; never write into LiveSpec `.specs/`.
-- Preserve Pencil visuals during extraction/enrichment; read `.pen` data only, do not overwrite layout.
+- Keep exactly one `.pen` output named `ui.pen`; enrichment/reverse operations update that canonical document rather than producing peers.
+- Preserve Pencil visual properties during extraction and enrichment; metadata-only operations may atomically update canonical `ui.pen` in place but must not alter layout or create peer `.pen` files.
 - Never auto-invent canonical flows; ask the user to declare or confirm them.
 - Never skip validation; run [`validator.py`](validator.py) before accepting generated specs.
-- If `ui.pen` is missing, continue without Pencil auto-fill and report the warning.
+- If `ui.pen` is missing, continue only when the failing start receipt contains exclusively the exact bootstrap allowlist, `doctor --fix` succeeds, and the following `doctor --check` passes; otherwise block.
 
 ## Target Layout
 
@@ -242,13 +255,13 @@ Open questions: <N> [NEEDS CLARIFICATION]
 ## Forward Command Sequence
 
 ```bash
-penflow validate-flow-contract <target>/flow-ui-contract/contract.json --json
-penflow export-semantic-tree <target>/flow-ui-contract/contract.json --out semantic-ui-tree.json --json
-penflow validate-semantic-tree semantic-ui-tree.json --json
-penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --theme-css <target>/theme.css --json
-penflow validate-pen ui.pen --json
-penflow export-expected ui.pen --out expected-ui-tree.json --json
-penflow code-ir --from-context ui.pen --semantic-tree semantic-ui-tree.json --flow-id <flow-id> --flow-name "<Flow name>" --out code-ir.json --json
+penflow validate-flow-contract <target>/flow-ui-contract/contract.json --project <consumer-project-root> --json
+penflow export-semantic-tree <target>/flow-ui-contract/contract.json --project <consumer-project-root> --out <target>/semantic-ui-tree.json --json
+penflow validate-semantic-tree <target>/semantic-ui-tree.json --project <consumer-project-root> --json
+penflow draft-pen-from-tree <target>/semantic-ui-tree.json --project <consumer-project-root> --out <target>/ui.pen --theme-css <target>/theme.css --json
+penflow validate-pen <target>/ui.pen --project <consumer-project-root> --json
+penflow export-expected <target>/ui.pen --project <consumer-project-root> --out <target>/expected-ui-tree.json --json
+penflow code-ir --from-context <target>/ui.pen --semantic-tree <target>/semantic-ui-tree.json --contract <target>/flow-ui-contract/contract.json --flow-id <flow-id> --flow-name "<Flow name>" --project <consumer-project-root> --out <target>/code-ir.json --json
 ```
 
 `draft-pen-from-tree` is only the structural handoff draft. Its JSON output can be saved as `draft-report.json` and carries `fidelity: "wireframe"`: draft = structure / wireframe, PAS un mockup final ; le hi-fi passe par mockup-factory.
@@ -256,19 +269,19 @@ penflow code-ir --from-context ui.pen --semantic-tree semantic-ui-tree.json --fl
 ## Enrichment Command Sequence
 
 ```bash
-penflow enrich-pen <target>/ui.pen semantic-ui-tree.json --out ui.enriched.pen --json
-penflow map-pencil-context ui.enriched.pen semantic-ui-tree.json --out pencil-context-map.json --strict-anchors --json
-penflow validate-pen ui.enriched.pen --json
-penflow export-expected ui.enriched.pen --out expected-ui-tree.json --json
-penflow code-ir --from-context ui.enriched.pen --semantic-tree semantic-ui-tree.json --context-map pencil-context-map.json --flow-id <flow-id> --flow-name "<Flow name>" --out code-ir.json --json
+penflow enrich-pen <target>/ui.pen <target>/semantic-ui-tree.json --project <consumer-project-root> --out <target>/ui.pen --json
+penflow map-pencil-context <target>/ui.pen <target>/semantic-ui-tree.json --project <consumer-project-root> --out <target>/pencil-context-map.json --strict-anchors --json
+penflow validate-pen <target>/ui.pen --project <consumer-project-root> --json
+penflow export-expected <target>/ui.pen --project <consumer-project-root> --out <target>/expected-ui-tree.json --json
+penflow code-ir --from-context <target>/ui.pen --semantic-tree <target>/semantic-ui-tree.json --context-map <target>/pencil-context-map.json --contract <target>/flow-ui-contract/contract.json --flow-id <flow-id> --flow-name "<Flow name>" --project <consumer-project-root> --out <target>/code-ir.json --json
 ```
 
 ## Reverse Command Sequence
 
 ```bash
-penflow reverse-pen <target>/ui.pen --out reverse-output --enrich --json
-penflow validate-semantic-tree reverse-output/semantic-ui-tree.json --json
-penflow validate-pen reverse-output/ui.enriched.pen --json
+penflow reverse-pen <target>/ui.pen --project <consumer-project-root> --out <target>/reverse-output --enrich --json
+penflow validate-semantic-tree <target>/reverse-output/semantic-ui-tree.json --project <consumer-project-root> --json
+penflow validate-pen <target>/ui.pen --project <consumer-project-root> --json
 ```
 
 `reverse-pen --out <dir>` writes a directory containing `semantic-ui-tree.json` and `flow-ui-contract/`; validate `<dir>/semantic-ui-tree.json`, not the directory path itself.

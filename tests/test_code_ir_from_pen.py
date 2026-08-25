@@ -200,6 +200,31 @@ def test_code_ir_source_map_back_references(tmp_path: Path) -> None:
     assert pay["source_map"]["screen_spec"].endswith("screens/checkout.md")
 
 
+def test_code_ir_preserves_physical_root_path_when_archive_precedes_active(
+    tmp_path: Path,
+) -> None:
+    pen = contextualized_pen()
+    active = pen["children"][0]
+    active["penflow"] = {
+        "lifecycle": {
+            "schema_version": 1,
+            "state": "active",
+            "logical_screen_id": "checkout",
+            "revision_id": "checkout-r2",
+        }
+    }
+    archived = json.loads(json.dumps(active))
+    archived["id"] = "checkout-r1"
+    archived["penflow"]["lifecycle"].update({"state": "archive", "revision_id": "checkout-r1"})
+    pen["children"] = [archived, active]
+    pen_path = write_json(tmp_path / "ui.pen", pen)
+
+    ir = code_ir_from_pen(pen_path, flow_id="checkout")
+
+    assert ir["screens"][0]["source_map"]["pencil_path"] == "1"
+    assert ir["screens"][0]["root"]["children"][1]["source_map"]["pencil_path"] == "1.1"
+
+
 def test_code_ir_validates_against_schema(tmp_path: Path) -> None:
     pen_path = write_json(tmp_path / "ui.pen", contextualized_pen())
     ir = code_ir_from_pen(pen_path, flow_id="checkout", flow_name="Checkout flow")

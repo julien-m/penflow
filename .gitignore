@@ -31,6 +31,10 @@ build/
 .specs/hooks/.commit-context.json
 .specs/.runs/
 .specs/.previews/
+.specs/conventions/runs/
+.specs/conventions/debt.json
+.specs/conventions/debt-report.md
+.specs/features/*/checks/transcripts/
 .specs/preflight-report.md
 .specs/features/*/preflight-report.md
 test-results/

@@ -20,6 +20,7 @@ from .flow_contract import (
 )
 from .models import PenNode
 from .pen import load_pen, parse_pen, update_pen_by_semantic_id
+from .pen_lifecycle import select_active_canvas_region_entries
 from .schema_cache import validator_for
 
 
@@ -271,12 +272,14 @@ def code_ir_from_pen(
     Returns:
         Deterministic runtime-agnostic code IR preserving hierarchy, context, states,
         validations, errors, test IDs, and source mapping.
+
     """
     pen = load_pen(pen_path)
+    # @spec FR-005: Code handoff consumes active regions only — .specs/features/074-penflow-doctor-consumer-project-hygiene/spec.md#fr-005
+    active_regions = select_active_canvas_region_entries(pen)
     screens = [
-        _screen_ir_from_pen_node(node, (index,), flow_id=flow_id)
-        for index, node in enumerate(pen.get("children", []) or [])
-        if isinstance(node, dict)
+        _screen_ir_from_pen_node(dict(region.raw_node), (region.source_index,), flow_id=flow_id)
+        for region in active_regions
     ]
     inferred_flow_id = flow_id or (screens[0]["id"] if screens else Path(pen_path).stem)
     flow = {"id": inferred_flow_id, "name": flow_name or inferred_flow_id}

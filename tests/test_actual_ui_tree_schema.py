@@ -26,13 +26,16 @@ VALID_FIXTURE = ROOT / "examples" / "demo" / "actual-ui-tree.json"
 INVALID_FIXTURE = ROOT / "examples" / "demo" / "actual-ui-tree.invalid.json"
 
 
-def _run_cli(*args: str) -> subprocess.CompletedProcess[str]:
+def _run_cli(project: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    # Installed CLI execution is a bounded process boundary; nonzero is
+    # asserted by each scenario because invalid fixtures fail by contract.
     return subprocess.run(
-        [sys.executable, "-m", "penflow", *args],
+        [sys.executable, "-m", "penflow", *args, "--project", str(project)],
         capture_output=True,
         text=True,
         cwd=ROOT,
         check=False,
+        timeout=10,
     )
 
 
@@ -98,8 +101,9 @@ def test_v0_signature_backward_compatible() -> None:
 
 
 # AC-002
-def test_cli_validate_actual_json_pass() -> None:
-    result = _run_cli("validate-actual", str(VALID_FIXTURE), "--json")
+def test_cli_validate_actual_json_pass(tmp_path: Path, governed_consumer_project) -> None:
+    project = governed_consumer_project(tmp_path / "consumer")
+    result = _run_cli(project, "validate-actual", str(VALID_FIXTURE), "--json")
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     assert payload["status"] == "PASS"
@@ -107,8 +111,9 @@ def test_cli_validate_actual_json_pass() -> None:
 
 
 # AC-003
-def test_cli_validate_actual_schema_flag_pass() -> None:
-    result = _run_cli("validate-actual", str(VALID_FIXTURE), "--schema", "--json")
+def test_cli_validate_actual_schema_flag_pass(tmp_path: Path, governed_consumer_project) -> None:
+    project = governed_consumer_project(tmp_path / "consumer")
+    result = _run_cli(project, "validate-actual", str(VALID_FIXTURE), "--schema", "--json")
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     assert payload["status"] == "PASS"
@@ -116,8 +121,11 @@ def test_cli_validate_actual_schema_flag_pass() -> None:
 
 
 # AC-004
-def test_cli_validate_actual_invalid_fixture_fails() -> None:
-    result = _run_cli("validate-actual", str(INVALID_FIXTURE), "--json")
+def test_cli_validate_actual_invalid_fixture_fails(
+    tmp_path: Path, governed_consumer_project
+) -> None:
+    project = governed_consumer_project(tmp_path / "consumer")
+    result = _run_cli(project, "validate-actual", str(INVALID_FIXTURE), "--json")
     assert result.returncode != 0
     payload = json.loads(result.stdout)
     assert payload["status"] == "FAIL"
@@ -127,14 +135,15 @@ def test_cli_validate_actual_invalid_fixture_fails() -> None:
 
 
 # AC-005
-def test_cli_output_is_byte_deterministic() -> None:
-    first = _run_cli("validate-actual", str(VALID_FIXTURE), "--json")
-    second = _run_cli("validate-actual", str(VALID_FIXTURE), "--json")
+def test_cli_output_is_byte_deterministic(tmp_path: Path, governed_consumer_project) -> None:
+    project = governed_consumer_project(tmp_path / "consumer")
+    first = _run_cli(project, "validate-actual", str(VALID_FIXTURE), "--json")
+    second = _run_cli(project, "validate-actual", str(VALID_FIXTURE), "--json")
     assert first.returncode == 0 and second.returncode == 0
     assert first.stdout == second.stdout
     # Schema mode is also deterministic
-    first_s = _run_cli("validate-actual", str(VALID_FIXTURE), "--schema", "--json")
-    second_s = _run_cli("validate-actual", str(VALID_FIXTURE), "--schema", "--json")
+    first_s = _run_cli(project, "validate-actual", str(VALID_FIXTURE), "--schema", "--json")
+    second_s = _run_cli(project, "validate-actual", str(VALID_FIXTURE), "--schema", "--json")
     assert first_s.stdout == second_s.stdout
 
 

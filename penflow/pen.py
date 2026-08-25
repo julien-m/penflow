@@ -16,6 +16,7 @@ from typing import Any
 from .context import Context, ContextIssue, format_context_string, validate_context
 from .flow_contract import contract_registries
 from .models import BBox, PenNode
+from .pen_lifecycle import select_active_canvas_region_entries, validate_canvas_lifecycle
 
 VISUAL_KEYS = {
     "fill",
@@ -39,11 +40,39 @@ def load_pen(path: str | Path) -> dict[str, Any]:
 
 
 def parse_pen(path_or_data: str | Path | dict[str, Any]) -> list[PenNode]:
+    """Parse the active lifecycle regions of a Pencil document."""
+    return parse_active_pen(path_or_data)
+
+
+def parse_active_pen(path_or_data: str | Path | dict[str, Any]) -> list[PenNode]:
+    """Parse active roots after strict canvas lifecycle validation.
+
+    Args:
+        path_or_data: `.pen` path or parsed document object.
+
+    Returns:
+        Parsed active roots in their original order.
+
+    Raises:
+        CanvasLifecycleError: If any region or lifecycle invariant is invalid.
+    """
     data = load_pen(path_or_data) if isinstance(path_or_data, (str, Path)) else path_or_data
-    roots: list[PenNode] = []
-    for index, child in enumerate(data.get("children", [])):
-        roots.append(_parse_node(child, None, index))
-    return roots
+    active_regions = select_active_canvas_region_entries(data)
+    return [
+        _parse_node(dict(region.raw_node), None, region.source_index) for region in active_regions
+    ]
+
+
+def _parse_all_regions(data: dict[str, Any]) -> list[PenNode]:
+    """Parse physical object roots for diagnostics after lifecycle validation."""
+    raw_children = data.get("children")
+    if not isinstance(raw_children, list):
+        return []
+    return [
+        _parse_node(child, None, index)
+        for index, child in enumerate(raw_children)
+        if isinstance(child, dict)
+    ]
 
 
 def _parse_node(data: dict[str, Any], parent_id: str | None, order: int) -> PenNode:
@@ -78,13 +107,15 @@ def all_nodes(roots: list[PenNode]) -> list[PenNode]:
 
 def inspect_pen(path: str | Path) -> dict[str, Any]:
     raw = load_pen(path)
-    roots = parse_pen(raw)
+    lifecycle = validate_canvas_lifecycle(raw)
+    roots = _parse_all_regions(raw)
+    validation_roots = parse_active_pen(raw) if lifecycle.is_valid else roots
     nodes = all_nodes(roots)
     contextual = [node for node in nodes if node.context.to_dict()]
     buttons = [node for node in nodes if node.role == "button"]
     lists = [node for node in nodes if node.role in {"list", "list_item"}]
     dynamic_text = [node for node in nodes if node.context.binding and node.type == "text"]
-    issues = validate_pen_context(roots)
+    issues = validate_pen_context(validation_roots)
     # Raw re-scan (feature 049): coerced bbox strings are only visible in raw JSON.
     warnings = [issue for issue in issues if issue.severity == "warning"] + bbox_issues(raw)
     errors = [issue for issue in issues if issue.severity == "error"]
@@ -104,7 +135,8 @@ def inspect_pen(path: str | Path) -> dict[str, Any]:
         "lists": [node.semantic_id or node.id for node in lists],
         "dynamic_text": [node.semantic_id or node.id for node in dynamic_text],
         "warnings": [asdict(issue) for issue in warnings],
-        "errors": [asdict(issue) for issue in errors],
+        "errors": [asdict(issue) for issue in errors]
+        + [finding.to_dict() for finding in lifecycle.findings],
     }
 
 

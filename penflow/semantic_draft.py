@@ -3,11 +3,21 @@
 
 from __future__ import annotations
 
+import copy
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
 
 from .context import format_context_string
+from .json_filesystem import write_json_atomically
+from .pen_lifecycle import (
+    CanvasFinding,
+    CanvasLifecycleError,
+    CanvasLifecycleResult,
+    CanvasState,
+    validate_canvas_lifecycle,
+)
 from .semantic_validation import validate_semantic_tree
 
 # Re-exported for backward compatibility: theme parsing moved to penflow.theme
@@ -25,6 +35,10 @@ PEN_VERSION = "2.11"
 SCREEN_GAP = 16
 SCREEN_PADDING = 24
 NODE_GAP = 8
+# Sixteen SHA-256 hex digits seed a 64-bit deterministic identity for a newly
+# created region. Managed replacements preserve that stable region identity;
+# this is not a content-version digest.
+REVISION_DIGEST_HEX_LENGTH = 16
 
 
 def pen_draft_from_semantic_tree(
@@ -54,6 +68,7 @@ def pen_draft_from_semantic_tree(
     return draft
 
 
+# @spec FR-005: Canonical producer migration — .specs/features/074-penflow-doctor-consumer-project-hygiene/spec.md#fr-005
 def write_pen_draft_from_semantic_tree(
     tree_path: str | Path, out_path: str | Path, *, theme_css_path: str | Path | None = None
 ) -> dict[str, Any]:
@@ -61,20 +76,158 @@ def write_pen_draft_from_semantic_tree(
 
     Args:
         tree_path: Path to `semantic-ui-tree.json`.
-        out_path: Destination `.pen` path.
+        out_path: Canonical ``ui.pen`` destination. If it exists, matching
+            active roots are replaced while unrelated and historical regions
+            remain byte-equivalent as JSON values.
 
     Returns:
         The generated Pencil draft dictionary.
+
+    Raises:
+        CanvasLifecycleError: If the existing canvas lifecycle or variables
+            cannot be merged safely.
+        OSError: If an input or destination cannot be read or written.
+        ValueError: If input JSON or semantic-tree validation is invalid.
+
+    Side effects:
+        Atomically creates or replaces canonical ``ui.pen`` while preserving
+        unrelated and historical lifecycle regions.
     """
     tree = json.loads(Path(tree_path).read_text(encoding="utf-8"))
     draft = pen_draft_from_semantic_tree(tree, theme_css_path=theme_css_path)
-    Path(out_path).write_text(json.dumps(draft, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    return draft
+    destination = Path(out_path)
+    document = _merge_with_existing_document(destination, draft)
+    write_json_atomically(destination, document)
+    return document
+
+
+def _merge_with_existing_document(path: Path, draft: dict[str, Any]) -> dict[str, Any]:
+    """Merge generated active roots into an existing canonical canvas."""
+    generated = _validated_lifecycle(draft)
+    if not path.exists():
+        return draft
+
+    existing = _load_existing_document(path)
+    existing_result = validate_canvas_lifecycle(existing)
+    generated_ids = {region.logical_screen_id for region in generated.active_regions}
+    blocking = _blocking_existing_findings(existing_result, generated_ids)
+    if blocking:
+        raise CanvasLifecycleError(blocking)
+
+    generated_by_id = {
+        region.logical_screen_id: copy.deepcopy(dict(region.raw_node))
+        for region in generated.active_regions
+    }
+    merged = copy.deepcopy(existing)
+    merged["version"] = draft["version"]
+    merged["children"] = _merge_canvas_children(existing, existing_result, generated_by_id)
+    _merge_document_variables(merged, existing, draft)
+    _validated_lifecycle(merged)
+    return merged
+
+
+def _validated_lifecycle(document: dict[str, Any]) -> CanvasLifecycleResult:
+    """Return lifecycle data or raise its stable typed validation error."""
+    result = validate_canvas_lifecycle(document)
+    if result.findings:
+        raise CanvasLifecycleError(result.findings)
+    return result
+
+
+def _load_existing_document(path: Path) -> dict[str, Any]:
+    """Load an existing canonical canvas and validate its object boundary."""
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(document, dict):
+        raise CanvasLifecycleError(
+            (CanvasFinding("canvas.document_invalid", "canvas document must be an object"),)
+        )
+    _existing_variables(document)
+    return document
+
+
+def _blocking_existing_findings(
+    lifecycle: CanvasLifecycleResult,
+    generated_ids: set[str],
+) -> tuple[CanvasFinding, ...]:
+    """Return findings that generated active roots cannot safely repair."""
+    # An empty canvas is safe only because the valid draft supplies active
+    # roots; active_missing is safe only for the same generated logical screen.
+    return tuple(
+        finding
+        for finding in lifecycle.findings
+        if finding.code != "canvas.empty"
+        and (
+            finding.code != "canvas.active_missing"
+            or finding.logical_screen_id not in generated_ids
+        )
+    )
+
+
+def _existing_variables(document: dict[str, Any]) -> dict[str, Any]:
+    """Return validated existing variables or raise a typed canvas finding."""
+    variables = document.get("variables", {})
+    if not isinstance(variables, dict):
+        raise CanvasLifecycleError(
+            (
+                CanvasFinding(
+                    "canvas.variables_invalid",
+                    "document variables must be an object",
+                ),
+            )
+        )
+    return variables
+
+
+def _merge_document_variables(
+    merged: dict[str, Any],
+    existing: dict[str, Any],
+    draft: dict[str, Any],
+) -> None:
+    """Merge generated theme variables without dropping consumer values."""
+    generated_variables = draft.get("variables")
+    if generated_variables:
+        merged["variables"] = {**_existing_variables(existing), **generated_variables}
+
+
+def _merge_canvas_children(
+    existing: dict[str, Any],
+    lifecycle: CanvasLifecycleResult,
+    generated_by_id: dict[str, dict[str, Any]],
+) -> list[Any]:
+    """Replace matching active roots in place, then append new screens."""
+    regions_by_index = {region.source_index: region for region in lifecycle.regions}
+    remaining = dict(generated_by_id)
+    children: list[Any] = []
+    for index, child in enumerate(existing.get("children", [])):
+        region = regions_by_index.get(index)
+        if (
+            region is not None
+            and region.state is CanvasState.ACTIVE
+            and region.logical_screen_id in remaining
+        ):
+            replacement = remaining.pop(region.logical_screen_id)
+            if not region.is_legacy and isinstance(child, dict):
+                # Managed replacements retain lifecycle identity and revision;
+                # generation changes active content, not canvas history.
+                old_penflow = child.get("penflow")
+                old_lifecycle = (
+                    old_penflow.get("lifecycle") if isinstance(old_penflow, dict) else None
+                )
+                if isinstance(old_lifecycle, dict):
+                    replacement.setdefault("penflow", {})["lifecycle"] = copy.deepcopy(
+                        old_lifecycle
+                    )
+            children.append(replacement)
+        else:
+            children.append(copy.deepcopy(child))
+    children.extend(remaining.values())
+    return children
 
 
 def _screen_to_pen(screen: dict[str, Any], index: int, *, theme: dict[str, Any]) -> dict[str, Any]:
     root = screen["root"]
     viewport = screen.get("viewport", {})
+    logical_screen_id = str(screen.get("screen_id") or screen.get("id") or root["semantic_id"])
     node = _semantic_node_to_pen(root, index, is_root=True, theme=theme)
     node.update(
         {
@@ -88,9 +241,26 @@ def _screen_to_pen(screen: dict[str, Any], index: int, *, theme: dict[str, Any])
             "alignItems": "stretch",
             "fill": theme["style"]["background"],
             "source_map": screen.get("source_map", root.get("source_map", {})),
+            "penflow": {
+                "lifecycle": {
+                    "schema_version": 1,
+                    "state": "active",
+                    "logical_screen_id": logical_screen_id,
+                    "revision_id": _generated_revision_id(screen, logical_screen_id),
+                }
+            },
         }
     )
     return node
+
+
+def _generated_revision_id(screen: dict[str, Any], logical_screen_id: str) -> str:
+    """Return a deterministic initial identity for a newly created region."""
+    canonical_screen = json.dumps(screen, sort_keys=True, separators=(",", ":"))
+    digest = hashlib.sha256(f"{logical_screen_id}:{canonical_screen}".encode("utf-8")).hexdigest()[
+        :REVISION_DIGEST_HEX_LENGTH
+    ]
+    return f"{logical_screen_id}-r-{digest}"
 
 
 def _semantic_node_to_pen(

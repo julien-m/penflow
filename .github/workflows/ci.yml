@@ -102,3 +102,103 @@ jobs:
       - name: Run tests
         shell: bash
         run: uv run --no-sync python -m pytest
+
+  qe7:
+    name: Feature 074 large-tree evidence
+    runs-on: ubuntu-latest
+    # QE7 must fail closed instead of occupying a runner indefinitely.
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.5"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Install dependencies
+        shell: bash
+        run: uv sync --extra dev --locked
+
+      - name: Prepare isolated QE7 consumer
+        shell: bash
+        run: |
+          QE7_CONSUMER="$RUNNER_TEMP/penflow-qe7-consumer"
+          mkdir -p "$QE7_CONSUMER"
+          git -C "$QE7_CONSUMER" init -q
+          git -C "$QE7_CONSUMER" config user.email "penflow-ci@example.invalid"
+          git -C "$QE7_CONSUMER" config user.name "Penflow CI"
+          echo "QE7_CONSUMER=$QE7_CONSUMER" >> "$GITHUB_ENV"
+          uv run --no-sync penflow doctor --project "$QE7_CONSUMER" --check --json > "$RUNNER_TEMP/qe7-doctor-start.json" || test "$?" -eq 1
+          uv run --no-sync python - "$RUNNER_TEMP/qe7-doctor-start.json" <<'PY'
+          import json
+          import sys
+
+          allowed = {
+              "pen.missing",
+              "gitignore.managed_block_missing",
+              "gitignore.managed_block_outdated",
+              "gitignore.managed_block_duplicate",
+          }
+          with open(sys.argv[1], encoding="utf-8") as receipt:
+              report = json.load(receipt)
+          codes = {
+              issue["code"] for issue in report["stable_result"]["findings"]
+          }
+          if not codes or not codes <= allowed:
+              raise SystemExit(f"unsafe QE7 Doctor bootstrap findings: {sorted(codes)}")
+          PY
+          uv run --no-sync penflow doctor --project "$QE7_CONSUMER" --fix --json
+          uv run --no-sync penflow doctor --project "$QE7_CONSUMER" --check --json
+          cp -R "$GITHUB_WORKSPACE/tests" "$QE7_CONSUMER/tests"
+          mkdir -p "$QE7_CONSUMER/.specs/features/074-penflow-doctor-consumer-project-hygiene/checks"
+          git -C "$QE7_CONSUMER" add .gitignore penflow/ui.pen tests
+          git -C "$QE7_CONSUMER" commit -q -m "Initialize isolated QE7 consumer"
+
+      - name: Capture pre-QE7 Doctor receipt
+        shell: bash
+        run: >-
+          uv run --no-sync penflow doctor --project "$QE7_CONSUMER" --check --json
+          > "$QE7_CONSUMER/.specs/features/074-penflow-doctor-consumer-project-hygiene/checks/qe7-doctor-before.json"
+
+      - name: Run bounded large-tree gate
+        shell: bash
+        run: >-
+          uv run --no-sync python tests/quality_gate_receipt.py qe7
+          --project "$QE7_CONSUMER"
+          --out "$QE7_CONSUMER/.specs/features/074-penflow-doctor-consumer-project-hygiene/checks/qe7-large-tree.json"
+        env:
+          PENFLOW_QE7_CONSUMER: ${{ env.QE7_CONSUMER }}
+
+      - name: Capture post-QE7 Doctor receipt
+        shell: bash
+        run: >-
+          uv run --no-sync penflow doctor --project "$QE7_CONSUMER" --check --json
+          > "$QE7_CONSUMER/.specs/features/074-penflow-doctor-consumer-project-hygiene/checks/qe7-doctor-after.json"
+
+      - name: Upload QE7 evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: penflow-074-qe7-${{ github.sha }}
+          # Keep bounded large-tree evidence for one monthly audit/reproduction window.
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            ${{ env.QE7_CONSUMER }}/.specs/features/074-penflow-doctor-consumer-project-hygiene/checks/qe7-large-tree.json
+            ${{ env.QE7_CONSUMER }}/.specs/features/074-penflow-doctor-consumer-project-hygiene/checks/qe7-large-tree-metrics.json
+            ${{ env.QE7_CONSUMER }}/.specs/features/074-penflow-doctor-consumer-project-hygiene/checks/qe7-doctor-before.json
+            ${{ env.QE7_CONSUMER }}/.specs/features/074-penflow-doctor-consumer-project-hygiene/checks/qe7-doctor-after.json
+            ${{ env.QE7_CONSUMER }}/.specs/features/074-penflow-doctor-consumer-project-hygiene/checks/transcripts/qe7-*

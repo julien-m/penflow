@@ -152,8 +152,8 @@ def _workspace(root: Path) -> tuple[Path, Path]:
         },
     )
 
-    pre = root / "pre.pen"
-    post = root / "post.pen"
+    pre = root / "pre.snapshot.json"
+    post = root / "post.snapshot.json"
     document = root / "ui.pen"
     pre.write_bytes(b'{"version":1,"children":[]}')
     post.write_bytes(b'{"version":1,"children":[{"id":"checkout","type":"frame"}]}')

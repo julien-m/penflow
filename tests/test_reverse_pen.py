@@ -1,4 +1,5 @@
 # @spec(AC-005)
+# @spec FR-005: Canonical producer migration — .specs/features/074-penflow-doctor-consumer-project-hygiene/spec.md#fr-005
 from __future__ import annotations
 
 import copy
@@ -150,12 +151,70 @@ def test_reverse_pen_optional_enrichment_preserves_existing_layout(tmp_path: Pat
     out_dir = tmp_path / "reverse"
 
     reverse_pen(pen_path, out_dir, enrich=True)
-    enriched = json.loads((out_dir / "ui.enriched.pen").read_text(encoding="utf-8"))
+    enriched = json.loads(pen_path.read_text(encoding="utf-8"))
     after_visual = visual_snapshot_by_id(enriched)
 
     assert before_visual == after_visual
     assert "semantic_id=checkout.pay" in enriched["children"][0]["children"][1]["context"]
     assert "intent=[NEEDS CLARIFICATION]" in enriched["children"][0]["children"][1]["context"]
+    assert not list(out_dir.rglob("*.pen"))
+    assert list(tmp_path.glob("*.pen")) == [pen_path]
+
+
+def test_reverse_pen_consumes_and_enriches_only_active_regions(tmp_path: Path) -> None:
+    pen = legacy_pen_without_business_logic()
+    active = pen["children"][0]
+    active["penflow"] = {
+        "lifecycle": {
+            "schema_version": 1,
+            "state": "active",
+            "logical_screen_id": "checkout",
+            "revision_id": "checkout-r2",
+        }
+    }
+    archived = copy.deepcopy(active)
+    archived["id"] = "checkoutArchived"
+    archived["name"] = "Archived checkout"
+    archived["penflow"]["lifecycle"].update({"state": "archive", "revision_id": "checkout-r1"})
+    archived_before = copy.deepcopy(archived)
+    pen["children"].append(archived)
+    pen_path = write_json(tmp_path / "ui.pen", pen)
+    out_dir = tmp_path / "reverse"
+
+    report = reverse_pen(pen_path, out_dir, enrich=True)
+
+    tree = json.loads((out_dir / "semantic-ui-tree.json").read_text(encoding="utf-8"))
+    updated = json.loads(pen_path.read_text(encoding="utf-8"))
+    assert report["screens"] == 1
+    assert [screen["id"] for screen in tree["screens"]] == ["checkout"]
+    assert "semantic_id=checkout.pay" in updated["children"][0]["children"][1]["context"]
+    assert updated["children"][1] == archived_before
+    assert not list(out_dir.rglob("*.pen"))
+
+
+def test_reverse_pen_preserves_physical_source_paths_for_active_regions(tmp_path: Path) -> None:
+    pen = legacy_pen_without_business_logic()
+    active = pen["children"][0]
+    active["context"] = "semantic_id=checkout; role=screen"
+    active["penflow"] = {
+        "lifecycle": {
+            "schema_version": 1,
+            "state": "active",
+            "logical_screen_id": "checkout",
+            "revision_id": "checkout-r2",
+        }
+    }
+    archived = copy.deepcopy(active)
+    archived["id"] = "checkoutArchived"
+    archived["penflow"]["lifecycle"].update({"state": "archive", "revision_id": "checkout-r1"})
+    pen["children"] = [archived, active]
+    pen_path = write_json(tmp_path / "ui.pen", pen)
+
+    reverse_pen(pen_path, tmp_path / "reverse")
+    tree = json.loads((tmp_path / "reverse/semantic-ui-tree.json").read_text(encoding="utf-8"))
+
+    assert "pencil_path: 1" in tree["screens"][0]["root"]["source_map"]["notes"]
+    assert "pencil_path: 1.1" in tree["screens"][0]["root"]["children"][1]["source_map"]["notes"]
 
 
 def test_reverse_pen_cli_outputs_json_and_valid_semantic_tree(tmp_path: Path) -> None:

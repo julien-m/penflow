@@ -1,0 +1,61 @@
+{
+  "$comment": "@spec FR-009: Deterministic cleanup receipt — .specs/features/074-penflow-doctor-consumer-project-hygiene/spec.md#fr-009",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.local/schemas/cleanup-receipt.schema.json",
+  "title": "Penflow Cleanup Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "phase",
+    "cleanup_state",
+    "deleted",
+    "preserved",
+    "blocked",
+    "errors",
+    "reclaimed_bytes",
+    "preserved_bytes",
+    "blocked_bytes"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "phase": {"enum": ["preflight", "postflight"]},
+    "cleanup_state": {
+      "enum": ["not_eligible", "eligible", "in_progress", "completed", "cleanup_failed"]
+    },
+    "deleted": {"type": "array", "items": {"$ref": "#/$defs/item"}},
+    "preserved": {"type": "array", "items": {"$ref": "#/$defs/item"}},
+    "blocked": {"type": "array", "items": {"$ref": "#/$defs/item"}},
+    "errors": {"type": "array", "items": {"$ref": "#/$defs/error"}},
+    "reclaimed_bytes": {"type": "integer", "minimum": 0},
+    "preserved_bytes": {"type": "integer", "minimum": 0},
+    "blocked_bytes": {"type": "integer", "minimum": 0}
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relative_path", "logical_bytes", "code"],
+      "properties": {
+        "relative_path": {
+          "type": "string",
+          "pattern": "^\\.penflow-tmp/runs/(?!\\.\\.(?:/|$))(?!.*\\/\\.\\.(?:/|$))(?!.*\\\\)(?!.*//).+$"
+        },
+        "logical_bytes": {"type": "integer", "minimum": 0},
+        "code": {"type": ["string", "null"], "minLength": 1}
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "path", "message"],
+      "properties": {
+        "code": {"type": "string", "minLength": 1},
+        "path": {"type": ["string", "null"], "minLength": 1},
+        "message": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

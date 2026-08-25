@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -23,6 +22,7 @@ from .actual_provenance import (
 from .codegen import react, rust_dioxus, swiftui
 from .compare import STRICT_THRESHOLD, compare_tree_files
 from .contracts import code_ir_from_pen, validate_code_ir
+from .json_filesystem import write_json_atomically
 from .llm import fix_compare_report, review_compare_report
 from .semantic import write_semantic_tree
 from .semantic_enrichment import enrich_pen_from_semantic_tree
@@ -30,6 +30,7 @@ from .semantic_mapping import write_pencil_context_map
 from .tree import expected_tree_from_pen
 
 
+# @spec FR-005: Canonical producer migration — .specs/features/074-penflow-doctor-consumer-project-hygiene/spec.md#fr-005
 def build_demo(out_dir: str | Path) -> dict[str, str]:
     # @spec FR-011: Demo fixtures use canonical contract.json and JSON reports — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-011
     """Write a deterministic full Penflow demo and return generated file paths.
@@ -41,6 +42,7 @@ def build_demo(out_dir: str | Path) -> dict[str, str]:
         Mapping of relative file path to absolute or relative generated path string.
     """
     out = Path(out_dir)
+    canonical_pen_path = out / "ui.pen"
     specs = out / "flow-ui-contract"
     flows = specs / "flows"
     screens = specs / "screens"
@@ -50,19 +52,18 @@ def build_demo(out_dir: str | Path) -> dict[str, str]:
     (flows / "checkout.md").write_text(_flow_spec(), encoding="utf-8")
     (screens / "checkout.md").write_text(_screen_spec(), encoding="utf-8")
     _write_json(specs / "contract.json", _flow_contract())
-    _write_json(out / "ui.visual.pen", _visual_pen())
+    _write_json(canonical_pen_path, _visual_pen())
 
     semantic_path = out / "semantic-ui-tree.json"
     write_semantic_tree(specs, semantic_path)
 
-    enriched_pen_path = out / "ui.pen"
-    enrich_pen_from_semantic_tree(out / "ui.visual.pen", semantic_path, enriched_pen_path)
+    enrich_pen_from_semantic_tree(canonical_pen_path, semantic_path, canonical_pen_path)
 
     context_map_path = out / "pencil-context-map.json"
-    write_pencil_context_map(enriched_pen_path, semantic_path, context_map_path)
+    write_pencil_context_map(canonical_pen_path, semantic_path, context_map_path)
 
     expected_path = out / "expected-ui-tree.json"
-    expected = expected_tree_from_pen(enriched_pen_path)
+    expected = expected_tree_from_pen(canonical_pen_path)
     _write_json(expected_path, expected)
 
     actual = _actual_tree_from_expected(expected)
@@ -72,7 +73,7 @@ def build_demo(out_dir: str | Path) -> dict[str, str]:
     _write_visual_evidence_fixture(out, expected)
 
     ir = code_ir_from_pen(
-        enriched_pen_path,
+        canonical_pen_path,
         flow_id="checkout",
         flow_name="Checkout",
         semantic_tree=semantic_path,
@@ -103,7 +104,7 @@ def build_demo(out_dir: str | Path) -> dict[str, str]:
 
 
 def _write_json(path: Path, data: dict[str, Any]) -> None:
-    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_json_atomically(path, data)
 
 
 def _write_actual_provenance_fixture(actual_path: Path, expected: dict[str, Any]) -> None:
@@ -601,6 +602,14 @@ def _visual_pen() -> dict[str, Any]:
                 "alignItems": "stretch",
                 "fill": "#FFFFFF",
                 "context": "role=screen; semantic_id=checkout",
+                "penflow": {
+                    "lifecycle": {
+                        "schema_version": 1,
+                        "state": "active",
+                        "logical_screen_id": "checkout",
+                        "revision_id": "checkout-r1",
+                    }
+                },
                 "children": [
                     {
                         "id": "orderSummary",

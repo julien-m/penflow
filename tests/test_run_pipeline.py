@@ -34,6 +34,39 @@ def copy_full_workspace(tmp_path: Path) -> Path:
     return workspace
 
 
+def init_cli_consumer(tmp_path: Path, name: str) -> tuple[Path, Path]:
+    """Create a governed Git consumer and return (project, artifact workspace)."""
+    project = tmp_path / name
+    project.mkdir()
+    # Git/project subprocesses are bounded to 10s so system failures cannot hang CI.
+    subprocess.run(["git", "init", "-q"], cwd=project, check=True, timeout=10)
+    assert main(["doctor", "--project", str(project), "--fix", "--json"]) == 0
+    return project, project / "penflow"
+
+
+def _run_penflow_process(project: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    """Run one bounded external Penflow CLI process with captured text channels."""
+    # System-process contract: no shell, repository import cwd, captured text,
+    # explicit project selector, non-raising status, and a hard 10-second bound.
+    return subprocess.run(
+        [sys.executable, "-m", "penflow", *args, "--project", str(project), "--json"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+
+@pytest.fixture
+def fresh_demo_cli(tmp_path: Path) -> tuple[Path, Path, dict]:
+    """Bootstrap one governed demo through the external process boundary."""
+    project, workspace = init_cli_consumer(tmp_path, "fresh-demo-project")
+    result = _run_penflow_process(project, "demo", "--out", str(workspace))
+    assert result.returncode == 0
+    return project, workspace, json.loads(result.stdout)
+
+
 def _png_chunk(chunk_type: bytes, data: bytes) -> bytes:
     checksum = zlib.crc32(chunk_type + data) & 0xFFFFFFFF
     return struct.pack(">I", len(data)) + chunk_type + data + struct.pack(">I", checksum)
@@ -214,29 +247,11 @@ def test_run_pipeline_tracked_demo_passes_without_test_materialization(
 
 
 # @spec(AC-009)
-def test_fresh_demo_cli_bootstrap_passes_then_missing_actual_fails_closed(
-    tmp_path: Path,
-) -> None:
-    workspace = tmp_path / "fresh-demo"
-    demo_result = subprocess.run(
-        [sys.executable, "-m", "penflow", "demo", "--out", str(workspace), "--json"],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    demo_payload = json.loads(demo_result.stdout)
-
-    run_result = subprocess.run(
-        [sys.executable, "-m", "penflow", "run", "--target", str(workspace), "--json"],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+def test_fresh_demo_cli_bootstrap_and_run_pass(fresh_demo_cli) -> None:
+    project, workspace, demo_payload = fresh_demo_cli
+    run_result = _run_penflow_process(project, "run", "--target", str(workspace))
     run_payload = json.loads(run_result.stdout)
 
-    assert demo_result.returncode == 0
     assert demo_payload["status"] == "PASS"
     assert (workspace / "actual-ui-tree.json").is_file()
     assert run_result.returncode == 0
@@ -245,14 +260,11 @@ def test_fresh_demo_cli_bootstrap_passes_then_missing_actual_fails_closed(
     assert run_payload["gates"]["validate-actual-provenance"]["exit"] == 0
     assert all(gate["exit"] == 0 for gate in run_payload["gates"].values())
 
+
+def test_fresh_demo_cli_missing_actual_fails_closed(fresh_demo_cli) -> None:
+    project, workspace, _ = fresh_demo_cli
     (workspace / "actual-ui-tree.json").unlink()
-    missing_result = subprocess.run(
-        [sys.executable, "-m", "penflow", "run", "--target", str(workspace), "--json"],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    missing_result = _run_penflow_process(project, "run", "--target", str(workspace))
     missing_payload = json.loads(missing_result.stdout)
 
     assert missing_result.returncode != 0
@@ -265,13 +277,24 @@ def test_fresh_demo_visual_evidence_is_load_bearing(
     tmp_path: Path,
     mutation: str,
 ) -> None:
-    workspace = tmp_path / f"fresh-demo-{mutation}"
+    project, workspace = init_cli_consumer(tmp_path, f"fresh-demo-{mutation}-project")
     demo_result = subprocess.run(
-        [sys.executable, "-m", "penflow", "demo", "--out", str(workspace), "--json"],
+        [
+            sys.executable,
+            "-m",
+            "penflow",
+            "demo",
+            "--project",
+            str(project),
+            "--out",
+            str(workspace),
+            "--json",
+        ],
         cwd=ROOT,
         check=False,
         capture_output=True,
         text=True,
+        timeout=10,
     )
     assert demo_result.returncode == 0
 
@@ -282,11 +305,22 @@ def test_fresh_demo_visual_evidence_is_load_bearing(
         png.write_bytes(b"corrupt-static-demo-fixture")
 
     run_result = subprocess.run(
-        [sys.executable, "-m", "penflow", "run", "--target", str(workspace), "--json"],
+        [
+            sys.executable,
+            "-m",
+            "penflow",
+            "run",
+            "--project",
+            str(project),
+            "--target",
+            str(workspace),
+            "--json",
+        ],
         cwd=ROOT,
         check=False,
         capture_output=True,
         text=True,
+        timeout=10,
     )
     payload = json.loads(run_result.stdout)
 

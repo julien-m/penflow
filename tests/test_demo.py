@@ -1,4 +1,5 @@
 # @spec(FR-008)
+# @spec FR-005: Canonical producer migration — .specs/features/074-penflow-doctor-consumer-project-hygiene/spec.md#fr-005
 """Feature 054 — direct unit coverage for `penflow/demo.py`.
 
 Invariant protected: `build_demo` is a deterministic fixture generator — it
@@ -21,7 +22,6 @@ EXPECTED_FILES = {
     "flow-ui-contract/contract.json",
     "flow-ui-contract/flows/checkout.md",
     "flow-ui-contract/screens/checkout.md",
-    "ui.visual.pen",
     "ui.pen",
     "semantic-ui-tree.json",
     "pencil-context-map.json",
@@ -50,6 +50,7 @@ def test_build_demo_writes_the_full_artifact_set(tmp_path: Path) -> None:
         assert path.is_file(), relative
         assert path.relative_to(tmp_path).as_posix() == relative
         assert path.stat().st_size > 0, relative
+    assert [path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*.pen")] == ["ui.pen"]
 
 
 def test_build_demo_compare_report_passes_at_strict_threshold(tmp_path: Path) -> None:
@@ -149,6 +150,18 @@ def test_build_demo_codegen_files_target_the_checkout_screen(tmp_path: Path) -> 
         encoding="utf-8"
     )
     assert "pub fn Checkout()" in (tmp_path / "checkout.rs").read_text(encoding="utf-8")
+
+
+def test_build_demo_marks_the_canonical_screen_active(tmp_path: Path) -> None:
+    build_demo(tmp_path)
+    pen = json.loads((tmp_path / "ui.pen").read_text(encoding="utf-8"))
+
+    assert pen["children"][0]["penflow"]["lifecycle"] == {
+        "schema_version": 1,
+        "state": "active",
+        "logical_screen_id": "checkout",
+        "revision_id": "checkout-r1",
+    }
 
 
 def test_build_demo_is_deterministic_modulo_output_directory(tmp_path: Path) -> None:

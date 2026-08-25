@@ -29,9 +29,9 @@ def _digest(path: Path) -> str:
 
 
 def _bundle(tmp_path: Path) -> tuple[Path, Path]:
-    pre = _write(tmp_path / "pre.pen", b'{"version":1,"children":[]}')
+    pre = _write(tmp_path / "pre.snapshot.json", b'{"version":1,"children":[]}')
     post = _write(
-        tmp_path / "post.pen",
+        tmp_path / "post.snapshot.json",
         b'{"version":1,"children":[{"id":"checkout","type":"frame"}]}',
     )
     document = _write(tmp_path / "ui.pen", post.read_bytes())

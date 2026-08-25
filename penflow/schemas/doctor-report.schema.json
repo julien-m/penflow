@@ -1,0 +1,141 @@
+{
+  "$comment": "@spec FR-011: Strict Doctor report envelope — .specs/features/074-penflow-doctor-consumer-project-hygiene/spec.md#fr-011",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.local/schemas/doctor-report.schema.json",
+  "title": "Penflow Doctor Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "stable_result", "diagnostics"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "stable_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "project_root",
+        "canonical_pen",
+        "findings",
+        "actions",
+        "git",
+        "runs",
+        "cleanup",
+        "summary"
+      ],
+      "properties": {
+        "status": {"enum": ["PASS", "BLOCKED", "ERROR"]},
+        "project_root": {"type": ["string", "null"], "minLength": 1},
+        "canonical_pen": {"type": ["string", "null"], "minLength": 1},
+        "findings": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/finding"}
+        },
+        "actions": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/action"}
+        },
+        "git": {"$ref": "#/$defs/git"},
+        "runs": {"type": "array", "items": false},
+        "cleanup": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": {
+            "status": {"const": "NOT_APPLICABLE"}
+          }
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["finding_count", "blocking_count", "action_count", "changed"],
+          "properties": {
+            "finding_count": {"type": "integer", "minimum": 0},
+            "blocking_count": {"type": "integer", "minimum": 0},
+            "action_count": {"type": "integer", "minimum": 0},
+            "changed": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observed_at",
+        "invocation_path",
+        "explicit_project",
+        "repository_kind",
+        "error"
+      ],
+      "properties": {
+        "observed_at": {"type": "string", "minLength": 1},
+        "invocation_path": {"type": ["string", "null"], "minLength": 1},
+        "explicit_project": {"type": "boolean"},
+        "repository_kind": {"type": ["string", "null"], "minLength": 1},
+        "error": {"type": ["string", "null"], "minLength": 1}
+      }
+    }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "path", "git_state", "details", "repair_action"],
+      "properties": {
+        "code": {"type": "string", "minLength": 1},
+        "severity": {"enum": ["error", "warning"]},
+        "path": {"type": ["string", "null"], "minLength": 1},
+        "git_state": {"type": ["string", "null"], "minLength": 1},
+        "details": {"type": "string", "minLength": 1},
+        "repair_action": {"type": ["string", "null"], "minLength": 1}
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "path", "status"],
+      "properties": {
+        "code": {"type": "string", "minLength": 1},
+        "path": {"type": ["string", "null"], "minLength": 1},
+        "status": {"enum": ["planned", "applied"]}
+      }
+    },
+    "git": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index_sha256_before",
+        "index_sha256_after",
+        "index_unchanged",
+        "porcelain_sha256_before",
+        "porcelain_sha256_after",
+        "porcelain_unchanged",
+        "paths"
+      ],
+      "properties": {
+        "index_sha256_before": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "index_sha256_after": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "index_unchanged": {"type": "boolean"},
+        "porcelain_sha256_before": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "porcelain_sha256_after": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "porcelain_unchanged": {"type": "boolean"},
+        "paths": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/git_path"}
+        }
+      }
+    },
+    "git_path": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relative_path", "index_state", "worktree_state", "flags", "blocking"],
+      "properties": {
+        "relative_path": {"type": "string", "minLength": 1},
+        "index_state": {"type": "string", "minLength": 1},
+        "worktree_state": {"type": "string", "minLength": 1},
+        "flags": {"type": "array", "items": {"type": "string", "minLength": 1}},
+        "blocking": {"type": "boolean"}
+      }
+    }
+  }
+}

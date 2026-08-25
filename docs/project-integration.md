@@ -1,10 +1,20 @@
 <!-- LiveSpec traceability anchors -->
 <!-- @spec(FR-007) -->
 <!-- @spec(FR-012) -->
+<!-- @spec(FR-013) -->
+<!-- @spec(FR-014) -->
 
 # Integrating Penflow Into an Existing Project
 
 Use this guide when an application already exists and you want Penflow to become the project-local contract layer between product intent, Pencil mockups, code generation, and runtime verification.
+
+Start and end every Penflow task with a read-only consumer-project receipt:
+
+```bash
+penflow doctor --project . --check --json
+```
+
+Run it from the exact application subproject or pass that directory explicitly with `--project`. The selected `<consumer-project-root>` is the exact normalized directory, or an existing selector file's parent; it is never widened to the enclosing Git worktree or to the Penflow source checkout. The internal `git_root` exists only for scoped Git interrogation and transient Git metadata coordination.
 
 Penflow does not replace your app stack. It stores and validates UI contracts next to the app so agents and humans can answer:
 
@@ -26,7 +36,6 @@ my-app/
       screens/
     semantic-ui-tree.json
     ui.pen
-    ui.enriched.pen
     pencil-context-map.json
     expected-ui-tree.json
     code-ir.json
@@ -43,27 +52,30 @@ Recommended ownership:
 | `penflow/flow-ui-contract/contract.json` | yes | product / design / agent | Canonical strict v2 business contract. |
 | `penflow/flow-ui-contract/flows/*.md`, `screens/*.md` | optional | product / design / agent | Human docs or explicit migration source only. |
 | `penflow/semantic-ui-tree.json` | yes | Penflow | Generated semantic contract from `flow-ui-contract/contract.json`. |
-| `penflow/ui.pen` or `penflow/ui.enriched.pen` | yes | design / agent | Pencil contract with business context. |
+| `penflow/ui.pen` | yes | design / agent | The only Pencil document; active, draft and archive revisions remain inside its infinite canvas. |
 | `penflow/pencil-context-map.json` | yes | Penflow | Review map for matched, ambiguous, and unmapped Pencil nodes. |
 | `penflow/expected-ui-tree.json` | yes | Penflow | Design-derived baseline for runtime comparison. |
 | `penflow/code-ir.json` | yes | Penflow / codegen | Handoff artifact for implementation agents. |
 | `penflow/actual-ui-tree.json` | optional | app runtime adapter | Runtime observation from the implemented app. |
 | `penflow/compare-report.json`, `review-report.json`, `fix-report.json` | optional | Penflow | JSON review artifacts; commit when useful for PR evidence. |
 
-Use one workspace per product area if the app is large:
+Keep one canonical `ui.pen` per selected consumer project, including large apps. Separate product areas with `logical_screen_id` values and top-level lifecycle regions inside that canvas. A collective Git worktree may hold several independent consumer projects, each selected and governed separately:
 
 ```text
 my-app/
   penflow/
-    checkout/
-      flow-ui-contract/
-      ui.pen
-      expected-ui-tree.json
-    account-settings/
-      flow-ui-contract/
-      ui.pen
-      expected-ui-tree.json
+    flow-ui-contract/
+    ui.pen
+    expected-ui-tree.json
+  .penflow-tmp/
+    manifests/
+    runs/
+    receipts/
 ```
+
+`ui.pen` top-level frames may declare `penflow.lifecycle` schema 1 with `state: active|draft|archive`, `logical_screen_id`, and unique `revision_id`. Each logical screen has exactly one active revision; exports ignore draft/archive regions but preserve them in the document. Unmarked legacy top-level frames are active for compatibility.
+
+`.penflow-tmp/`, `.penflow-run/`, and `.mockup-validation/` are ignored and managed below `<consumer-project-root>`. Producer preflight reconciles cleanup-eligible completed, failed or proven-dead runs; postflight removes successful working payload only after durable outputs finalize. Do not put source files or manually managed evidence there, and do not bypass a cleanup block for live owners, unknown paths, symlinks, Git-tracked/staged data or referenced artifacts. Ancestor, sibling and repository-root `.gitignore` files are outside ownership when they are not the selected project file.
 
 ## Install and Run
 
@@ -73,9 +85,10 @@ For local development, install Penflow from the Penflow repository or a pinned i
 python3 -m pip install -e /path/to/penflow
 ```
 
-Run commands from the application repository root and use paths inside the app:
+Run commands from the exact application project root and use paths inside that selected boundary:
 
 ```bash
+penflow doctor --project . --check --json
 penflow validate-flow-contract penflow/flow-ui-contract/contract.json --json
 ```
 
@@ -84,6 +97,7 @@ penflow validate-flow-contract penflow/flow-ui-contract/contract.json --json
 Start with `flow-ui-contract/contract.json` and `theme.css`, then let Penflow generate the tree and themed Pencil draft.
 
 ```bash
+penflow doctor --project . --check --json
 penflow validate-flow-contract penflow/flow-ui-contract/contract.json --json
 penflow export-semantic-tree penflow/flow-ui-contract/contract.json --out penflow/semantic-ui-tree.json --json
 penflow validate-semantic-tree penflow/semantic-ui-tree.json --json
@@ -105,15 +119,16 @@ After this path:
 ## Path B: Existing Pencil Mockups
 
 Use this when designers already have a `.pen` file and you want to preserve the layout.
+First perform a reviewed one-time move or import of the existing document into the canonical `penflow/ui.pen` path. Only move `design/ui.pen` when the canonical destination is absent. If `penflow/ui.pen` already exists, do not replace it: manually consolidate the intended lifecycle regions into that canonical canvas, validate it, and remove the old source only after validation passes. Confirm that the former path no longer leaves a second `.pen`; enrichment then updates the canonical canvas in place.
 
 ```bash
 penflow validate-flow-contract penflow/flow-ui-contract/contract.json --json
 penflow export-semantic-tree penflow/flow-ui-contract/contract.json --out penflow/semantic-ui-tree.json --json
-penflow enrich-pen design/ui.pen penflow/semantic-ui-tree.json --out penflow/ui.enriched.pen --json
-penflow map-pencil-context penflow/ui.enriched.pen penflow/semantic-ui-tree.json --out penflow/pencil-context-map.json --json
-penflow validate-pen penflow/ui.enriched.pen --json
-penflow export-expected penflow/ui.enriched.pen --out penflow/expected-ui-tree.json --json
-penflow code-ir --from-context penflow/ui.enriched.pen --semantic-tree penflow/semantic-ui-tree.json --context-map penflow/pencil-context-map.json --contract penflow/flow-ui-contract/contract.json --out penflow/code-ir.json --json
+penflow enrich-pen penflow/ui.pen penflow/semantic-ui-tree.json --out penflow/ui.pen --json
+penflow map-pencil-context penflow/ui.pen penflow/semantic-ui-tree.json --out penflow/pencil-context-map.json --strict-anchors --json
+penflow validate-pen penflow/ui.pen --json
+penflow export-expected penflow/ui.pen --out penflow/expected-ui-tree.json --json
+penflow code-ir --from-context penflow/ui.pen --semantic-tree penflow/semantic-ui-tree.json --context-map penflow/pencil-context-map.json --contract penflow/flow-ui-contract/contract.json --out penflow/code-ir.json --json
 ```
 
 Review `pencil-context-map.json` before implementation. Ambiguous or unmapped nodes mean the mockup and product intent need a human or agent decision.
@@ -123,10 +138,10 @@ Review `pencil-context-map.json` before implementation. Ambiguous or unmapped no
 Use reverse mode to bootstrap missing docs from an old Pencil file, then explicitly migrate/review into `contract.json`.
 
 ```bash
-penflow reverse-pen design/ui.pen --out penflow/reverse-output --enrich --json
+penflow reverse-pen penflow/ui.pen --out penflow/reverse-output --enrich --json
 penflow migrate-flow-md-to-contract-json penflow/reverse-output/flow-ui-contract --out penflow/reverse-output/flow-ui-contract/contract.json --json
 penflow validate-semantic-tree penflow/reverse-output/semantic-ui-tree.json --json
-penflow validate-pen penflow/reverse-output/ui.enriched.pen --json
+penflow validate-pen penflow/ui.pen --json
 ```
 
 `reverse-pen --out <dir>` creates a directory. The semantic tree is `<dir>/semantic-ui-tree.json`; recovered specs are under `<dir>/flow-ui-contract/`.
@@ -138,8 +153,9 @@ Once reviewed, promote the recovered files into the project workspace:
 ```text
 penflow/reverse-output/flow-ui-contract/ -> penflow/flow-ui-contract/
 penflow/reverse-output/semantic-ui-tree.json -> penflow/semantic-ui-tree.json
-penflow/reverse-output/ui.enriched.pen -> penflow/ui.enriched.pen
 ```
+
+The canonical `penflow/ui.pen` remains in place throughout reverse migration; only recovered JSON/Markdown contract artifacts move into their durable locations.
 
 ## Implementation Handoff
 
@@ -147,7 +163,7 @@ Give implementation agents the contextualized Pencil file and code IR:
 
 ```text
 Implement the checkout flow from:
-- penflow/ui.enriched.pen
+- penflow/ui.pen
 - penflow/semantic-ui-tree.json
 - penflow/code-ir.json
 
@@ -184,7 +200,7 @@ Mockup Factory requires these project-local artifacts before UX/UI work starts:
 
 - `penflow/flow-ui-contract/`
 - `penflow/semantic-ui-tree.json`
-- `penflow/ui.pen` or `penflow/ui.enriched.pen`
+- `penflow/ui.pen`
 - `penflow/pencil-context-map.json`
 - `penflow/expected-ui-tree.json`
 - `penflow/drift-report.json`
@@ -227,11 +243,12 @@ A minimal CI gate for a project-local Penflow workspace:
 ```bash
 penflow validate-flow-contract penflow/flow-ui-contract/contract.json --json
 penflow validate-semantic-tree penflow/semantic-ui-tree.json --json
-penflow validate-pen penflow/ui.enriched.pen --json
-penflow export-expected penflow/ui.enriched.pen --out /tmp/expected-ui-tree.json --json
+penflow validate-pen penflow/ui.pen --json
+penflow export-expected penflow/ui.pen --out penflow/expected-ui-tree.json --json
 penflow validate-actual penflow/actual-ui-tree.json --schema --json
-penflow compare-tree /tmp/expected-ui-tree.json penflow/actual-ui-tree.json --out /tmp/compare-report.json --json
-penflow validate-report /tmp/compare-report.json --schema --json
+penflow compare-tree penflow/expected-ui-tree.json penflow/actual-ui-tree.json --out penflow/compare-report.json --json
+penflow validate-report penflow/compare-report.json --schema --json
+penflow doctor --project . --check --json
 ```
 
 For early migration, make `validate-flow-contract`, `validate-semantic-tree`, and `validate-pen` blocking. `validate-flow-specs` is compatibility-only for explicitly migrated legacy Markdown and must not run in the strict v2 gate. Add `actual-ui-tree.json` comparison once the app has a runtime adapter.
@@ -239,23 +256,31 @@ For early migration, make `validate-flow-contract`, `validate-semantic-tree`, an
 ## Migration Checklist
 
 - Choose one Penflow workspace path, usually `penflow/`.
+- Run read-only Doctor at task start and keep its receipt.
 - Add or migrate `flow-ui-contract/contract.json`; keep Markdown/YAML docs-only.
 - Generate and validate `semantic-ui-tree.json`.
-- Draft or enrich a Pencil file.
+- Draft or enrich the one canonical `ui.pen`; keep active/draft/archive revisions inside it.
 - Review `pencil-context-map.json` for ambiguous or unmapped nodes.
 - Export `expected-ui-tree.json`.
 - Generate and validate `code-ir.json` for implementation handoff.
 - Add a runtime adapter that emits `actual-ui-tree.json`.
 - Compare expected vs actual and use `review-report.json` / `fix-report.json` for correction planning.
 - Add CI commands once the artifacts are stable.
+- Run read-only Doctor again at task end and keep the final receipt.
 
 ## Common Decisions
 
 | Decision | Recommended default |
 |---|---|
 | Where to store artifacts? | `penflow/` inside the app repo. |
-| One workspace or many? | One per bounded product area for large apps. |
+| One workspace or many? | One canonical `ui.pen` per selected consumer project; independent projects may share one enclosing non-bare Git worktree. Standalone non-Git paths are rejected because Doctor cannot prove tracked/staged hygiene. |
 | Commit generated JSON? | Yes for contract artifacts; optional for transient reports. |
 | Who owns `actual-ui-tree.json`? | The app runtime adapter, not Penflow. |
 | Can agents edit `.pen` directly? | Yes, but only through Penflow commands or Pencil-aware tooling that preserves context. |
 | Can agents hand-write semantic trees? | No for production; author or migrate `contract.json` and run `export-semantic-tree`. |
+
+## Manual Doctor Resolution
+
+- `multiple_pen_files`: Doctor does not select, rename, move or delete a candidate. Inspect every file, consolidate the intended revisions as active/draft/archive regions in the canonical `ui.pen`, then deliberately migrate or remove the extras and rerun `penflow doctor --project . --check --json`.
+- Tracked or staged `.penflow-tmp/`, `.penflow-run/` or `.mockup-validation/` paths: Doctor reports exact Git states but never rewrites the index/history. Review the content, manually unstage or untrack it, keep the managed ignore block, then rerun Doctor.
+- Cleanup block: preserve the run. Resolve the reported live owner, unknown descendant, link/path escape, Git state or durable reference; never broaden deletion to make the command pass.

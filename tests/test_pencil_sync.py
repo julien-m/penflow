@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 from pathlib import Path
 from typing import Any
 
 from penflow import cli
+from penflow.artifact_policy import MANAGED_IGNORE_BLOCK
 from penflow.pencil_sync import SaveOutcome, sync_pencil_to_disk
 
 
@@ -113,6 +115,9 @@ def test_pencil_sync_fails_when_disk_inspection_is_below_expectation(tmp_path: P
 
 def test_pencil_sync_cli_returns_exit_code_from_status(tmp_path: Path, monkeypatch) -> None:
     pen_path = write_json(tmp_path / "ui.pen", pen_with_screens(1))
+    # Git is a real system boundary; setup must succeed within the test budget.
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True, timeout=10)
+    (tmp_path / ".gitignore").write_text(MANAGED_IGNORE_BLOCK, encoding="utf-8")
     observed: dict[str, Any] = {}
 
     def fake_sync(path: str, *, expect_min_nodes: int | None, expect_screens: int | None):
@@ -146,6 +151,8 @@ def test_pencil_sync_cli_returns_exit_code_from_status(tmp_path: Path, monkeypat
                 "--expect-screens",
                 "1",
                 "--json",
+                "--project",
+                str(tmp_path),
             ]
         )
         == 0

@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
+
+import pytest
 
 from penflow.cli import main
 from penflow.flow_specs import validate_flow_specs_dir
@@ -23,106 +26,144 @@ def test_validate_flow_specs_accepts_full_demo_contract() -> None:
     assert report["issues"] == []
 
 
-def test_validate_flow_specs_cli_reports_invalid_markdown(tmp_path: Path) -> None:
+def test_validate_flow_specs_cli_reports_invalid_markdown(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], governed_consumer_project
+) -> None:
     specs = tmp_path / "flow-ui-contract"
     (specs / "flows").mkdir(parents=True)
     (specs / "screens").mkdir()
     (specs / "flows" / "broken.md").write_text("# Missing frontmatter\n", encoding="utf-8")
+    governed_consumer_project(tmp_path, tmp_path / "ui.pen")
+    capsys.readouterr()
 
-    assert main(["validate-flow-specs", str(specs), "--json"]) == 1
+    assert main(["validate-flow-specs", str(specs), "--project", str(tmp_path), "--json"]) == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert [issue["code"] for issue in payload["issues"]] == ["flow_specs.contract_json_required"]
 
 
-def test_c16_final_workflow_regression_chain(tmp_path: Path) -> None:
-    semantic_tree = tmp_path / "semantic-ui-tree.json"
-    drafted_pen = tmp_path / "ui.pen"
-    expected_tree = tmp_path / "expected-ui-tree.json"
-    enriched_pen = tmp_path / "ui.enriched.pen"
-    reverse_output = tmp_path / "reverse-output"
-    compare_json = tmp_path / "compare.json"
-    review_json = tmp_path / "review.json"
-    fix_json = tmp_path / "fix.json"
+@pytest.fixture
+def c16_project(tmp_path: Path, governed_consumer_project) -> dict[str, Path]:
+    """Prepare isolated C16 inputs without executing the workflow under test."""
+    contract_dir = tmp_path / "flow-ui-contract"
+    shutil.copytree(FULL / "flow-ui-contract", contract_dir)
+    actual_tree = tmp_path / "actual-ui-tree.json"
+    shutil.copy2(FULL / "actual-ui-tree.json", actual_tree)
+    governed_consumer_project(tmp_path, tmp_path / "ui.pen")
+    return {
+        "root": tmp_path,
+        "contract": contract_dir,
+        "actual": actual_tree,
+        "semantic": tmp_path / "semantic-ui-tree.json",
+        "pen": tmp_path / "ui.pen",
+        "expected": tmp_path / "expected-ui-tree.json",
+    }
 
-    assert main(["validate-flow-specs", str(FULL / "flow-ui-contract"), "--json"]) == 0
-    assert (
-        main(
-            [
-                "export-semantic-tree",
-                str(FULL / "flow-ui-contract" / "contract.json"),
-                "--out",
-                str(semantic_tree),
-                "--json",
-            ]
-        )
-        == 0
-    )
-    assert main(["validate-semantic-tree", str(semantic_tree), "--json"]) == 0
-    assert (
-        main(["draft-pen-from-tree", str(semantic_tree), "--out", str(drafted_pen), "--json"]) == 0
-    )
-    assert main(["validate-pen", str(drafted_pen), "--json"]) == 0
-    assert main(["export-expected", str(drafted_pen), "-o", str(expected_tree), "--json"]) == 0
 
-    assert (
-        main(
-            [
-                "enrich-pen",
-                str(LEGACY / "ui.pen"),
-                str(semantic_tree),
-                "--out",
-                str(enriched_pen),
-                "--json",
-            ]
-        )
-        == 0
-    )
-    assert main(["validate-pen", str(enriched_pen), "--json"]) == 0
+def _run_c16(paths: dict[str, Path], *args: str) -> int:
+    """Run one governed JSON command inside the C16 consumer."""
+    return main([*args, "--project", str(paths["root"]), "--json"])
 
-    # Strict default (feature 049): the legacy reverse output still needs
-    # clarification, so the command exits 1; --lenient keeps the chain green.
+
+def _export_c16_semantic_tree(paths: dict[str, Path]) -> None:
     assert (
-        main(["reverse-pen", str(LEGACY / "ui.pen"), "--out", str(reverse_output), "--json"]) == 1
-    )
-    assert (
-        main(
-            [
-                "reverse-pen",
-                str(LEGACY / "ui.pen"),
-                "--out",
-                str(reverse_output),
-                "--lenient",
-                "--json",
-            ]
-        )
-        == 0
-    )
-    assert (
-        main(
-            [
-                "validate-semantic-tree",
-                str(reverse_output / "semantic-ui-tree.json"),
-                "--json",
-            ]
+        _run_c16(
+            paths,
+            "export-semantic-tree",
+            str(paths["contract"] / "contract.json"),
+            "--out",
+            str(paths["semantic"]),
         )
         == 0
     )
 
-    assert main(["validate-actual", str(FULL / "actual-ui-tree.json"), "--schema", "--json"]) == 0
+
+def test_c16_forward_draft_and_expected_exports(c16_project: dict[str, Path]) -> None:
+    paths = c16_project
+    assert _run_c16(paths, "validate-flow-specs", str(paths["contract"])) == 0
+    _export_c16_semantic_tree(paths)
+    assert _run_c16(paths, "validate-semantic-tree", str(paths["semantic"])) == 0
     assert (
-        main(
-            [
-                "compare-tree",
-                str(expected_tree),
-                str(FULL / "actual-ui-tree.json"),
-                "--out",
-                str(compare_json),
-                "--json",
-            ]
+        _run_c16(
+            paths,
+            "draft-pen-from-tree",
+            str(paths["semantic"]),
+            "--out",
+            str(paths["pen"]),
         )
         == 0
     )
-    assert main(["review-report", str(compare_json), "--out", str(review_json)]) == 0
-    assert main(["fix-report", str(compare_json), "--out", str(fix_json)]) == 0
+    assert _run_c16(paths, "validate-pen", str(paths["pen"])) == 0
+    assert (
+        _run_c16(
+            paths,
+            "export-expected",
+            str(paths["pen"]),
+            "-o",
+            str(paths["expected"]),
+        )
+        == 0
+    )
 
+
+def test_c16_legacy_enrichment_and_reverse(
+    c16_project: dict[str, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    paths = c16_project
+    _export_c16_semantic_tree(paths)
+    paths["pen"].write_bytes((LEGACY / "ui.pen").read_bytes())
+    assert (
+        _run_c16(
+            paths,
+            "enrich-pen",
+            str(paths["pen"]),
+            str(paths["semantic"]),
+            "--out",
+            str(paths["pen"]),
+        )
+        == 0
+    )
+    reverse_output = paths["root"] / "reverse-output"
+    capsys.readouterr()
+    assert _run_c16(paths, "reverse-pen", str(paths["pen"]), "--out", str(reverse_output)) == 1
+    strict_reverse = json.loads(capsys.readouterr().out)
+    assert {issue["code"] for issue in strict_reverse["issues"]} == {"reverse.clarification_needed"}
+    assert (
+        _run_c16(
+            paths,
+            "reverse-pen",
+            str(paths["pen"]),
+            "--out",
+            str(reverse_output),
+            "--lenient",
+        )
+        == 0
+    )
+    assert (
+        _run_c16(paths, "validate-semantic-tree", str(reverse_output / "semantic-ui-tree.json"))
+        == 0
+    )
+
+
+def test_c16_compare_review_and_fix_reports(c16_project: dict[str, Path]) -> None:
+    paths = c16_project
+    shutil.copy2(FULL / "expected-ui-tree.json", paths["expected"])
+    compare_json = paths["root"] / "compare.json"
+    review_json = paths["root"] / "review.json"
+    fix_json = paths["root"] / "fix.json"
+    assert _run_c16(paths, "validate-actual", str(paths["actual"]), "--schema") == 0
+    assert (
+        _run_c16(
+            paths,
+            "compare-tree",
+            str(paths["expected"]),
+            str(paths["actual"]),
+            "--out",
+            str(compare_json),
+        )
+        == 0
+    )
+    assert _run_c16(paths, "review-report", str(compare_json), "--out", str(review_json)) == 0
+    assert _run_c16(paths, "fix-report", str(compare_json), "--out", str(fix_json)) == 0
     assert json.loads(compare_json.read_text(encoding="utf-8"))["status"] == "PASS"
     assert json.loads(review_json.read_text(encoding="utf-8"))["kind"] == "penflow-review-report"
     assert json.loads(fix_json.read_text(encoding="utf-8"))["kind"] == "penflow-fix-report"

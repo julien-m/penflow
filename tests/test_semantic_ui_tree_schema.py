@@ -1,6 +1,7 @@
 # @spec(AC-010)
 # @spec(AC-012)
 # @spec(FR-005)
+# @spec FR-007 FR-008 AC-012: Feature 075 remains runtime-agnostic.
 from __future__ import annotations
 
 import json
@@ -137,10 +138,14 @@ def test_semantic_schema_does_not_add_feature_036_or_later_runtime_pipeline() ->
     # (C48): native export_nodes coverage bound to run/.pen SHA-256/C46
     # persistence/document identity with homologous references, verified from
     # local bytes only, without any Pencil MCP or runtime adapter.
-    future_feature_dirs: list[Path] = []
-    for feature_number in range(74, 75):
-        future_feature_dirs.extend((ROOT / ".specs" / "features").glob(f"{feature_number:03d}-*"))
-    assert future_feature_dirs == []
+    # Feature 074 is in scope — it adds consumer-project Git/filesystem hygiene,
+    # one-canvas lifecycle selection, and managed local temporary cleanup. It
+    # does not add a UI runtime adapter or expand the semantic-tree schema.
+    # Feature 075 is in scope — it narrows that hygiene to the exact selected
+    # project inside a larger Git worktree and adds only scoped Git/filesystem
+    # interrogation, tests and receipts; it does not add a UI runtime adapter.
+    # Runtime isolation is asserted directly through forbidden imports/process
+    # APIs below; future feature numbering is unrelated to that invariant.
     assert not (ROOT / "penflow" / "semantic_validator.py").exists()
     assert not (ROOT / "penflow" / "pencil_enrichment.py").exists()
     assert not (ROOT / "penflow" / "pencil_draft_from_tree.py").exists()

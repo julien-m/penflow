@@ -60,7 +60,7 @@ def _theme_path(tmp_path: Path) -> Path:
     return path
 
 
-def _write_pen(tmp_path: Path, data: dict, name: str = "fixture.pen") -> Path:
+def _write_pen(tmp_path: Path, data: dict, name: str = "ui.pen") -> Path:
     path = tmp_path / name
     path.write_text(json.dumps(data), encoding="utf-8")
     return path

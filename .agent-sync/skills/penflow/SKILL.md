@@ -9,6 +9,8 @@ description: Use the Penflow CLI for Pencil .pen context validation, semantic/ex
 <!-- @spec(FR-006) -->
 <!-- @spec(FR-008) -->
 <!-- @spec(FR-012) -->
+<!-- @spec(FR-013) -->
+<!-- @spec(FR-014) -->
 
 # Penflow Skill
 
@@ -26,6 +28,16 @@ Penflow owns file validation and tree comparison only:
 - `actual-ui-tree.json`: after-code runtime tree produced by an external adapter.
 
 Penflow does **not** run browsers, Xcode, simulators, Playwright, React Native, Metro, or app builds. External adapters produce `actual-ui-tree.json`; Penflow validates and compares it.
+
+## Consumer Project Hygiene
+
+At task start, run `penflow doctor --project <consumer-project-root> --check --json` before reading or mutating Penflow artifacts and retain the read-only receipt. At task end, run the same command again and retain the final receipt. The selector is the exact project directory (or an existing file's parent), never the enclosing Git worktree. `git_root` is internal and used only for scoped Git interrogation and transient metadata coordination; discovery, uniqueness, ignore ownership, repair and cleanup stay below `<consumer-project-root>`. Never aim Doctor at the Penflow source checkout when the task belongs to another application project.
+
+- Exactly one regular, case-sensitive `ui.pen` may exist in each selected consumer project. A collective Git worktree may contain several independently selected projects. Keep all screen revisions as top-level regions inside the project's canvas: one `active` revision per `logical_screen_id`, plus optional `draft` and `archive` revisions with unique `revision_id`; unmarked legacy regions are active.
+- All technical working data belongs below ignored `.penflow-tmp/`, `.penflow-run/`, and `.mockup-validation/`. Producer preflight reconciles eligible terminal/dead-owner runs; postflight cleans successful working payload only after durable outputs finalize. Preserve live, unknown, linked, escaped, tracked/staged, referenced or canonical-document paths when cleanup blocks.
+- `doctor --fix` may initialize `penflow/ui.pen` when none exists and repair the managed ignore block. It never chooses among multiple candidates or rewrites Git index/history.
+- On `multiple_pen_files`, manually inspect and consolidate the intended regions into `ui.pen`, then deliberately migrate/remove extras. On tracked/staged temporary findings, manually review and unstage/untrack the exact reported paths before rerunning Doctor.
+- Exit codes: `0` PASS, `1` project-health block, `2` usage, `3` untrustworthy I/O/schema, `4` cleanup safety block.
 
 ## Strict by Default (Feature 049 / C24)
 
@@ -160,14 +172,24 @@ When references exist, `manifest.json` declares `references_manifest` pointing t
 Use when a visual Pencil file already exists and must keep its layout.
 
 ```bash
-penflow validate-flow-contract examples/full/flow-ui-contract/contract.json --json
-penflow export-semantic-tree examples/full/flow-ui-contract/contract.json --out semantic-ui-tree.json --json
-penflow validate-semantic-tree semantic-ui-tree.json --json
-penflow enrich-pen examples/full/ui.visual.pen semantic-ui-tree.json --out ui.enriched.pen --json
-penflow map-pencil-context ui.enriched.pen semantic-ui-tree.json --out pencil-context-map.json --strict-anchors --json
-penflow validate-pen ui.enriched.pen --json
-penflow export-expected ui.enriched.pen --out expected-ui-tree.json --json
-penflow code-ir --from-context ui.enriched.pen --semantic-tree semantic-ui-tree.json --context-map pencil-context-map.json --contract examples/full/flow-ui-contract/contract.json --flow-id checkout --flow-name "Checkout flow" --out code-ir.json --json
+consumer=$(mktemp -d)
+trap 'rm -rf -- "$consumer"' EXIT
+git -C "$consumer" init
+cp -R examples/full/flow-ui-contract "$consumer/flow-ui-contract"
+cp examples/full/ui.pen "$consumer/ui.pen"
+penflow doctor --project "$consumer" --check --json > "$consumer/.penflow-doctor-start.json" || test "$?" -eq 1
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); a={"pen.missing","gitignore.managed_block_missing","gitignore.managed_block_outdated","gitignore.managed_block_duplicate"}; c={i["code"] for i in d["stable_result"]["findings"]}; raise SystemExit(0 if c and c <= a else 1)' "$consumer/.penflow-doctor-start.json"
+penflow doctor --project "$consumer" --fix --json
+penflow doctor --project "$consumer" --check --json
+penflow validate-flow-contract "$consumer/flow-ui-contract/contract.json" --project "$consumer" --json
+penflow export-semantic-tree "$consumer/flow-ui-contract/contract.json" --project "$consumer" --out "$consumer/semantic-ui-tree.json" --json
+penflow validate-semantic-tree "$consumer/semantic-ui-tree.json" --project "$consumer" --json
+penflow enrich-pen "$consumer/ui.pen" "$consumer/semantic-ui-tree.json" --project "$consumer" --out "$consumer/ui.pen" --json
+penflow map-pencil-context "$consumer/ui.pen" "$consumer/semantic-ui-tree.json" --project "$consumer" --out "$consumer/pencil-context-map.json" --strict-anchors --json
+penflow validate-pen "$consumer/ui.pen" --project "$consumer" --json
+penflow export-expected "$consumer/ui.pen" --project "$consumer" --out "$consumer/expected-ui-tree.json" --json
+penflow code-ir --from-context "$consumer/ui.pen" --semantic-tree "$consumer/semantic-ui-tree.json" --context-map "$consumer/pencil-context-map.json" --contract "$consumer/flow-ui-contract/contract.json" --flow-id checkout --flow-name "Checkout flow" --project "$consumer" --out "$consumer/code-ir.json" --json
+penflow doctor --project "$consumer" --check --json
 ```
 
 Preserve existing visual layout. Treat ambiguous or unmapped nodes from `map-pencil-context` as review work, not as permission to overwrite visual design.
@@ -177,9 +199,18 @@ Preserve existing visual layout. Treat ambiguous or unmapped nodes from `map-pen
 Use when a legacy `.pen` exists before flow specs.
 
 ```bash
-penflow reverse-pen examples/full/ui.pen --out reverse-output --enrich --json
-penflow validate-semantic-tree reverse-output/semantic-ui-tree.json --json
-penflow validate-pen reverse-output/ui.enriched.pen --json
+consumer=$(mktemp -d)
+trap 'rm -rf -- "$consumer"' EXIT
+git -C "$consumer" init
+cp examples/full/ui.pen "$consumer/ui.pen"
+penflow doctor --project "$consumer" --check --json > "$consumer/.penflow-doctor-start.json" || test "$?" -eq 1
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); a={"pen.missing","gitignore.managed_block_missing","gitignore.managed_block_outdated","gitignore.managed_block_duplicate"}; c={i["code"] for i in d["stable_result"]["findings"]}; raise SystemExit(0 if c and c <= a else 1)' "$consumer/.penflow-doctor-start.json"
+penflow doctor --project "$consumer" --fix --json
+penflow doctor --project "$consumer" --check --json
+penflow reverse-pen "$consumer/ui.pen" --project "$consumer" --out "$consumer/reverse-output" --lenient --json
+penflow validate-semantic-tree "$consumer/reverse-output/semantic-ui-tree.json" --project "$consumer" --json
+penflow validate-pen "$consumer/ui.pen" --project "$consumer" --json
+penflow doctor --project "$consumer" --check --json
 ```
 
 `reverse-pen --out <dir>` writes a directory containing `semantic-ui-tree.json` and `flow-ui-contract/`; validate `<dir>/semantic-ui-tree.json`, not the directory path itself.
@@ -225,24 +256,36 @@ Any explicit max-age value — `penflow run --actual-max-age-seconds`, `penflow 
 Use for CI/regression coverage of contract C16. The proof is pytest-first, with the final CLI chain reproducible on `examples/full` and `examples/legacy`.
 
 ```bash
+set -euo pipefail
 python3 -m pytest -q
-penflow validate-flow-contract examples/full/flow-ui-contract/contract.json --json
-penflow export-semantic-tree examples/full/flow-ui-contract/contract.json --out /tmp/semantic-ui-tree.json --json
-penflow validate-semantic-tree /tmp/semantic-ui-tree.json --json
-penflow draft-pen-from-tree /tmp/semantic-ui-tree.json --out /tmp/ui.pen --theme-css examples/demo/theme.css --json
-penflow validate-pen /tmp/ui.pen --json
-penflow export-expected /tmp/ui.pen -o /tmp/expected-ui-tree.json --json
-penflow enrich-pen examples/legacy/ui.pen /tmp/semantic-ui-tree.json --out /tmp/ui.enriched.pen --json
-penflow validate-pen /tmp/ui.enriched.pen --json
-penflow reverse-pen examples/legacy/ui.pen --out /tmp/reverse-output --lenient --json
-penflow validate-semantic-tree /tmp/reverse-output/semantic-ui-tree.json --json
-penflow validate-actual examples/full/actual-ui-tree.json --schema --json
-penflow compare-tree /tmp/expected-ui-tree.json examples/full/actual-ui-tree.json --out /tmp/compare.json --json
-penflow review-report /tmp/compare.json --out /tmp/review.json --json
-penflow fix-report /tmp/compare.json --out /tmp/fix.json --json
+consumer=$(mktemp -d)
+trap 'rm -rf -- "$consumer"' EXIT
+git -C "$consumer" init
+cp -R examples/full/flow-ui-contract "$consumer/flow-ui-contract"
+cp examples/full/actual-ui-tree.json "$consumer/actual-ui-tree.json"
+cp examples/demo/theme.css "$consumer/theme.css"
+penflow doctor --project "$consumer" --check --json > "$consumer/.penflow-doctor-start.json" || test "$?" -eq 1
+python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); a={"pen.missing","gitignore.managed_block_missing","gitignore.managed_block_outdated","gitignore.managed_block_duplicate"}; c={i["code"] for i in d["stable_result"]["findings"]}; raise SystemExit(0 if c and c <= a else 1)' "$consumer/.penflow-doctor-start.json"
+penflow doctor --project "$consumer" --fix --json
+penflow doctor --project "$consumer" --check --json
+penflow validate-flow-contract "$consumer/flow-ui-contract/contract.json" --project "$consumer" --json
+penflow export-semantic-tree "$consumer/flow-ui-contract/contract.json" --project "$consumer" --out "$consumer/semantic-ui-tree.json" --json
+penflow validate-semantic-tree "$consumer/semantic-ui-tree.json" --project "$consumer" --json
+penflow draft-pen-from-tree "$consumer/semantic-ui-tree.json" --project "$consumer" --out "$consumer/penflow/ui.pen" --theme-css "$consumer/theme.css" --json
+penflow validate-pen "$consumer/penflow/ui.pen" --project "$consumer" --json
+penflow export-expected "$consumer/penflow/ui.pen" --project "$consumer" -o "$consumer/expected-ui-tree.json" --json
+penflow enrich-pen "$consumer/penflow/ui.pen" "$consumer/semantic-ui-tree.json" --project "$consumer" --out "$consumer/penflow/ui.pen" --json
+penflow validate-pen "$consumer/penflow/ui.pen" --project "$consumer" --json
+penflow reverse-pen "$consumer/penflow/ui.pen" --project "$consumer" --out "$consumer/reverse-output" --lenient --json
+penflow validate-semantic-tree "$consumer/reverse-output/semantic-ui-tree.json" --project "$consumer" --json
+penflow validate-actual "$consumer/actual-ui-tree.json" --schema --project "$consumer" --json
+penflow compare-tree "$consumer/expected-ui-tree.json" "$consumer/actual-ui-tree.json" --project "$consumer" --out "$consumer/compare.json" --json
+penflow review-report "$consumer/compare.json" --project "$consumer" --out "$consumer/review.json" --json
+penflow fix-report "$consumer/compare.json" --project "$consumer" --out "$consumer/fix.json" --json
+penflow doctor --project "$consumer" --check --json
 ```
 
-`/tmp/reverse-output` is a reverse output directory; its semantic tree lives at `/tmp/reverse-output/semantic-ui-tree.json` and recovered flow specs live under `/tmp/reverse-output/flow-ui-contract/`.
+`$consumer/reverse-output` is a reverse output directory; its semantic tree lives at `$consumer/reverse-output/semantic-ui-tree.json` and recovered flow specs live under `$consumer/reverse-output/flow-ui-contract/`. Managed run payloads remain under `$consumer/.penflow-tmp/` until safe preflight/postflight cleanup.
 
 ## Full Demo Mode
 

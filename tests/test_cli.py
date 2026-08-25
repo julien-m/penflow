@@ -5,14 +5,23 @@
 # @spec(FR-003)
 from __future__ import annotations
 
+import argparse
+import ast
 import hashlib
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
-from penflow.cli import _validate_json_schema_subset
-from penflow.cli import main
+import penflow.cli as cli_module
+from penflow.artifact_policy import (
+    LIFECYCLE_EXEMPT_COMMANDS,
+    PRODUCER_COMMANDS,
+    READ_ONLY_COMMANDS,
+)
+from penflow.cli import _PRODUCER_PATH_ARGUMENTS, _validate_json_schema_subset, build_parser, main
 from penflow.theme import theme_fingerprint
 from tests.test_flow_contract_v2 import valid_contract, write_json
 
@@ -398,3 +407,307 @@ def test_schema_subset_pattern_keyword_fails_closed_on_malformed_schema() -> Non
     assert len(issues) == 1
     assert issues[0]["path"] == "$.__schema__.pattern"
     assert issues[0]["message"].startswith("schema pattern is not a valid regex:")
+
+
+# @spec AC-013: every argparse command is closed over the lifecycle registry.
+def test_cli_subcommands_match_closed_lifecycle_registry() -> None:
+    parser = build_parser()
+    subparsers = next(
+        action for action in parser._actions if isinstance(action, argparse._SubParsersAction)
+    )
+    registered = set(subparsers.choices)
+    registered.discard("validate")
+    registered.discard("migrate-flow-md-to-contract-json")
+    registered.add("migrate-flow-contract")
+
+    assert registered == (
+        set(PRODUCER_COMMANDS)
+        | set(READ_ONLY_COMMANDS)
+        | (set(LIFECYCLE_EXEMPT_COMMANDS) - {"--help", "--version"})
+    )
+    assert set(_PRODUCER_PATH_ARGUMENTS) == set(PRODUCER_COMMANDS)
+    for command in sorted(set(PRODUCER_COMMANDS) | set(READ_ONLY_COMMANDS)):
+        parser_command = (
+            "migrate-flow-md-to-contract-json" if command == "migrate-flow-contract" else command
+        )
+        command_parser = subparsers.choices[parser_command]
+        assert any(action.dest == "project" for action in command_parser._actions), command
+
+
+def _init_git_consumer(tmp_path: Path) -> tuple[Path, Path]:
+    """Create a governed consumer with one canonical nested canvas."""
+    project = tmp_path / "consumer"
+    project.mkdir()
+    # Git setup is a bounded system contract: success is mandatory within 10s.
+    subprocess.run(["git", "init", "-q"], cwd=project, check=True, timeout=10)
+    subprocess.run(
+        ["git", "config", "user.email", "penflow-tests@example.invalid"],
+        cwd=project,
+        check=True,
+        timeout=10,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Penflow Tests"],
+        cwd=project,
+        check=True,
+        timeout=10,
+    )
+    canvas = project / "design" / "ui.pen"
+    canvas.parent.mkdir()
+    canvas.write_bytes((Path(__file__).parents[1] / "examples/demo/ui.pen").read_bytes())
+    return project, canvas
+
+
+def _run_governed_cli(
+    capsys: pytest.CaptureFixture[str], project: Path, *args: str
+) -> tuple[int, dict[str, object]]:
+    """Run one JSON CLI command after clearing its prior captured output."""
+    capsys.readouterr()
+    code = main([*args, "--project", str(project), "--json"])
+    return code, json.loads(capsys.readouterr().out)
+
+
+def _assert_clean_managed_run(project: Path, *, receipt_count: int) -> None:
+    """Assert a producer finalized all transient run state."""
+    assert list((project / ".penflow-tmp/runs").iterdir()) == []
+    assert len(list((project / ".penflow-tmp/receipts").glob("*.json"))) == receipt_count
+
+
+def test_governed_producer_cleans_managed_run(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    project, canvas = _init_git_consumer(tmp_path)
+
+    assert main(["doctor", "--project", str(project), "--fix", "--json"]) == 0
+    expected = project / "expected-ui-tree.json"
+    code, report = _run_governed_cli(
+        capsys, project, "export-expected", str(canvas), "--out", str(expected)
+    )
+    assert code == 0
+    assert report["screens"]
+    assert expected.is_file()
+    _assert_clean_managed_run(project, receipt_count=1)
+
+
+def test_governed_producer_rejects_peer_pen(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    project, canvas = _init_git_consumer(tmp_path)
+    assert main(["doctor", "--project", str(project), "--fix", "--json"]) == 0
+
+    updates = project / "updates.json"
+    updates.write_text("{}\n", encoding="utf-8")
+    peer = project / "draft.pen"
+    code, blocked = _run_governed_cli(
+        capsys,
+        project,
+        "update-pen",
+        str(canvas),
+        str(updates),
+        "--out",
+        str(peer),
+    )
+    assert code == 3
+    assert blocked["status"] == "BLOCKED"
+    assert blocked["issues"] == [
+        {
+            "severity": "error",
+            "code": "project.path_blocked",
+            "message": (
+                "update-pen --out must resolve to canonical design/ui.pen; "
+                "peer .pen files are forbidden"
+            ),
+        }
+    ]
+    assert not peer.exists()
+
+
+# @spec AC-016: Feature 074 core remains local-artifact/Git only.
+def test_runtime_isolation_forbidden_dependencies_are_absent() -> None:
+    forbidden_import_roots = {
+        "cc_hub",
+        "metro",
+        "pencil",
+        "playwright",
+        "react_native",
+        "selenium",
+        "pencil_mcp",
+        "xcode",
+        "simctl",
+    }
+    forbidden_process_tokens = (
+        "react-native",
+        "metro",
+        "cc-hub",
+        "pencil",
+        "playwright",
+        "xcode",
+        "simctl",
+        "browser",
+    )
+    subprocess_calls = {"run", "call", "check_call", "check_output", "popen"}
+    os_process_calls = {"system", "popen", "spawn", "spawnl", "spawnlp", "spawnv", "spawnvp"}
+    source_root = Path(__file__).parents[1] / "penflow"
+    # pencil_sync.py is the explicitly reviewed OS adapter; Feature 074 core
+    # isolation covers every other production Python module discovered here.
+    reviewed_runtime_adapter_allowlist = {Path("pencil_sync.py")}
+    discovered_modules = {path.relative_to(source_root) for path in source_root.rglob("*.py")}
+    assert reviewed_runtime_adapter_allowlist <= discovered_modules
+    feature_modules = sorted(discovered_modules - reviewed_runtime_adapter_allowlist)
+    observed_imports: set[str] = set()
+    subprocess_literals: list[str] = []
+    for relative_path in feature_modules:
+        source = (source_root / relative_path).read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        module_aliases: dict[str, str] = {}
+        call_aliases: dict[str, tuple[str, str]] = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                observed_imports.update(alias.name.split(".", 1)[0] for alias in node.names)
+                for alias in node.names:
+                    root = alias.name.split(".", 1)[0]
+                    if root in {"subprocess", "os"}:
+                        module_aliases[alias.asname or root] = root
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                root = node.module.split(".", 1)[0]
+                observed_imports.add(root)
+                if root in {"subprocess", "os"}:
+                    for alias in node.names:
+                        call_aliases[alias.asname or alias.name] = (root, alias.name.lower())
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                process_call: tuple[str, str] | None = None
+                function = node.func
+                if isinstance(function, ast.Name):
+                    process_call = call_aliases.get(function.id)
+                elif isinstance(function, ast.Attribute) and isinstance(function.value, ast.Name):
+                    module = module_aliases.get(function.value.id)
+                    if module is not None:
+                        process_call = (module, function.attr.lower())
+                elif (
+                    isinstance(function, ast.Call)
+                    and isinstance(function.func, ast.Name)
+                    and function.func.id == "getattr"
+                    and len(function.args) >= 2
+                    and isinstance(function.args[0], ast.Name)
+                    and isinstance(function.args[1], ast.Constant)
+                    and isinstance(function.args[1].value, str)
+                ):
+                    module = module_aliases.get(function.args[0].id)
+                    if module is not None:
+                        process_call = (module, function.args[1].value.lower())
+                if process_call is not None and (
+                    (process_call[0] == "subprocess" and process_call[1] in subprocess_calls)
+                    or (
+                        process_call[0] == "os"
+                        and (
+                            process_call[1] in os_process_calls
+                            or process_call[1].startswith(("exec", "spawn"))
+                        )
+                    )
+                ):
+                    subprocess_literals.extend(
+                        child.value.lower()
+                        for child in ast.walk(node)
+                        if isinstance(child, ast.Constant) and isinstance(child.value, str)
+                    )
+
+    assert observed_imports.isdisjoint(forbidden_import_roots)
+    assert not any(
+        token in literal for literal in subprocess_literals for token in forbidden_process_tokens
+    )
+
+
+def test_read_only_command_runs_health_without_managed_run(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    project = tmp_path / "read-only-consumer"
+    project.mkdir()
+    # Git setup is a bounded system contract: success is mandatory within 10s.
+    subprocess.run(["git", "init", "-q"], cwd=project, check=True, timeout=10)
+    canvas = project / "ui.pen"
+    canvas.write_bytes((Path(__file__).parents[1] / "examples/demo/ui.pen").read_bytes())
+    assert main(["doctor", "--project", str(project), "--fix", "--json"]) == 0
+    capsys.readouterr()
+    manifests = project / ".penflow-tmp" / "manifests"
+    before = sorted(path.name for path in manifests.glob("*.json"))
+
+    assert main(["validate-pen", str(canvas), "--project", str(project), "--json"]) == 0
+
+    assert sorted(path.name for path in manifests.glob("*.json")) == before
+    assert not (project / ".penflow-tmp" / "receipts").exists()
+
+
+def test_process_cli_producer_defaults_project_to_cwd(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    project = tmp_path / "cwd-consumer"
+    project.mkdir()
+    # Git setup is a bounded system contract: success is mandatory within 10s.
+    subprocess.run(["git", "init", "-q"], cwd=project, check=True, timeout=10)
+    subprocess.run(
+        ["git", "config", "user.email", "penflow-tests@example.invalid"],
+        cwd=project,
+        check=True,
+        timeout=10,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Penflow Tests"],
+        cwd=project,
+        check=True,
+        timeout=10,
+    )
+    canvas = project / "ui.pen"
+    canvas.write_bytes((Path(__file__).parents[1] / "examples/demo/ui.pen").read_bytes())
+    assert main(["doctor", "--project", str(project), "--fix", "--json"]) == 0
+    capsys.readouterr()
+
+    monkeypatch.chdir(project)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["penflow", "export-expected", "ui.pen", "--out", "expected-ui-tree.json", "--json"],
+    )
+    assert main() == 0
+    assert (project / "expected-ui-tree.json").is_file()
+    assert list((project / ".penflow-tmp/runs").iterdir()) == []
+
+
+def test_programmatic_cli_producer_defaults_project_to_cwd(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    project = tmp_path / "programmatic-consumer"
+    project.mkdir()
+    # Git setup is a bounded system contract: success is mandatory within 10s.
+    subprocess.run(["git", "init", "-q"], cwd=project, check=True, timeout=10)
+    canvas = project / "ui.pen"
+    canvas.write_bytes((Path(__file__).parents[1] / "examples/demo/ui.pen").read_bytes())
+    assert main(["doctor", "--project", str(project), "--fix", "--json"]) == 0
+    capsys.readouterr()
+
+    monkeypatch.chdir(project)
+    assert cli_module.main(["export-expected", "ui.pen", "--out", "expected.json", "--json"]) == 0
+
+    assert (project / "expected.json").is_file()
+    assert list((project / ".penflow-tmp/runs").iterdir()) == []
+
+
+def test_cli_project_selector_and_boundary_have_distinct_exit_codes(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    missing = tmp_path / "missing"
+    assert main(["doctor", "--project", str(missing), "--check", "--json"]) == 2
+    missing_report = json.loads(capsys.readouterr().out)
+    assert missing_report["issues"][0]["code"] == "project.path_missing"
+
+    outside_git = tmp_path / "outside-git"
+    outside_git.mkdir()
+    assert main(["doctor", "--project", str(outside_git), "--check", "--json"]) == 3
+    unsafe_report = json.loads(capsys.readouterr().out)
+    assert unsafe_report["issues"][0]["code"] == "not_git_project"

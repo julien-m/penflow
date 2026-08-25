@@ -1,0 +1,151 @@
+{
+  "$comment": "@spec FR-006: Versioned managed run manifest — .specs/features/074-penflow-doctor-consumer-project-hygiene/spec.md#fr-006",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.local/schemas/managed-run-manifest.schema.json",
+  "title": "Penflow Managed Run Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "revision",
+    "run_id",
+    "command",
+    "producer_state",
+    "cleanup_state",
+    "created_at",
+    "updated_at",
+    "owner",
+    "entries",
+    "durable_outputs",
+    "last_cleanup_receipt",
+    "blocking_findings"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "revision": {"type": "integer", "minimum": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "command": {
+      "enum": [
+        "run",
+        "pencil-sync",
+        "verify-pencil-persistence",
+        "verify-export-operation",
+        "export-expected",
+        "export-semantic-tree",
+        "migrate-flow-contract",
+        "draft-pen-from-tree",
+        "enrich-pen",
+        "map-pencil-context",
+        "reverse-pen",
+        "detect-drift",
+        "checklist-from-drift",
+        "compare-tree",
+        "check-consistency",
+        "audit-visual",
+        "flow-to-screens",
+        "draft-pen",
+        "update-pen",
+        "extract-tokens",
+        "lint-tokens",
+        "export-ir",
+        "code-ir",
+        "codegen",
+        "ci",
+        "review-report",
+        "fix-report",
+        "demo"
+      ]
+    },
+    "producer_state": {
+      "enum": ["preparing", "active", "finalizing", "succeeded", "failed"]
+    },
+    "cleanup_state": {
+      "enum": ["not_eligible", "eligible", "in_progress", "completed", "cleanup_failed"]
+    },
+    "created_at": {"type": "string", "minLength": 1},
+    "updated_at": {"type": "string", "minLength": 1},
+    "owner": {"$ref": "#/$defs/owner"},
+    "entries": {"type": "array", "items": {"$ref": "#/$defs/entry"}},
+    "durable_outputs": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/durable_output"}
+    },
+    "last_cleanup_receipt": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["phase", "reclaimed_bytes", "preserved_bytes", "blocked_bytes"],
+      "properties": {
+        "phase": {"enum": ["preflight", "postflight"]},
+        "reclaimed_bytes": {"type": "integer", "minimum": 0},
+        "preserved_bytes": {"type": "integer", "minimum": 0},
+        "blocked_bytes": {"type": "integer", "minimum": 0}
+      }
+    },
+    "blocking_findings": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1}
+    }
+  },
+  "$defs": {
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pid", "process_start_token", "host_id", "boot_id", "verification"],
+      "properties": {
+        "pid": {"type": "integer", "minimum": 1},
+        "process_start_token": {"type": "string", "minLength": 1},
+        "host_id": {"type": "string", "minLength": 1},
+        "boot_id": {"type": "string", "minLength": 1},
+        "verification": {"enum": ["LIVE", "DEAD", "UNKNOWN"]}
+      }
+    },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relative_path",
+        "kind",
+        "device",
+        "inode",
+        "mode",
+        "link_count",
+        "logical_bytes",
+        "retention",
+        "references",
+        "cleanup_status"
+      ],
+      "properties": {
+        "relative_path": {
+          "type": "string",
+          "pattern": "^\\.penflow-tmp/runs/(?!\\.\\.(?:/|$))(?!.*\\/\\.\\.(?:/|$))(?!.*\\\\)(?!.*//).+$"
+        },
+        "kind": {"enum": ["regular_file", "directory"]},
+        "device": {"type": "integer", "minimum": 0},
+        "inode": {"type": "integer", "minimum": 0},
+        "mode": {"type": "integer", "minimum": 0},
+        "link_count": {"type": "integer", "minimum": 1},
+        "logical_bytes": {"type": "integer", "minimum": 0},
+        "retention": {"enum": ["working", "durable"]},
+        "references": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1}
+        },
+        "cleanup_status": {"enum": ["pending", "deleted", "preserved", "blocked", "error"]}
+      }
+    },
+    "durable_output": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["relative_path", "sha256", "finalized", "manifest_revision"],
+      "properties": {
+        "relative_path": {
+          "type": "string",
+          "pattern": "^(?!/)(?!\\.\\.(?:/|$))(?!.*\\/\\.\\.(?:/|$))(?!.*\\\\)(?!.*//).+$"
+        },
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "finalized": {"type": "boolean"},
+        "manifest_revision": {"type": "integer", "minimum": 1}
+      }
+    }
+  }
+}

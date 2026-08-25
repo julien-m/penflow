@@ -9,6 +9,8 @@ from pathlib import Path
 from typing import Any
 
 from .context import Context, format_context_string
+from .json_filesystem import write_json_atomically
+from .pen_lifecycle import select_active_canvas_region_entries
 from .semantic_validation import validate_semantic_tree
 
 
@@ -27,6 +29,7 @@ class PenRecord:
     node: dict[str, Any]
 
 
+# @spec FR-005: Canonical producer migration — .specs/features/074-penflow-doctor-consumer-project-hygiene/spec.md#fr-005
 def enrich_pen_from_semantic_tree(
     pen_path: str | Path, tree_path: str | Path, out_path: str | Path
 ) -> dict[str, Any]:
@@ -35,15 +38,28 @@ def enrich_pen_from_semantic_tree(
     Args:
         pen_path: Existing Pencil `.pen` file.
         tree_path: Valid `semantic-ui-tree.json`.
-        out_path: Destination enriched `.pen` file.
+        out_path: Canonical `.pen` destination. It must resolve to ``pen_path``
+            because peer Pencil files are forbidden.
 
     Returns:
         Scriptable enrichment report with status, matched node count, and issues.
 
     Raises:
-        ValueError: If the semantic tree is invalid.
+        ValueError: If the destination differs from the canonical source or
+            the semantic tree is invalid.
+        CanvasLifecycleError: If active lifecycle selection is invalid.
+        OSError: If input JSON cannot be read or canonical output cannot be written.
+
+    Side effects:
+        Atomically replaces the canonical input ``ui.pen`` in place after
+        enriching selected active regions.
     """
-    pen = json.loads(Path(pen_path).read_text(encoding="utf-8"))
+    canonical_path = Path(pen_path).resolve()
+    destination = Path(out_path).resolve()
+    if destination != canonical_path:
+        raise ValueError("enrichment output must resolve to the canonical input ui.pen")
+
+    pen = json.loads(canonical_path.read_text(encoding="utf-8"))
     tree = json.loads(Path(tree_path).read_text(encoding="utf-8"))
     issues = validate_semantic_tree(tree)
     if _has_errors(issues):
@@ -52,9 +68,7 @@ def enrich_pen_from_semantic_tree(
     enriched = copy.deepcopy(pen)
     report_issues: list[dict[str, Any]] = []
     matched_paths = _apply_enrichment(enriched, tree, report_issues)
-    Path(out_path).write_text(
-        json.dumps(enriched, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    write_json_atomically(canonical_path, enriched)
     return {
         "status": "PASS" if not report_issues else "PARTIAL",
         "out": str(out_path),
@@ -67,7 +81,7 @@ def _apply_enrichment(
     pen: dict[str, Any], tree: dict[str, Any], issues: list[dict[str, Any]]
 ) -> set[tuple[int, ...]]:
     semantic_records = _semantic_records(tree)
-    pen_records = _pen_records(pen)
+    pen_records = active_pen_records(pen)
     by_semantic_id = _pen_records_by_semantic_id(pen_records)
     semantic_to_path: dict[str, tuple[int, ...]] = {}
     matched_paths: set[tuple[int, ...]] = set()
@@ -135,6 +149,23 @@ def _pen_records(pen: dict[str, Any]) -> list[PenRecord]:
     for index, child in enumerate(pen.get("children", []) or []):
         if isinstance(child, dict):
             records.extend(_walk_pen(child, (index,), None))
+    return records
+
+
+def active_pen_records(pen: dict[str, Any]) -> list[PenRecord]:
+    """Return active Pencil records using physical top-level source paths.
+
+    Args:
+        pen: Parsed Pencil document.
+
+    Returns:
+        Active records whose first path component is the physical top-level
+        index in ``pen['children']``.
+    """
+    records: list[PenRecord] = []
+    for region in select_active_canvas_region_entries(pen):
+        if isinstance(region.raw_node, dict):
+            records.extend(_walk_pen(region.raw_node, (region.source_index,), None))
     return records
 
 

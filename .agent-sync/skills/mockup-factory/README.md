@@ -2,6 +2,8 @@
 
 Penflow-local guided UX/UI optimizer for Pencil mockups.
 
+At task start and end, run `penflow doctor --project <consumer-project-root> --check --json` and retain both read-only receipts. The exact selected project is never widened to its enclosing Git worktree; collective worktrees may contain several independent projects. Work on the single canonical `ui.pen` for that project and keep active/draft/archive revisions inside its canvas. Penflow-managed intermediates belong below ignored `.penflow-tmp/`, `.penflow-run/`, and `.mockup-validation/` and are cleaned by safe producer preflight/postflight only. Multiple `.pen` candidates or tracked/staged temporary leaks require manual consolidation/Git-index resolution; Doctor never chooses files or rewrites history.
+
 Use **Read** [`SKILL.md`](SKILL.md) as the canonical workflow. The skill is tree-aware: it treats `flow-ui-contract`, `semantic-ui-tree.json`, `theme.css`, `ui.pen`, `pencil-context-map.json`, `expected-ui-tree.json`, and `detect-drift` reports as required anchors before any UX/UI audit or Pencil fix loop.
 
 Before any audit or fix, **Read** [`../../../.conventions/index.md`](../../../.conventions/index.md) and load the relevant design domains. A themed but generic mockup fails if it ignores app-shell, dashboard, payment, form, list/table, state, responsive, or accessibility conventions.
