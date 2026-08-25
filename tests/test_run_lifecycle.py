@@ -535,15 +535,17 @@ def test_identity_change_after_plan_records_cleanup_failed_without_deletion(
         )
     )
     plan = build_cleanup_plan(git_project, manifest, canonical_pen=git_project / "ui.pen")
-    payload.unlink()
-    payload.write_bytes(b"replacement")
+    replacement = run_dir / "replacement.bin"
+    # Write first so the atomic replacement guarantees a distinct inode without an absence window.
+    replacement.write_bytes(b"after!")
+    os.replace(replacement, payload)
 
     receipt = apply_cleanup_plan(git_project, manifest, plan)
 
     assert receipt.cleanup_state is CleanupState.CLEANUP_FAILED
     assert receipt.reclaimed_bytes == 0
     assert "cleanup.identity_changed" in {item.code for item in receipt.blocked}
-    assert payload.read_bytes() == b"replacement"
+    assert payload.read_bytes() == b"after!"
 
 
 def test_cleanup_failed_recovery_removes_remaining_entries_and_validates_schemas(
