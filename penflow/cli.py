@@ -27,12 +27,14 @@ from .cli_reporting import (
     _validate_report_schema,
 )
 from .flow_contract import FlowContractValidationError
+from .flow_docs import FlowDocsError
 from .pen_lifecycle import CanvasLifecycleError
 from .pencil_sync import sync_pencil_to_disk
 from .project_doctor import ProjectResolutionError
 from .run_lifecycle import LifecycleBlockedError
 from .run_pipeline import run_pipeline
 from .strict_closure import validate_strict_closure
+from .semantic_context_report import CoverageInputError
 
 # Public embedding surface; command handlers remain implementation details of
 # the focused command modules used by ``cli_parser``.
@@ -89,7 +91,7 @@ def main(
         issues = [finding.to_dict() for finding in error.findings]
         _print({"status": "FAIL", "issues": issues}, bool(getattr(args, "json", False)))
         return 1
-    except (PenflowError, FlowContractValidationError) as error:
+    except (PenflowError, FlowContractValidationError, CoverageInputError, FlowDocsError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 2
 
@@ -109,6 +111,8 @@ def _dispatch(
         return int(args.func(args) or 0)
     if getattr(args, "project", None) is None:
         args.project = "."
+    if str(args.command) == "export-flow-docs" and bool(getattr(args, "check", False)):
+        return _run_project_health_checked(args)
     if policy.category is CommandClassification.PRODUCER:
         return _run_governed_producer(args)
     return _run_project_health_checked(args)

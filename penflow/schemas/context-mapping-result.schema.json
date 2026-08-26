@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.dev/schemas/context-mapping-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "version", "context_map", "coverage"],
+  "properties": {
+    "kind": {"const": "penflow-context-mapping-result"},
+    "version": {"const": 2},
+    "context_map": {"$ref": "#/$defs/contextMap"},
+    "coverage": {"$ref": "#/$defs/coverage"}
+  },
+  "$defs": {
+    "contextMap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "status", "forward_only"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "status": {"type": "string", "minLength": 1},
+        "forward_only": {"const": true}
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "status", "schema_version"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "status": {"enum": ["PASS", "FAIL", "LEGACY_PARTIAL"]},
+        "schema_version": {"const": 1}
+      }
+    }
+  }
+}

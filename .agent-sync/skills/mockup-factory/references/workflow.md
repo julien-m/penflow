@@ -9,10 +9,10 @@
 The full chain, run in order (strict default exit policy, no `--lenient`):
 
 1. `penflow validate-flow-contract <target>/flow-ui-contract/contract.json --json` — `interactive_coverage` must have no `uncovered` screens.
-2. `penflow export-semantic-tree` + `penflow validate-semantic-tree` for `semantic-ui-tree.json` — `semantic.downgrade_suspect` blocks; add `repeat` to repeated list-like containers.
-3. `penflow validate-pen` on the source `.pen`
-4. `penflow map-pencil-context` → `pencil-context-map.json`
-5. `penflow export-expected` → `expected-ui-tree.json`
+2. `penflow export-flow-docs <contract.json> --out <flow-ui-contract> --json`, then repeat with `--check` — generate projections transactionally and prove they are fresh.
+3. `penflow export-semantic-tree` + `penflow validate-semantic-tree` for `semantic-ui-tree.json`.
+4. `penflow map-pencil-context ... --strict-coverage --contract ... --coverage-out semantic-context-coverage.json` — forward map and exhaustive reverse coverage; only `PASS` continues.
+5. `penflow validate-pen` then `penflow export-expected` → `expected-ui-tree.json`.
 6. `penflow lint-tokens` → `token-lint-report.json` (`tokens` gate)
 7. `penflow check-consistency` → `consistency-report.json` (`consistency` gate)
 8. `penflow audit-visual` → `visual-metrics-report.json` (`accessibility_alignment` gate; pass `--layout-snapshot <target>/.mockup-validation/visual-evidence/layout-snapshot.json` when the renderer produced it)

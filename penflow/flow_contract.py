@@ -9,6 +9,7 @@ import re
 from pathlib import Path
 from typing import Any
 
+from .flow_contract_context import semantic_context_reference_issues
 from .schema_cache import load_schema
 
 ID_RE = re.compile(r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$")
@@ -116,6 +117,7 @@ def contract_registries(contract: dict[str, Any]) -> dict[str, Any]:
         "actions": _by_id(contract, "actions"),
         "flows": _by_id(contract, "flows"),
         "transitions": _by_id(contract, "transitions"),
+        "relations": _by_id(contract, "relations"),
         "semantic_ids": {
             str(node["semantic_id"]): node
             for node in nodes.values()
@@ -296,6 +298,7 @@ def _validate_references(contract: dict[str, Any], issues: list[dict[str, Any]])
         _validate_transition_semantics(transition, path, registries, issues)
     _validate_guard_semantics(contract, issues)
     _validate_transition_fanout(contract, registries, issues)
+    issues.extend(semantic_context_reference_issues(contract, registries, screen_states))
     _unused_reference_issues(contract, issues)
     _interactive_screen_coverage_issues(contract, issues)
 

@@ -1,0 +1,20 @@
+{
+  "contract": {
+    "path": "examples/demo/flow-ui-contract/contract.json",
+    "sha256": "47a7f2568fc2100e5a2289fa9f85efd22a26ebcd5009e35a29ab3b9e0927efc1"
+  },
+  "files": [
+    {
+      "path": "flows/checkout.md",
+      "sha256": "64c56af5dce85fff73e64afc78c745d82678d31414ef1a432491e181c35672c6"
+    },
+    {
+      "path": "screens/checkout.md",
+      "sha256": "f233d150dfd5d26f164fa33ded190f086d4fd5cbefa2f58ab897724f2e907f64"
+    }
+  ],
+  "generator": "penflow.flow-docs/1",
+  "kind": "penflow-generated-docs",
+  "status": "PASS",
+  "version": 1
+}

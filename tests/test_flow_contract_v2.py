@@ -258,6 +258,73 @@ def test_contract_rejects_ungoverned_and_duplicate_fanout() -> None:
     assert "contract.transition.non_exclusive_fanout" in duplicate_codes
 
 
+# @spec FR-006: Complete behavior graph — .specs/features/076-exhaustive-bidirectional-semantic-context/spec.md#fr-006
+# @spec FR-007: Fail-closed references — .specs/features/076-exhaustive-bidirectional-semantic-context/spec.md#fr-007
+def test_contract_accepts_explicit_owner_relation_and_repeat_registries() -> None:
+    contract = valid_contract()
+    contract["nodes"][0].update(
+        {"kind": "screen_root", "owner": {"scope": "screen", "screen": "checkout"}}
+    )
+    contract["nodes"][1].update(
+        {
+            "kind": "element",
+            "owner": {
+                "scope": "screen",
+                "screen": "checkout",
+                "section": {"kind": "none", "reason": "screen_level_element"},
+            },
+            "parent": "checkout.root",
+        }
+    )
+    contract["nodes"][2].update(
+        {
+            "kind": "element",
+            "owner": {
+                "scope": "screen",
+                "screen": "checkout",
+                "section": {"kind": "none", "reason": "screen_level_element"},
+            },
+            "parent": "checkout.root",
+            "repeat_model": {
+                "collection": "checkout.payment_method",
+                "item_model": "checkout",
+                "item_key": "payment_method",
+                "instance_id_template": "checkout.pay.{payment_method}",
+            },
+        }
+    )
+    contract["relations"] = [
+        {
+            "id": "pay_updates_title",
+            "kind": "data_dependency",
+            "source": "checkout.pay",
+            "target": "checkout.title",
+            "effect": "refresh",
+        }
+    ]
+
+    assert validate_flow_contract_v2(contract) == []
+
+
+# @spec FR-007: Fail-closed references — .specs/features/076-exhaustive-bidirectional-semantic-context/spec.md#fr-007
+def test_contract_emits_stable_destination_binding_list_and_static_codes() -> None:
+    contract = valid_contract()
+    contract["actions"][0]["destination"] = {"screen": "missing", "state": "unknown"}
+    contract["actions"][0]["binding_ref"] = {"entity": "checkout", "field": "missing"}
+    contract["nodes"][2]["role"] = "list"
+    contract["screens"][0]["static"] = True
+    contract["screens"][0]["static_reason"] = "system_surface"
+
+    issue_codes = {issue["code"] for issue in validate_flow_contract_v2(contract)}
+
+    assert {
+        "binding.field_missing",
+        "destination.reference_missing",
+        "list.model_incomplete",
+        "screen.static_interactive",
+    } <= issue_codes
+
+
 def test_contract_accepts_explicitly_governed_fanout() -> None:
     contract = valid_contract()
     for transition in contract["transitions"]:

@@ -49,6 +49,7 @@
               "contract": "examples/full/flow-ui-contract/contract.json",
               "contract_path": "$.nodes[1]"
             },
+            "test_id": "checkout-order-summary",
             "text": "Order summary"
           },
           {
@@ -60,6 +61,7 @@
               "contract": "examples/full/flow-ui-contract/contract.json",
               "contract_path": "$.nodes[2]"
             },
+            "test_id": "checkout-selected-payment-method",
             "text": "Selected payment method"
           },
           {
@@ -93,7 +95,8 @@
         "source_map": {
           "contract": "examples/full/flow-ui-contract/contract.json",
           "contract_path": "$.nodes[0]"
-        }
+        },
+        "test_id": "checkout-screen"
       },
       "side_effects": [
         {

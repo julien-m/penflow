@@ -7,10 +7,19 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Any
 
+from .context_classification import classification_errors
+
 ALLOWED_KEYS = {
+    "classification",
+    "decorative_owner",
+    "decorative_reason",
+    "inherits_from",
+    "instance_key",
+    "relation",
     "semantic_id",
     "role",
     "intent",
@@ -65,6 +74,13 @@ class ContextIssue:
 
 @dataclass(slots=True)
 class Context:
+    # @spec(FR-001)
+    classification: str | None = None
+    decorative_owner: str | None = None
+    decorative_reason: str | None = None
+    inherits_from: str | None = None
+    instance_key: str | None = None
+    relation: str | None = None
     semantic_id: str | None = None
     role: str | None = None
     intent: str | None = None
@@ -153,16 +169,29 @@ def infer_role(node_type: str, context: Context) -> str:
     return ROLE_ALIASES.get(node_type, node_type)
 
 
-def validate_context(node_id: str, node_type: str, context: Context) -> list[ContextIssue]:
-    issues: list[ContextIssue] = []
-    semantic_id = context.semantic_id
+def validate_context(
+    node_id: str,
+    node_type: str,
+    context: Context,
+    *,
+    require_classification: bool = False,
+) -> list[ContextIssue]:
+    """Validate one context, optionally enforcing feature-076 classification."""
+    issues = _metadata_issues(node_id, context)
+    if require_classification:
+        issues.extend(_classification_issues(node_id, context))
+    issues.extend(_behavior_issues(node_id, node_type, context))
+    return issues
 
+
+def _metadata_issues(node_id: str, context: Context) -> list[ContextIssue]:
+    issues: list[ContextIssue] = []
     if context.extra:
         keys = ", ".join(sorted(context.extra))
         issues.append(
             ContextIssue("warning", "context.extra_keys", f"unknown context keys: {keys}", node_id)
         )
-
+    semantic_id = context.semantic_id
     if semantic_id and not IDENT_RE.match(str(semantic_id)):
         issues.append(
             ContextIssue(
@@ -173,7 +202,22 @@ def validate_context(node_id: str, node_type: str, context: Context) -> list[Con
                 str(semantic_id),
             )
         )
+    if semantic_id and unicodedata.normalize("NFC", str(semantic_id)) != semantic_id:
+        issues.append(
+            ContextIssue(
+                "error",
+                "context.semantic_id_normalization",
+                "semantic_id must already be NFC-normalized",
+                node_id,
+                str(semantic_id),
+            )
+        )
+    return issues
 
+
+def _behavior_issues(node_id: str, node_type: str, context: Context) -> list[ContextIssue]:
+    issues: list[ContextIssue] = []
+    semantic_id = context.semantic_id
     role = infer_role(node_type, context)
     if role == "button" and not context.intent:
         issues.append(
@@ -185,7 +229,6 @@ def validate_context(node_id: str, node_type: str, context: Context) -> list[Con
                 semantic_id,
             )
         )
-
     if role in {"list", "list_item"} and not context.repeat:
         issues.append(
             ContextIssue(
@@ -196,7 +239,6 @@ def validate_context(node_id: str, node_type: str, context: Context) -> list[Con
                 semantic_id,
             )
         )
-
     if context.binding and not BINDING_RE.match(str(context.binding)):
         issues.append(
             ContextIssue(
@@ -207,7 +249,6 @@ def validate_context(node_id: str, node_type: str, context: Context) -> list[Con
                 semantic_id,
             )
         )
-
     lowered = " ".join(str(value).lower() for value in context.to_dict().values())
     found_platforms = sorted(word for word in PLATFORM_WORDS if word in lowered)
     if found_platforms:
@@ -220,5 +261,11 @@ def validate_context(node_id: str, node_type: str, context: Context) -> list[Con
                 semantic_id,
             )
         )
-
     return issues
+
+
+def _classification_issues(node_id: str, context: Context) -> list[ContextIssue]:
+    return [
+        ContextIssue("error", code, message, node_id, context.semantic_id)
+        for code, message in classification_errors(context)
+    ]

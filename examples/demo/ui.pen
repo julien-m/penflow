@@ -5,7 +5,7 @@
       "children": [
         {
           "content": "Order summary",
-          "context": "binding=checkout.order_summary; entity=checkout; role=text; semantic_id=checkout.order-summary",
+          "context": "binding=checkout.order_summary; classification=semantic; entity=checkout; role=text; semantic_id=checkout.order-summary; test_id=checkout-order-summary",
           "fill": "#111827",
           "fontSize": 24,
           "fontWeight": "600",
@@ -21,7 +21,7 @@
         },
         {
           "content": "Selected payment method",
-          "context": "binding=checkout.selected_payment_method; entity=checkout; role=text; semantic_id=checkout.selected-payment-method",
+          "context": "binding=checkout.selected_payment_method; classification=semantic; entity=checkout; role=text; semantic_id=checkout.selected-payment-method; test_id=checkout-selected-payment-method",
           "fill": "#374151",
           "fontSize": 16,
           "fontWeight": "400",
@@ -40,6 +40,7 @@
           "children": [
             {
               "content": "Pay now",
+              "context": "classification=inherited; inherits_from=checkout.pay-now; relation=content",
               "fill": "#FFFFFF",
               "fontSize": 16,
               "fontWeight": "600",
@@ -47,7 +48,7 @@
               "type": "text"
             }
           ],
-          "context": "binding=checkout.selected_payment_method; entity=checkout; intent=submit_payment; role=button; semantic_id=checkout.pay-now; test_id=checkout-pay-now",
+          "context": "binding=checkout.selected_payment_method; classification=semantic; entity=checkout; intent=submit_payment; role=button; semantic_id=checkout.pay-now; test_id=checkout-pay-now",
           "cornerRadius": 8,
           "fill": "#0057FF",
           "gap": 8,
@@ -68,7 +69,7 @@
           "width": "fill_container"
         }
       ],
-      "context": "role=screen; semantic_id=checkout",
+      "context": "classification=semantic; role=screen; semantic_id=checkout; test_id=checkout-screen",
       "fill": "#FFFFFF",
       "gap": 16,
       "height": 844,

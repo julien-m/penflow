@@ -50,7 +50,8 @@ Recommended ownership:
 | Path | Commit? | Owner | Purpose |
 |---|---:|---|---|
 | `penflow/flow-ui-contract/contract.json` | yes | product / design / agent | Canonical strict v2 business contract. |
-| `penflow/flow-ui-contract/flows/*.md`, `screens/*.md` | optional | product / design / agent | Human docs or explicit migration source only. |
+| `penflow/flow-ui-contract/generated-docs.json` | generated when docs enabled | Penflow | Hash-binds generated flow/screen Markdown to the canonical contract. |
+| `penflow/flow-ui-contract/flows/*.md`, `screens/*.md` | generated when docs enabled | Penflow | Deterministic human projections; edit `contract.json` and regenerate. Legacy Markdown is migration-only. |
 | `penflow/semantic-ui-tree.json` | yes | Penflow | Generated semantic contract from `flow-ui-contract/contract.json`. |
 | `penflow/ui.pen` | yes | design / agent | The only Pencil document; active, draft and archive revisions remain inside its infinite canvas. |
 | `penflow/pencil-context-map.json` | yes | Penflow | Review map for matched, ambiguous, and unmapped Pencil nodes. |
@@ -90,6 +91,8 @@ Run commands from the exact application project root and use paths inside that s
 ```bash
 penflow doctor --project . --check --json
 penflow validate-flow-contract penflow/flow-ui-contract/contract.json --json
+penflow export-flow-docs penflow/flow-ui-contract/contract.json --out penflow/flow-ui-contract --json
+penflow export-flow-docs penflow/flow-ui-contract/contract.json --out penflow/flow-ui-contract --check --json
 ```
 
 ## Path A: New Project or New Feature Area
@@ -125,7 +128,7 @@ First perform a reviewed one-time move or import of the existing document into t
 penflow validate-flow-contract penflow/flow-ui-contract/contract.json --json
 penflow export-semantic-tree penflow/flow-ui-contract/contract.json --out penflow/semantic-ui-tree.json --json
 penflow enrich-pen penflow/ui.pen penflow/semantic-ui-tree.json --out penflow/ui.pen --json
-penflow map-pencil-context penflow/ui.pen penflow/semantic-ui-tree.json --out penflow/pencil-context-map.json --strict-anchors --json
+penflow map-pencil-context penflow/ui.pen penflow/semantic-ui-tree.json --out penflow/pencil-context-map.json --strict-coverage --contract penflow/flow-ui-contract/contract.json --coverage-out penflow/semantic-context-coverage.json --json
 penflow validate-pen penflow/ui.pen --json
 penflow export-expected penflow/ui.pen --out penflow/expected-ui-tree.json --json
 penflow code-ir --from-context penflow/ui.pen --semantic-tree penflow/semantic-ui-tree.json --context-map penflow/pencil-context-map.json --contract penflow/flow-ui-contract/contract.json --out penflow/code-ir.json --json

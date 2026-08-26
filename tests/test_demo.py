@@ -22,7 +22,9 @@ EXPECTED_FILES = {
     "flow-ui-contract/contract.json",
     "flow-ui-contract/flows/checkout.md",
     "flow-ui-contract/screens/checkout.md",
+    "flow-ui-contract/generated-docs.json",
     "ui.pen",
+    "semantic-context-coverage.json",
     "semantic-ui-tree.json",
     "pencil-context-map.json",
     "expected-ui-tree.json",
@@ -174,6 +176,10 @@ def test_build_demo_is_deterministic_modulo_output_directory(tmp_path: Path) -> 
         bytes_first = Path(files_first[relative]).read_bytes()
         bytes_second = Path(files_second[relative]).read_bytes()
         normalized = bytes_second.replace(str(second).encode(), str(first).encode())
+        if relative == "semantic-context-coverage.json":
+            first_digest = json.loads(bytes_first)["inputs"]["pencil"]["sha256"]
+            second_digest = json.loads(bytes_second)["inputs"]["pencil"]["sha256"]
+            normalized = normalized.replace(second_digest.encode(), first_digest.encode())
         assert normalized == bytes_first, relative
 
 

@@ -32,6 +32,8 @@
         "verify-export-operation",
         "export-expected",
         "export-semantic-tree",
+        "export-flow-docs",
+        "audit-context-coverage",
         "migrate-flow-contract",
         "draft-pen-from-tree",
         "enrich-pen",

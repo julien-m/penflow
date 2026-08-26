@@ -70,6 +70,7 @@
       "role": "screen",
       "screen_id": "checkout",
       "semantic_id": "checkout"
+      ,"test_id": "checkout-screen"
     },
     {
       "binding": "checkout.order_summary",
@@ -77,6 +78,7 @@
       "role": "text",
       "screen_id": "checkout",
       "semantic_id": "checkout.order-summary",
+      "test_id": "checkout-order-summary",
       "text": "Order summary"
     },
     {
@@ -85,6 +87,7 @@
       "role": "text",
       "screen_id": "checkout",
       "semantic_id": "checkout.selected-payment-method",
+      "test_id": "checkout-selected-payment-method",
       "text": "Selected payment method"
     },
     {

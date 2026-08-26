@@ -22,9 +22,11 @@
             "children": [],
             "context": {
               "binding": "checkout.order_summary",
+              "classification": "semantic",
               "entity": "checkout",
               "role": "text",
               "semantic_id": "checkout.order-summary",
+              "test_id": "checkout-order-summary",
               "variant": "heading"
             },
             "id": "checkout.order-summary",
@@ -49,9 +51,11 @@
             "children": [],
             "context": {
               "binding": "checkout.selected_payment_method",
+              "classification": "semantic",
               "entity": "checkout",
               "role": "text",
               "semantic_id": "checkout.selected-payment-method",
+              "test_id": "checkout-selected-payment-method",
               "variant": "body"
             },
             "id": "checkout.selected-payment-method",
@@ -83,6 +87,9 @@
                 },
                 "children": [],
                 "context": {
+                  "classification": "inherited",
+                  "inherits_from": "checkout.pay-now",
+                  "relation": "content",
                   "variant": "label"
                 },
                 "id": "payNowLabel",
@@ -100,6 +107,7 @@
             ],
             "context": {
               "binding": "checkout.selected_payment_method",
+              "classification": "semantic",
               "entity": "checkout",
               "intent": "submit_payment",
               "role": "button",
@@ -126,8 +134,10 @@
           }
         ],
         "context": {
+          "classification": "semantic",
           "role": "screen",
-          "semantic_id": "checkout"
+          "semantic_id": "checkout",
+          "test_id": "checkout-screen"
         },
         "id": "checkout",
         "name": "checkout",

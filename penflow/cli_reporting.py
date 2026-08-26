@@ -385,6 +385,12 @@ def _report_schema_name(report: dict[str, Any], filename: str) -> str:
         return "export-operator-receipt.schema.json"
     if kind == "penflow-strict-closure-report":
         return "strict-closure-report.schema.json"
+    if kind == "penflow-semantic-context-coverage":
+        # @spec FR-008: Strict coverage schema registration — .specs/features/076-exhaustive-bidirectional-semantic-context/spec.md#fr-008
+        return "semantic-context-coverage.schema.json"
+    if kind == "penflow-generated-docs":
+        # @spec FR-012: Generated-docs manifest schema — .specs/features/076-exhaustive-bidirectional-semantic-context/spec.md#fr-012
+        return "generated-docs.schema.json"
     if "compare" in filename or {"score", "summary", "issues"}.issubset(report):
         return "compare-report.schema.json"
     if "visual" in filename:

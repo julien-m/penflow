@@ -181,3 +181,60 @@ def test_platform_words_are_rejected_in_context_values() -> None:
     [issue] = validate_context("n", "text", context)
     assert issue.code == "context.platform_coupling"
     assert "swiftui" in issue.message
+
+
+# @spec FR-001: Closed node classifications — .specs/features/076-exhaustive-bidirectional-semantic-context/spec.md#fr-001
+def test_strict_semantic_classification_requires_join_ids_and_role() -> None:
+    valid = Context.from_raw(
+        "classification=semantic; semantic_id=checkout.pay; test_id=checkout-pay; role=button; intent=pay"
+    )
+    invalid = Context.from_raw("classification=semantic; semantic_id=checkout.pay")
+
+    assert validate_context("pay", "frame", valid, require_classification=True) == []
+    assert {
+        issue.code
+        for issue in validate_context("pay", "frame", invalid, require_classification=True)
+    } == {"pencil.semantic_role_missing", "test_id.missing"}
+
+
+# @spec FR-001: Closed node classifications — .specs/features/076-exhaustive-bidirectional-semantic-context/spec.md#fr-001
+def test_strict_inherited_and_decorative_classifications_are_exclusive() -> None:
+    inherited = Context.from_raw(
+        "classification=inherited; inherits_from=checkout.pay; relation=label"
+    )
+    decorative = Context.from_raw(
+        "classification=decorative; decorative_owner=checkout.pay; decorative_reason=visual_only"
+    )
+    conflict = Context.from_raw(
+        "classification=decorative; semantic_id=checkout.icon; test_id=checkout-icon; "
+        "role=button; decorative_owner=checkout.pay; decorative_reason=visual_only"
+    )
+
+    assert validate_context("label", "text", inherited, require_classification=True) == []
+    assert validate_context("icon", "icon_font", decorative, require_classification=True) == []
+    assert "pencil.classification_conflict" in codes(
+        validate_context("icon", "icon_font", conflict, require_classification=True)
+    )
+
+
+# @spec FR-001: Closed node classifications — .specs/features/076-exhaustive-bidirectional-semantic-context/spec.md#fr-001
+def test_strict_classification_never_uses_appearance_and_requires_nfc_ids() -> None:
+    for appearance in ("Zoom", "Recenter", "+", "−"):
+        context = Context.from_raw({"label": appearance})
+        issue_codes = codes(
+            validate_context("icon", "icon_font", context, require_classification=True)
+        )
+        assert "pencil.node_unclassified" in issue_codes
+
+    decomposed = Context.from_raw(
+        {
+            "classification": "semantic",
+            "semantic_id": "cafe\u0301.action",
+            "test_id": "cafe-action",
+            "role": "button",
+            "intent": "submit",
+        }
+    )
+    assert "context.semantic_id_normalization" in codes(
+        validate_context("action", "frame", decomposed, require_classification=True)
+    )

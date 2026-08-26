@@ -31,7 +31,7 @@ Exit codes are `0` PASS, `1` project-health block, `2` usage error, `3` untrustw
 
 ## JSON-Only Contract v2
 
-`flow-ui-contract/contract.json` is the canonical strict v2 business contract. Markdown/YAML flow files are documentation or explicit migration input only; strict validation, semantic export, `.pen` contract checks, code IR, and report handoff use JSON artifacts. Causal transitions bind a visible action to complete structured guards, an actual destination/state change, an outcome, and an exclusive or governed fan-out policy; runtime observations live in a separate run-bound evidence artifact whose receipts are closed identity-bound JSON payloads. Incompatible outcomes cannot reuse receipt bytes or SHA-256.
+`flow-ui-contract/contract.json` is the canonical strict v2 business contract. Flow/screen Markdown is a deterministic, hash-bound projection produced by `export-flow-docs`; legacy Markdown is accepted only through explicit migration. Strict coverage is bidirectional: every contract node has one Pencil anchor and every authored Pencil node is explicitly semantic, inherited, or decorative.
 
 ## Strict by Default (Breaking Change, Feature 049 / C24)
 
@@ -80,7 +80,10 @@ penflow validate-semantic-tree <workspace>/semantic-ui-tree.json --project <cons
 penflow draft-pen-from-tree <workspace>/semantic-ui-tree.json --out <workspace>/ui.pen --theme-css <workspace>/theme.css --project <consumer-project-root> --json
 penflow lint-tokens <workspace>/ui.pen --theme-css <workspace>/theme.css --out <workspace>/token-lint-report.json --project <consumer-project-root> --json
 penflow enrich-pen <workspace>/ui.pen <workspace>/semantic-ui-tree.json --out <workspace>/ui.pen --project <consumer-project-root> --json
-penflow map-pencil-context <workspace>/ui.pen <workspace>/semantic-ui-tree.json --out <workspace>/pencil-context-map.json --project <consumer-project-root> --strict-anchors --json
+penflow map-pencil-context <workspace>/ui.pen <workspace>/semantic-ui-tree.json --out <workspace>/pencil-context-map.json --project <consumer-project-root> --strict-coverage --contract <workspace>/flow-ui-contract/contract.json --coverage-out <workspace>/semantic-context-coverage.json --json
+penflow audit-context-coverage <workspace>/ui.pen --contract <workspace>/flow-ui-contract/contract.json --out <workspace>/semantic-context-coverage.json --project <consumer-project-root> --json
+penflow export-flow-docs <workspace>/flow-ui-contract/contract.json --out <workspace>/flow-ui-contract --project <consumer-project-root> --json
+penflow export-flow-docs <workspace>/flow-ui-contract/contract.json --out <workspace>/flow-ui-contract --check --project <consumer-project-root> --json
 penflow migrate-flow-md-to-contract-json <workspace>/flow-ui-contract --out <workspace>/flow-ui-contract/contract.json --project <consumer-project-root> --json
 penflow reverse-pen <workspace>/ui.pen --out <workspace>/reverse-output --project <consumer-project-root> --json
 penflow detect-drift <workspace>/flow-ui-contract/contract.json <workspace>/semantic-ui-tree.json <workspace>/ui.pen --out <workspace>/drift-report.json --project <consumer-project-root> --json

@@ -22,8 +22,28 @@ from .semantic_enrichment import (
     _normalize,
 )
 from .semantic_validation import validate_semantic_tree
+from .semantic_context_coverage import audit_semantic_context
 
 MAP_VERSION = 1
+
+
+# @spec FR-003: One canonical coverage service — .specs/features/076-exhaustive-bidirectional-semantic-context/spec.md#fr-003
+def exhaustive_context_coverage(
+    contract: dict[str, Any],
+    pen: dict[str, Any],
+    *,
+    contract_path: str,
+    pen_path: str,
+    legacy: bool = False,
+) -> dict[str, Any]:
+    """Expose the canonical reverse-inclusive coverage result to mapping callers."""
+    return audit_semantic_context(
+        contract,
+        pen,
+        contract_path=contract_path,
+        pen_path=pen_path,
+        legacy=legacy,
+    )
 
 
 # @spec FR-005: Canonical producer migration — .specs/features/074-penflow-doctor-consumer-project-hygiene/spec.md#fr-005

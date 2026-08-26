@@ -20,7 +20,7 @@ Use this skill when a task mentions Penflow, Pencil `.pen`, flow specs, `semanti
 
 Penflow is a deterministic, runtime-agnostic CLI that connects product flow intent, Pencil design contracts, codegen handoff data, and post-implementation runtime verification.
 
-Strict v2 uses `flow-ui-contract/contract.json` as the canonical machine contract. Markdown/YAML flow docs are human documentation or explicit migration input only.
+Strict v2 uses `flow-ui-contract/contract.json` as the canonical machine contract. Markdown flow/screen docs are deterministic `export-flow-docs` projections or explicit legacy migration input, never competing sources.
 
 Penflow owns file validation and tree comparison only:
 - `semantic-ui-tree.json`: before-code intent exported from strict `flow-ui-contract/contract.json` (legacy `flow-ui-contract/*.md` docs remain migration/documentation input).
@@ -72,15 +72,15 @@ For the semantic-tree formation rules, **Read** [`../flow-ui-contract/references
 
 ## Pencil Context Grammar
 
-Pencil `context` is the shorthand string parsed by [`../../../penflow/context.py`](../../../penflow/context.py): `key=value` pairs separated by `;`. Allowed keys: `semantic_id`, `role`, `intent`, `binding`, `repeat`, `entity`, `variant`, `test_id`, `action`, `permission`, `mask`, `mask_text`, `tolerance`.
+Pencil `context` is the shorthand string parsed by [`../../../penflow/context.py`](../../../penflow/context.py): `key=value` pairs separated by `;`. Allowed keys: `classification`, `decorative_owner`, `decorative_reason`, `inherits_from`, `instance_key`, `relation`, `semantic_id`, `role`, `intent`, `binding`, `repeat`, `entity`, `variant`, `test_id`, `action`, `permission`, `mask`, `mask_text`, `tolerance`. Every authored id-bearing node declares exactly one `classification=semantic|inherited|decorative`. Semantic nodes require `semantic_id`, `test_id`, and `role`; inherited nodes require `inherits_from` and `relation`; decorative nodes require `decorative_owner` and `decorative_reason`. Appearance never supplies classification.
 
 Examples:
-- Screen frame: `semantic_id=cockpit-live; role=screen`
-- Section frame: `semantic_id=cockpit-live.git; role=container`
-- Button: `semantic_id=cockpit-live.stop-worker; role=button; intent=stop-worker; action=stop_worker`
-- List: `semantic_id=cockpit-live.workers; role=list; repeat=worker in workers`
+- Screen frame: `classification=semantic; semantic_id=cockpit-live; test_id=cockpit-live-screen; role=screen`
+- Button: `classification=semantic; semantic_id=cockpit-live.stop-worker; test_id=stop-worker; role=button; intent=stop-worker; action=stop_worker`
+- Internal label: `classification=inherited; inherits_from=cockpit-live.stop-worker; relation=content`
+- Icon: `classification=decorative; decorative_owner=cockpit-live.stop-worker; decorative_reason=duplicates-label`
 
-When creating frames/components via `batch_design`, attach context at insertion time to every screen frame, section frame, interactive component, and repeated list. Adding context later is error-prone and must be treated as repair work. Run `penflow map-pencil-context <ui.pen> <semantic-ui-tree.json> --out pencil-context-map.json --strict-anchors --json`; ambiguous or unmapped anchors block. `--create-placeholders` is opt-in only, and its report remains `PARTIAL`, never PASS.
+When creating frames/components via `batch_design`, attach classification context at insertion time; adding it later is repair work. Run `penflow map-pencil-context <ui.pen> <semantic-ui-tree.json> --out pencil-context-map.json --strict-coverage --contract flow-ui-contract/contract.json --coverage-out semantic-context-coverage.json --json`; only coverage `PASS` authorizes downstream strict gates. `--strict-anchors` remains labeled forward-only diagnostic evidence and cannot prove reverse coverage. `--create-placeholders` is opt-in repair scaffolding only: its report remains `PARTIAL`, never `PASS`, and never closes exhaustive coverage.
 
 ## Mode Selection
 
@@ -113,10 +113,13 @@ Use when `flow-ui-contract/contract.json` is the source of truth. Keep Markdown 
 ```bash
 penflow run --target penflow --theme-css penflow/theme.css --references penflow/references --strict --json
 penflow validate-flow-contract examples/full/flow-ui-contract/contract.json --json
+penflow export-flow-docs examples/full/flow-ui-contract/contract.json --out examples/full/flow-ui-contract --json
+penflow export-flow-docs examples/full/flow-ui-contract/contract.json --out examples/full/flow-ui-contract --check --json
 penflow export-semantic-tree examples/full/flow-ui-contract/contract.json --out semantic-ui-tree.json --json
 penflow validate-semantic-tree semantic-ui-tree.json --json
 penflow draft-pen-from-tree semantic-ui-tree.json --out ui.pen --theme-css theme.css --json
 penflow lint-tokens ui.pen --theme-css theme.css --out token-lint-report.json --json
+penflow map-pencil-context ui.pen semantic-ui-tree.json --out pencil-context-map.json --strict-coverage --contract examples/full/flow-ui-contract/contract.json --coverage-out semantic-context-coverage.json --json
 penflow validate-pen ui.pen --json
 penflow export-expected ui.pen --out expected-ui-tree.json --json
 penflow check-consistency expected-ui-tree.json --group-by role+intent+variant+size-class --out consistency-report.json --json
@@ -129,7 +132,7 @@ penflow validate-code-ir code-ir.json --json
 
 Use `--group-by role+intent+variant+size-class` on dense screens: `check-consistency` skips anonymous containers with no stable intent, variant, or human name; height buckets keep 56px headers out of 820px panel groups; repeated divergences are aggregated. `--lenient` downgrades non-`fill`/`fontFamily` divergences to warnings in the report; `fill` and `fontFamily` stay errors.
 
-`penflow run --target <workspace> [--theme-css f] [--references dir] [--strict] --json` is the single DX wrapper for an already authored workspace. It runs the deterministic gates in order: `validate-flow-contract`, `export-semantic-tree`, `pencil-sync` when explicitly armed (`PENFLOW_RUN_PENCIL_SYNC=1`), `map-pencil-context --strict-anchors`, `validate-pen`, `export-expected`, `lint-tokens`, `check-consistency`, `audit-visual`, `detect-drift`, `validate-visual-evidence`, optional `reference-fidelity`, `code-ir`, and `validate-actual-provenance`. The output is one JSON summary plus an aggregate exit code; the summary and every gate cite the same `runId`, identity `version`, current-run provenance, and SHA-256 lineage for `ui.pen`, contract, expected/actual trees, theme, references, renderer, and export timestamp. Missing required inputs, explicitly requested missing optional paths, source mutation, or citation/provenance divergence exit nonzero; unarmed absent theme/reference inputs receive deterministic `not-provided` receipts. Individual gate reports remain in the workspace.
+`penflow run --target <workspace> [--theme-css f] [--references dir] [--strict] --json` is the single DX wrapper for an already authored workspace. It runs the deterministic gates in order: `validate-flow-contract`, generated-flow-doc freshness, `export-semantic-tree`, `pencil-sync` when explicitly armed (`PENFLOW_RUN_PENCIL_SYNC=1`), forward mapping, exhaustive `semantic-context-coverage`, `validate-pen`, `export-expected`, `lint-tokens`, `check-consistency`, `audit-visual`, `detect-drift`, `validate-visual-evidence`, optional `reference-fidelity`, `code-ir`, and `validate-actual-provenance`. Strict execution stops before `validate-pen` unless coverage is `PASS`; non-strict execution records `LEGACY_PARTIAL`. The output is one JSON summary plus an aggregate exit code; the summary and every gate cite the same `runId`, identity `version`, current-run provenance, and SHA-256 lineage for `ui.pen`, contract, expected/actual trees, theme, references, renderer, and export timestamp. Missing required inputs, explicitly requested missing optional paths, source mutation, or citation/provenance divergence exit nonzero; unarmed absent theme/reference inputs receive deterministic `not-provided` receipts. Individual gate reports remain in the workspace.
 
 Use `penflow run --target <workspace> --references <workspace>/references --strict-closure
 --json` only as the explicit C47 final check. It is read-only over evidence and writes only
@@ -182,10 +185,12 @@ python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); a={"pen.missing","g
 penflow doctor --project "$consumer" --fix --json
 penflow doctor --project "$consumer" --check --json
 penflow validate-flow-contract "$consumer/flow-ui-contract/contract.json" --project "$consumer" --json
+penflow export-flow-docs "$consumer/flow-ui-contract/contract.json" --project "$consumer" --out "$consumer/flow-ui-contract" --json
+penflow export-flow-docs "$consumer/flow-ui-contract/contract.json" --project "$consumer" --out "$consumer/flow-ui-contract" --check --json
 penflow export-semantic-tree "$consumer/flow-ui-contract/contract.json" --project "$consumer" --out "$consumer/semantic-ui-tree.json" --json
 penflow validate-semantic-tree "$consumer/semantic-ui-tree.json" --project "$consumer" --json
 penflow enrich-pen "$consumer/ui.pen" "$consumer/semantic-ui-tree.json" --project "$consumer" --out "$consumer/ui.pen" --json
-penflow map-pencil-context "$consumer/ui.pen" "$consumer/semantic-ui-tree.json" --project "$consumer" --out "$consumer/pencil-context-map.json" --strict-anchors --json
+penflow map-pencil-context "$consumer/ui.pen" "$consumer/semantic-ui-tree.json" --project "$consumer" --out "$consumer/pencil-context-map.json" --strict-coverage --contract "$consumer/flow-ui-contract/contract.json" --coverage-out "$consumer/semantic-context-coverage.json" --json
 penflow validate-pen "$consumer/ui.pen" --project "$consumer" --json
 penflow export-expected "$consumer/ui.pen" --project "$consumer" --out "$consumer/expected-ui-tree.json" --json
 penflow code-ir --from-context "$consumer/ui.pen" --semantic-tree "$consumer/semantic-ui-tree.json" --context-map "$consumer/pencil-context-map.json" --contract "$consumer/flow-ui-contract/contract.json" --flow-id checkout --flow-name "Checkout flow" --project "$consumer" --out "$consumer/code-ir.json" --json
@@ -208,7 +213,10 @@ python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); a={"pen.missing","g
 penflow doctor --project "$consumer" --fix --json
 penflow doctor --project "$consumer" --check --json
 penflow reverse-pen "$consumer/ui.pen" --project "$consumer" --out "$consumer/reverse-output" --lenient --json
+penflow export-flow-docs "$consumer/reverse-output/flow-ui-contract/contract.json" --project "$consumer" --out "$consumer/reverse-output/flow-ui-contract" --json
+penflow export-flow-docs "$consumer/reverse-output/flow-ui-contract/contract.json" --project "$consumer" --out "$consumer/reverse-output/flow-ui-contract" --check --json
 penflow validate-semantic-tree "$consumer/reverse-output/semantic-ui-tree.json" --project "$consumer" --json
+penflow map-pencil-context "$consumer/ui.pen" "$consumer/reverse-output/semantic-ui-tree.json" --project "$consumer" --out "$consumer/pencil-context-map.json" --strict-coverage --contract "$consumer/reverse-output/flow-ui-contract/contract.json" --coverage-out "$consumer/semantic-context-coverage.json" --json
 penflow validate-pen "$consumer/ui.pen" --project "$consumer" --json
 penflow doctor --project "$consumer" --check --json
 ```
@@ -269,12 +277,16 @@ python3 -c 'import json,sys; d=json.load(open(sys.argv[1])); a={"pen.missing","g
 penflow doctor --project "$consumer" --fix --json
 penflow doctor --project "$consumer" --check --json
 penflow validate-flow-contract "$consumer/flow-ui-contract/contract.json" --project "$consumer" --json
+penflow export-flow-docs "$consumer/flow-ui-contract/contract.json" --project "$consumer" --out "$consumer/flow-ui-contract" --json
+penflow export-flow-docs "$consumer/flow-ui-contract/contract.json" --project "$consumer" --out "$consumer/flow-ui-contract" --check --json
 penflow export-semantic-tree "$consumer/flow-ui-contract/contract.json" --project "$consumer" --out "$consumer/semantic-ui-tree.json" --json
 penflow validate-semantic-tree "$consumer/semantic-ui-tree.json" --project "$consumer" --json
 penflow draft-pen-from-tree "$consumer/semantic-ui-tree.json" --project "$consumer" --out "$consumer/penflow/ui.pen" --theme-css "$consumer/theme.css" --json
+penflow map-pencil-context "$consumer/penflow/ui.pen" "$consumer/semantic-ui-tree.json" --project "$consumer" --out "$consumer/pencil-context-map.json" --strict-coverage --contract "$consumer/flow-ui-contract/contract.json" --coverage-out "$consumer/semantic-context-coverage.json" --json
 penflow validate-pen "$consumer/penflow/ui.pen" --project "$consumer" --json
 penflow export-expected "$consumer/penflow/ui.pen" --project "$consumer" -o "$consumer/expected-ui-tree.json" --json
 penflow enrich-pen "$consumer/penflow/ui.pen" "$consumer/semantic-ui-tree.json" --project "$consumer" --out "$consumer/penflow/ui.pen" --json
+penflow map-pencil-context "$consumer/penflow/ui.pen" "$consumer/semantic-ui-tree.json" --project "$consumer" --out "$consumer/pencil-context-map.json" --strict-coverage --contract "$consumer/flow-ui-contract/contract.json" --coverage-out "$consumer/semantic-context-coverage.json" --json
 penflow validate-pen "$consumer/penflow/ui.pen" --project "$consumer" --json
 penflow reverse-pen "$consumer/penflow/ui.pen" --project "$consumer" --out "$consumer/reverse-output" --lenient --json
 penflow validate-semantic-tree "$consumer/reverse-output/semantic-ui-tree.json" --project "$consumer" --json
@@ -312,8 +324,9 @@ The demo deterministically derives its actual tree from the generated expected t
 1. Run `penflow fix-report compare-report.json --out fix-report.json --json` for deterministic fix suggestions.
 2. Fix deterministic errors first: missing nodes, role mismatch, invalid context, broken bindings.
 3. Apply code or `.pen` changes only when the report identifies a stable `semantic_id`.
-4. Re-run `validate-pen`, `validate-actual --schema`, and `compare-tree`.
-5. Stop with the remaining report if the issue requires a runtime artifact not available locally.
+4. After any `.pen` change, rerun `penflow map-pencil-context ui.pen semantic-ui-tree.json --out pencil-context-map.json --strict-coverage --contract flow-ui-contract/contract.json --coverage-out semantic-context-coverage.json --json`; only coverage `PASS` permits `validate-pen`.
+5. Re-run `validate-pen`, `validate-actual --schema`, and `compare-tree`.
+6. Stop with the remaining report if the issue requires a runtime artifact not available locally.
 
 ## cc-hub Sync
 

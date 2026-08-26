@@ -22,11 +22,13 @@ from .actual_provenance import (
 from .codegen import react, rust_dioxus, swiftui
 from .compare import STRICT_THRESHOLD, compare_tree_files
 from .contracts import code_ir_from_pen, validate_code_ir
+from .flow_docs import export_flow_docs
 from .json_filesystem import write_json_atomically
 from .llm import fix_compare_report, review_compare_report
 from .semantic import write_semantic_tree
 from .semantic_enrichment import enrich_pen_from_semantic_tree
 from .semantic_mapping import write_pencil_context_map
+from .semantic_context_coverage import write_coverage_report
 from .tree import expected_tree_from_pen
 
 
@@ -44,14 +46,9 @@ def build_demo(out_dir: str | Path) -> dict[str, str]:
     out = Path(out_dir)
     canonical_pen_path = out / "ui.pen"
     specs = out / "flow-ui-contract"
-    flows = specs / "flows"
-    screens = specs / "screens"
-    flows.mkdir(parents=True, exist_ok=True)
-    screens.mkdir(parents=True, exist_ok=True)
-
-    (flows / "checkout.md").write_text(_flow_spec(), encoding="utf-8")
-    (screens / "checkout.md").write_text(_screen_spec(), encoding="utf-8")
+    specs.mkdir(parents=True, exist_ok=True)
     _write_json(specs / "contract.json", _flow_contract())
+    export_flow_docs(specs / "contract.json", specs)
     _write_json(canonical_pen_path, _visual_pen())
 
     semantic_path = out / "semantic-ui-tree.json"
@@ -61,6 +58,11 @@ def build_demo(out_dir: str | Path) -> dict[str, str]:
 
     context_map_path = out / "pencil-context-map.json"
     write_pencil_context_map(canonical_pen_path, semantic_path, context_map_path)
+    write_coverage_report(
+        specs / "contract.json",
+        canonical_pen_path,
+        out / "semantic-context-coverage.json",
+    )
 
     expected_path = out / "expected-ui-tree.json"
     expected = expected_tree_from_pen(canonical_pen_path)
@@ -349,6 +351,7 @@ def _flow_contract() -> dict[str, Any]:
                 "id": "checkout.root",
                 "screen_id": "checkout",
                 "semantic_id": "checkout",
+                "test_id": "checkout-screen",
                 "role": "screen",
                 "children": [
                     "checkout.order_summary",
@@ -360,6 +363,7 @@ def _flow_contract() -> dict[str, Any]:
                 "id": "checkout.order_summary",
                 "screen_id": "checkout",
                 "semantic_id": "checkout.order-summary",
+                "test_id": "checkout-order-summary",
                 "role": "text",
                 "text": "Order summary",
                 "binding": "checkout.order_summary",
@@ -368,6 +372,7 @@ def _flow_contract() -> dict[str, Any]:
                 "id": "checkout.selected_payment_method",
                 "screen_id": "checkout",
                 "semantic_id": "checkout.selected-payment-method",
+                "test_id": "checkout-selected-payment-method",
                 "role": "text",
                 "text": "Selected payment method",
                 "binding": "checkout.selected_payment_method",
@@ -601,7 +606,7 @@ def _visual_pen() -> dict[str, Any]:
                 "padding": 24,
                 "alignItems": "stretch",
                 "fill": "#FFFFFF",
-                "context": "role=screen; semantic_id=checkout",
+                "context": "classification=semantic; role=screen; semantic_id=checkout; test_id=checkout-screen",
                 "penflow": {
                     "lifecycle": {
                         "schema_version": 1,
@@ -621,7 +626,7 @@ def _visual_pen() -> dict[str, Any]:
                         "fontSize": 24,
                         "fontWeight": "600",
                         "fill": "#111827",
-                        "context": "variant=heading",
+                        "context": "classification=semantic; semantic_id=checkout.order-summary; test_id=checkout-order-summary; role=text; variant=heading",
                     },
                     {
                         "id": "selectedPaymentMethod",
@@ -633,7 +638,7 @@ def _visual_pen() -> dict[str, Any]:
                         "fontSize": 16,
                         "fontWeight": "400",
                         "fill": "#374151",
-                        "context": "variant=body",
+                        "context": "classification=semantic; semantic_id=checkout.selected-payment-method; test_id=checkout-selected-payment-method; role=text; variant=body",
                     },
                     {
                         "id": "payNowButton",
@@ -648,6 +653,7 @@ def _visual_pen() -> dict[str, Any]:
                         "justifyContent": "center",
                         "cornerRadius": 8,
                         "fill": "#0057FF",
+                        "context": "classification=semantic; semantic_id=checkout.pay-now; test_id=checkout-pay-now; role=button; intent=submit_payment",
                         "children": [
                             {
                                 "id": "payNowLabel",
@@ -656,7 +662,7 @@ def _visual_pen() -> dict[str, Any]:
                                 "fontSize": 16,
                                 "fontWeight": "600",
                                 "fill": "#FFFFFF",
-                                "context": "variant=label",
+                                "context": "classification=inherited; inherits_from=checkout.pay-now; relation=content; variant=label",
                             }
                         ],
                     },

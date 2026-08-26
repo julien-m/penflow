@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.dev/schemas/generated-docs.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "version", "status", "generator", "contract", "files"],
+  "properties": {
+    "kind": {"const": "penflow-generated-docs"},
+    "version": {"const": 1},
+    "status": {"const": "PASS"},
+    "generator": {"type": "string", "minLength": 1},
+    "contract": {"$ref": "#/$defs/artifact"},
+    "files": {"type": "array", "minItems": 2, "items": {"$ref": "#/$defs/artifact"}}
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

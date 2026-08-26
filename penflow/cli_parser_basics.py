@@ -18,7 +18,6 @@ from .cli_commands_a import (
     cmd_export_expected,
     cmd_export_semantic_tree,
     cmd_inspect,
-    cmd_map_pencil_context,
     cmd_migrate_flow_contract,
     cmd_pencil_sync,
     cmd_reverse_pen,
@@ -32,6 +31,10 @@ from .cli_commands_a import (
     cmd_validate_semantic_tree,
     cmd_verify_export_operation,
     cmd_verify_pencil_persistence,
+)
+from .cli_context_parser import (
+    register_context_artifact_commands,
+    register_context_mapping,
 )
 from .cli_reporting import _add_lenient
 
@@ -198,6 +201,8 @@ def _register_causal_migration(sub: Any) -> None:
 
 
 def _register_semantic_producers(sub: Any) -> None:
+    register_context_artifact_commands(sub)
+
     semantic_draft = sub.add_parser(
         "draft-pen-from-tree", help="generate Pencil draft from semantic UI tree"
     )
@@ -214,23 +219,7 @@ def _register_semantic_producers(sub: Any) -> None:
     enrich.add_argument("-o", "--out", default="ui.pen")
     enrich.set_defaults(func=cmd_enrich_pen)
 
-    map_context = sub.add_parser("map-pencil-context", help="map semantic nodes to Pencil nodes")
-    map_context.add_argument("--json", action="store_true", help="print machine-readable JSON")
-    map_context.add_argument("pen")
-    map_context.add_argument("semantic_tree")
-    map_context.add_argument("-o", "--out", required=True)
-    map_context.add_argument("--pen-out", default=None)
-    map_context.add_argument(
-        "--strict-anchors",
-        action="store_true",
-        help="exit 1 when mapping leaves ambiguous, unmapped, or placeholder anchors",
-    )
-    map_context.add_argument(
-        "--create-placeholders",
-        action="store_true",
-        help="record missing semantic nodes as placeholders; report status stays PARTIAL",
-    )
-    map_context.set_defaults(func=cmd_map_pencil_context)
+    register_context_mapping(sub)
 
     reverse = sub.add_parser("reverse-pen", help="reverse Pencil file into flow specs")
     reverse.add_argument("--json", action="store_true", help="print machine-readable JSON")

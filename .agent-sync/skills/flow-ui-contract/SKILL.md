@@ -20,7 +20,7 @@ description: >
 
 # flow-ui-contract — Skill Posture
 
-Guided pipeline that captures product behavior visible in Pencil/mockup artifacts and now promotes reviewed behavior into canonical `flow-ui-contract/contract.json`. Legacy `flow-ui-contract/flows/*.md` and `flow-ui-contract/screens/*.md` files are documentation or explicit migration inputs only.
+Guided pipeline that promotes reviewed behavior into canonical `flow-ui-contract/contract.json`. Flow/screen Markdown is generated through `export-flow-docs` or supplied only as explicit legacy migration input.
 
 ## Purpose
 
@@ -40,15 +40,15 @@ For a new project, continue from a failing start receipt only when every issue c
 
 ## Pencil Context Grammar
 
-When a contract is consumed by Pencil authoring, every screen/section/interactive/repeated element must map to Pencil `context` at insertion time. The shorthand string is `key=value` pairs separated by `;`; allowed keys come from [`../../../penflow/context.py`](../../../penflow/context.py): `semantic_id`, `role`, `intent`, `binding`, `repeat`, `entity`, `variant`, `test_id`, `action`, `permission`, `mask`, `mask_text`, `tolerance`.
+When a contract is consumed by Pencil authoring, every id-bearing authored node receives exactly one explicit `semantic`, `inherited`, or `decorative` classification at insertion time. Allowed keys are `classification`, `decorative_owner`, `decorative_reason`, `inherits_from`, `instance_key`, `relation`, `semantic_id`, `role`, `intent`, `binding`, `repeat`, `entity`, `variant`, `test_id`, `action`, `permission`, `mask`, `mask_text`, and `tolerance`. Semantic nodes require `semantic_id`, `test_id`, and `role`; inherited/decorative nodes name an anchored owner and relation/reason. Never infer classification from visible appearance.
 
 Examples:
-- Screen frame: `semantic_id=cockpit-live; role=screen`
-- Section frame: `semantic_id=cockpit-live.git; role=container`
-- Button: `semantic_id=cockpit-live.stop-worker; role=button; intent=stop-worker; action=stop_worker`
-- List: `semantic_id=cockpit-live.workers; role=list; repeat=worker in workers`
+- Screen frame: `classification=semantic; semantic_id=cockpit-live; test_id=cockpit-live-screen; role=screen`
+- Section frame: `classification=semantic; semantic_id=cockpit-live.git; test_id=cockpit-live-git; role=container`
+- Button: `classification=semantic; semantic_id=cockpit-live.stop-worker; test_id=stop-worker; role=button; intent=stop-worker; action=stop_worker`
+- List: `classification=semantic; semantic_id=cockpit-live.workers; test_id=worker-list; role=list; repeat=worker in workers`
 
-After authoring/enrichment, run `penflow map-pencil-context <target>/ui.pen <target>/semantic-ui-tree.json --project <consumer-project-root> --out <target>/pencil-context-map.json --strict-anchors --json`. Any `ambiguous` or `unmapped` anchor blocks downstream work; `--create-placeholders` is explicit repair scaffolding and yields `PARTIAL`, never PASS.
+After authoring/enrichment, run `penflow map-pencil-context <target>/ui.pen <target>/semantic-ui-tree.json --project <consumer-project-root> --out <target>/pencil-context-map.json --strict-coverage --contract <target>/flow-ui-contract/contract.json --coverage-out <target>/semantic-context-coverage.json --json`. Only exhaustive coverage `PASS` permits downstream strict work; `--strict-anchors` is forward-only diagnostic evidence. `--create-placeholders` is explicit repair scaffolding and yields `PARTIAL`, never `PASS`.
 
 ## Invocation
 
@@ -61,7 +61,7 @@ After authoring/enrichment, run `penflow map-pencil-context <target>/ui.pen <tar
 
 ## Positioning
 
-- **Forward mode:** write/review `contract.json`, export `semantic-ui-tree.json`, validate it, draft or enrich `ui.pen`, export expected tree, and generate code IR.
+- **Forward mode:** write/review `contract.json`, generate/check Markdown projections, export `semantic-ui-tree.json`, draft or enrich `ui.pen`, require exhaustive semantic coverage, then generate downstream artifacts.
 - **Pencil enrichment:** use an existing visual `.pen`, inject Penflow context from the semantic tree, map semantic nodes to Pencil nodes, and validate the enriched file.
 - **Reverse mode:** run `reverse-pen` on legacy `ui.pen` to reconstruct flow/screen specs and `semantic-ui-tree.json`; unknown business logic becomes `[NEEDS CLARIFICATION]`.
 - **Runtime verification:** external adapters emit `actual-ui-tree.json`; Penflow validates, compares, and writes review/fix reports.
@@ -123,6 +123,15 @@ Input specs:
       validation: payment_method_present
 ```
 
+Matching Pencil contexts classify every id-bearing node explicitly:
+
+```text
+classification=semantic; semantic_id=checkout-form; test_id=checkout-form-screen; role=screen
+classification=semantic; semantic_id=pay-button; test_id=pay-button; role=button; intent=submit_payment
+classification=inherited; inherits_from=pay-button; relation=content
+classification=decorative; decorative_owner=pay-button; decorative_reason=duplicates-label
+```
+
 Expected `semantic-ui-tree.json` excerpt:
 
 ```json
@@ -143,10 +152,12 @@ Expected `semantic-ui-tree.json` excerpt:
       "flow_id": "checkout",
       "root": {
         "semantic_id": "checkout-form",
+        "test_id": "checkout-form-screen",
         "role": "screen",
         "children": [
           {
             "semantic_id": "pay-button",
+            "test_id": "pay-button",
             "role": "button",
             "text": "Pay now",
             "intent": "submit_payment",
@@ -219,11 +230,14 @@ If any flow or screen declares surface `landing` or `showcase`, run the Design R
 
 ### Step 6 — Generation
 
-Generate:
-- `<target>/flow-ui-contract/flows/<flow-slug>.md`
-- `<target>/flow-ui-contract/screens/<screen-slug>.md`
+Author or update `<target>/flow-ui-contract/contract.json`, then generate its Markdown projections transactionally:
 
-Use the templates as skeletons and keep prose language consistent per file.
+```bash
+penflow export-flow-docs <target>/flow-ui-contract/contract.json --project <consumer-project-root> --out <target>/flow-ui-contract --json
+penflow export-flow-docs <target>/flow-ui-contract/contract.json --project <consumer-project-root> --out <target>/flow-ui-contract --check --json
+```
+
+The generated `<target>/flow-ui-contract/flows/<flow-slug>.md` and `<target>/flow-ui-contract/screens/<screen-slug>.md` are read-only projections; edit the canonical JSON and regenerate instead of editing Markdown directly.
 
 ### Step 7 — Flow Spec Validation
 
@@ -256,9 +270,12 @@ Open questions: <N> [NEEDS CLARIFICATION]
 
 ```bash
 penflow validate-flow-contract <target>/flow-ui-contract/contract.json --project <consumer-project-root> --json
+penflow export-flow-docs <target>/flow-ui-contract/contract.json --project <consumer-project-root> --out <target>/flow-ui-contract --json
+penflow export-flow-docs <target>/flow-ui-contract/contract.json --project <consumer-project-root> --out <target>/flow-ui-contract --check --json
 penflow export-semantic-tree <target>/flow-ui-contract/contract.json --project <consumer-project-root> --out <target>/semantic-ui-tree.json --json
 penflow validate-semantic-tree <target>/semantic-ui-tree.json --project <consumer-project-root> --json
 penflow draft-pen-from-tree <target>/semantic-ui-tree.json --project <consumer-project-root> --out <target>/ui.pen --theme-css <target>/theme.css --json
+penflow map-pencil-context <target>/ui.pen <target>/semantic-ui-tree.json --project <consumer-project-root> --out <target>/pencil-context-map.json --strict-coverage --contract <target>/flow-ui-contract/contract.json --coverage-out <target>/semantic-context-coverage.json --json
 penflow validate-pen <target>/ui.pen --project <consumer-project-root> --json
 penflow export-expected <target>/ui.pen --project <consumer-project-root> --out <target>/expected-ui-tree.json --json
 penflow code-ir --from-context <target>/ui.pen --semantic-tree <target>/semantic-ui-tree.json --contract <target>/flow-ui-contract/contract.json --flow-id <flow-id> --flow-name "<Flow name>" --project <consumer-project-root> --out <target>/code-ir.json --json
@@ -270,7 +287,7 @@ penflow code-ir --from-context <target>/ui.pen --semantic-tree <target>/semantic
 
 ```bash
 penflow enrich-pen <target>/ui.pen <target>/semantic-ui-tree.json --project <consumer-project-root> --out <target>/ui.pen --json
-penflow map-pencil-context <target>/ui.pen <target>/semantic-ui-tree.json --project <consumer-project-root> --out <target>/pencil-context-map.json --strict-anchors --json
+penflow map-pencil-context <target>/ui.pen <target>/semantic-ui-tree.json --project <consumer-project-root> --out <target>/pencil-context-map.json --strict-coverage --contract <target>/flow-ui-contract/contract.json --coverage-out <target>/semantic-context-coverage.json --json
 penflow validate-pen <target>/ui.pen --project <consumer-project-root> --json
 penflow export-expected <target>/ui.pen --project <consumer-project-root> --out <target>/expected-ui-tree.json --json
 penflow code-ir --from-context <target>/ui.pen --semantic-tree <target>/semantic-ui-tree.json --context-map <target>/pencil-context-map.json --contract <target>/flow-ui-contract/contract.json --flow-id <flow-id> --flow-name "<Flow name>" --project <consumer-project-root> --out <target>/code-ir.json --json
@@ -281,6 +298,7 @@ penflow code-ir --from-context <target>/ui.pen --semantic-tree <target>/semantic
 ```bash
 penflow reverse-pen <target>/ui.pen --project <consumer-project-root> --out <target>/reverse-output --enrich --json
 penflow validate-semantic-tree <target>/reverse-output/semantic-ui-tree.json --project <consumer-project-root> --json
+penflow map-pencil-context <target>/ui.pen <target>/reverse-output/semantic-ui-tree.json --project <consumer-project-root> --out <target>/pencil-context-map.json --strict-coverage --contract <target>/reverse-output/flow-ui-contract/contract.json --coverage-out <target>/semantic-context-coverage.json --json
 penflow validate-pen <target>/ui.pen --project <consumer-project-root> --json
 ```
 
