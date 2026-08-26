@@ -65,7 +65,6 @@ from .run_pipeline import RunPipelineError
 from .semantic import write_semantic_tree
 from .semantic_draft import write_pen_draft_from_semantic_tree
 from .semantic_enrichment import enrich_pen_from_semantic_tree
-from .semantic_mapping import write_pencil_context_map
 from .semantic_validation import validate_semantic_tree, validate_semantic_tree_file
 from .strict_closure import StrictClosureError
 from .tree import load_tree, validate_actual_tree, write_expected_tree
@@ -342,24 +341,6 @@ def cmd_enrich_pen(args: argparse.Namespace) -> int:
         return 1
     report = enrich_pen_from_semantic_tree(args.pen, args.semantic_tree, args.out)
     _print(report, args.json)
-    return 0
-
-
-def cmd_map_pencil_context(args: argparse.Namespace) -> int:
-    passed, issues = validate_semantic_tree_file(args.semantic_tree)
-    if not passed:
-        _print({"status": "FAIL", "issues": issues}, args.json)
-        return 1
-    context_map = write_pencil_context_map(
-        args.pen,
-        args.semantic_tree,
-        args.out,
-        pen_out=args.pen_out,
-        create_placeholders=args.create_placeholders,
-    )
-    _print(context_map | {"out": args.out, "pen_out": args.pen_out}, args.json)
-    if args.strict_anchors and context_map["status"] != "PASS":
-        return 1
     return 0
 
 

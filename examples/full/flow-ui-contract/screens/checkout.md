@@ -1,42 +1,89 @@
----
-screen: checkout
-mockup: checkout.png
-flow: checkout
-sourceNodeId: checkoutScreen
-sourceFile: ui.pen
-generated_at: "2026-05-20"
----
+<!-- Generated from contract.json; do not edit. -->
+<!-- @spec(FR-011) -->
 
-# Écran — Checkout
+# Screen: checkout
 
-- **Acteur:** Returning customer
-- **Source d'entrée:** Customer opens the checkout route with an order in progress
-- **Sortie principale:** Payment is submitted and the runtime contract can be compared
+Generator: `penflow.flow-docs/1`
 
-## Données affichées
-
-- Order summary
-- Selected payment method
-
-## Actions
-
-| Élément | Type | Effet |
-|---------|------|-------|
-| Pay now | button | POST /payments → submitting |
-
-## Validations
-
-- A selected payment method is required before submitting payment
-
-## États UI
-
-default · submitting · error
-
-## Erreurs
-
-- Missing payment method → "Choose a payment method before paying."
-- Payment failed → "Payment failed. Try again."
-
-## Side effects locaux
-
-- The submitting state is shown while the payment request is in flight
+```json
+{
+  "actions": [
+    {
+      "error_transition": "payment_error",
+      "guard": "payment_ready",
+      "id": "submit_payment",
+      "mutation": "create_payment",
+      "node": "checkout.pay_now",
+      "permission": "buyer_can_pay",
+      "success_transition": "payment_success",
+      "trigger": "click"
+    }
+  ],
+  "nodes": [
+    {
+      "binding": "checkout.order_summary",
+      "id": "checkout.order_summary",
+      "role": "text",
+      "screen_id": "checkout",
+      "semantic_id": "checkout.order-summary",
+      "test_id": "checkout-order-summary",
+      "text": "Order summary"
+    },
+    {
+      "action": "submit_payment",
+      "binding": "checkout.selected_payment_method",
+      "entity": "checkout",
+      "id": "checkout.pay_now",
+      "role": "button",
+      "screen_id": "checkout",
+      "semantic_id": "checkout.pay-now",
+      "test_id": "checkout-pay-now",
+      "text": "Pay now"
+    },
+    {
+      "children": [
+        "checkout.order_summary",
+        "checkout.selected_payment_method",
+        "checkout.pay_now"
+      ],
+      "id": "checkout.root",
+      "role": "screen",
+      "screen_id": "checkout",
+      "semantic_id": "checkout",
+      "test_id": "checkout-screen"
+    },
+    {
+      "binding": "checkout.selected_payment_method",
+      "id": "checkout.selected_payment_method",
+      "role": "text",
+      "screen_id": "checkout",
+      "semantic_id": "checkout.selected-payment-method",
+      "test_id": "checkout-selected-payment-method",
+      "text": "Selected payment method"
+    }
+  ],
+  "relations": [],
+  "screen": {
+    "flow_id": "checkout",
+    "id": "checkout",
+    "root_node": "checkout.root",
+    "states": [
+      {
+        "id": "default"
+      },
+      {
+        "id": "submitting"
+      },
+      {
+        "id": "error"
+      }
+    ],
+    "surface": "web",
+    "title": "Checkout",
+    "viewport": {
+      "height": 844,
+      "width": 390
+    }
+  }
+}
+```

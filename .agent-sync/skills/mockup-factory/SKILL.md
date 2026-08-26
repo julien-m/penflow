@@ -48,11 +48,13 @@ Run from the target project root and produce missing anchors before auditing UX:
 
 ```bash
 penflow validate-flow-contract <target>/flow-ui-contract/contract.json --json
+penflow export-flow-docs <target>/flow-ui-contract/contract.json --out <target>/flow-ui-contract --json
+penflow export-flow-docs <target>/flow-ui-contract/contract.json --out <target>/flow-ui-contract --check --json
 penflow export-semantic-tree <target>/flow-ui-contract/contract.json --out <target>/semantic-ui-tree.json --json
 penflow validate-semantic-tree <target>/semantic-ui-tree.json --json
 penflow draft-pen-from-tree <target>/semantic-ui-tree.json --out <target>/ui.pen --theme-css <target>/theme.css --json
+penflow map-pencil-context <target>/ui.pen <target>/semantic-ui-tree.json --out <target>/pencil-context-map.json --strict-coverage --contract <target>/flow-ui-contract/contract.json --coverage-out <target>/semantic-context-coverage.json --json
 penflow validate-pen <target>/ui.pen --json
-penflow map-pencil-context <target>/ui.pen <target>/semantic-ui-tree.json --out <target>/pencil-context-map.json --strict-anchors --json
 penflow export-expected <target>/ui.pen --out <target>/expected-ui-tree.json --json
 penflow lint-tokens <target>/ui.pen --theme-css <target>/theme.css -o <target>/token-lint-report.json --json
 penflow check-consistency <target>/expected-ui-tree.json --group-by role+intent+variant+size-class -o <target>/consistency-report.json --json

@@ -103,6 +103,13 @@ jobs:
         shell: bash
         run: uv run --no-sync python -m pytest
 
+      - name: Exhaustive semantic coverage gate
+        shell: bash
+        run: >-
+          uv run --no-sync python -m pytest -q
+          tests/test_semantic_context_coverage.py::test_audit_context_coverage_cli_writes_report_and_uses_exact_exit_codes
+          tests/test_run_pipeline.py::test_strict_semantic_coverage_stops_before_validate_pen
+
   qe7:
     name: Feature 074 large-tree evidence
     runs-on: ubuntu-latest

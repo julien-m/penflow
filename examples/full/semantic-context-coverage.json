@@ -1,0 +1,55 @@
+{
+  "buckets": {
+    "behavior_incomplete": [],
+    "contract_missing_in_pencil": [],
+    "decorative_exclusions": [],
+    "pencil_missing_in_contract": [],
+    "pencil_unclassified": [],
+    "reference_invalid": [],
+    "valid_inheritance": [
+      {
+        "blocking": false,
+        "code": "pencil.valid_inheritanc_valid",
+        "contract_path": null,
+        "correction": "add or repair explicit semantic context fields",
+        "document": "pencil",
+        "message": "valid owner",
+        "node_id": "payNowLabel",
+        "node_path": "$.children[0].children[2].children[0]",
+        "owner_screen": "checkout",
+        "semantic_id": "checkout.pay-now",
+        "severity": "info"
+      }
+    ]
+  },
+  "generator": "penflow.semantic-context-coverage/1",
+  "inputs": {
+    "contract": {
+      "path": "examples/full/flow-ui-contract/contract.json",
+      "sha256": "47a7f2568fc2100e5a2289fa9f85efd22a26ebcd5009e35a29ab3b9e0927efc1"
+    },
+    "pencil": {
+      "path": "examples/full/ui.pen",
+      "sha256": "0ee3b39a43e1f13aa0ebf55b708dd3e2f357512e4b1bf8c4f51824d6a4fcb7ab"
+    }
+  },
+  "kind": "penflow-semantic-context-coverage",
+  "status": "PASS",
+  "summary": {
+    "anchored_unique": 4,
+    "blocking": 0,
+    "classification_conflict": 0,
+    "contract_anchor_duplicate": 0,
+    "contract_anchor_missing": 0,
+    "contract_total": 4,
+    "decorative": 0,
+    "inherited": 1,
+    "out_of_scope_metadata": 0,
+    "pencil_records_seen": 5,
+    "pencil_total": 5,
+    "semantic": 4,
+    "semantic_resolved": 4,
+    "unclassified": 0
+  },
+  "version": 1
+}

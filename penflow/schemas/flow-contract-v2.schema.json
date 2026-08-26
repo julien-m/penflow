@@ -1,5 +1,5 @@
 {
-  "$comment": "LiveSpec traceability anchors: @spec(FR-001)",
+  "$comment": "LiveSpec traceability anchors: @spec(FR-001) @spec FR-006 FR-007 — .specs/features/076-exhaustive-bidirectional-semantic-context/spec.md#fr-006",
   "$id": "https://penflow.dev/schemas/flow-contract-v2.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Penflow Flow Contract v2",
@@ -36,6 +36,7 @@
     "actions": {"type": "array", "items": {"$ref": "#/$defs/action"}},
     "flows": {"type": "array", "items": {"$ref": "#/$defs/flow"}},
     "transitions": {"type": "array", "items": {"$ref": "#/$defs/transition"}},
+    "relations": {"type": "array", "items": {"$ref": "#/$defs/relation"}},
     "needs_review": {"type": "boolean"},
     "needs_clarification": {"type": "array", "items": {"type": "string"}}
   },
@@ -163,7 +164,60 @@
         "binding": {"type": "string"},
         "entity": {"type": "string"},
         "action": {"type": "string"},
+        "kind": {"enum": ["screen_root", "section", "element", "shared_component"]},
+        "owner": {"$ref": "#/$defs/owner"},
+        "parent": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "repeat_model": {"$ref": "#/$defs/repeatModel"},
+        "copy_id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "states": {"type": "array", "items": {"type": "string"}},
         "children": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope"],
+      "properties": {
+        "scope": {"enum": ["screen", "shared_component"]},
+        "screen": {"type": "string"},
+        "section": {
+          "oneOf": [
+            {"type": "string"},
+            {"$ref": "#/$defs/noneReference"}
+          ]
+        }
+      }
+    },
+    "noneReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "reason"],
+      "properties": {
+        "kind": {"const": "none"},
+        "reason": {"type": "string", "pattern": ".*\\S.*"}
+      }
+    },
+    "repeatModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["collection", "item_model", "item_key", "instance_id_template"],
+      "properties": {
+        "collection": {"type": "string"},
+        "item_model": {"type": "string"},
+        "item_key": {"type": "string"},
+        "instance_id_template": {"type": "string", "pattern": ".*\\{[^}]+\\}.*"}
+      }
+    },
+    "relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "source", "target", "effect"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "kind": {"enum": ["selection", "ownership", "navigation", "data_dependency", "state_dependency", "instance"]},
+        "source": {"type": "string"},
+        "target": {"type": "string"},
+        "effect": {"type": "string", "pattern": ".*\\S.*"}
       }
     },
     "permission": {
@@ -206,7 +260,42 @@
         "mutation": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
         "success_transition": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
         "error_transition": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
+        "kind": {"enum": ["navigation", "state_change", "data_mutation", "system"]},
+        "event": {"type": "string"},
+        "intent": {"type": "string"},
+        "source_node": {"type": "string"},
+        "validation": {"type": "string"},
+        "binding_ref": {"$ref": "#/$defs/bindingReference"},
+        "payload": {"type": "object"},
+        "side_effects": {"type": "array", "items": {"type": "string"}},
+        "destination": {"$ref": "#/$defs/destination"},
+        "success": {"type": "object"},
+        "failure": {"type": "object"},
+        "loading": {"type": "object"},
+        "unavailable": {"type": "object"},
         "unused_allowed": {"type": "boolean"}
+      }
+    },
+    "bindingReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entity", "field"],
+      "properties": {
+        "entity": {"type": "string"},
+        "field": {"type": "string"},
+        "access": {"enum": ["read", "write", "read_write", "transmit"]},
+        "unit": {"type": "string"},
+        "provenance": {"type": "string"}
+      }
+    },
+    "destination": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["screen", "state"],
+      "properties": {
+        "screen": {"type": "string"},
+        "state": {"type": "string"},
+        "transition": {"type": "string"}
       }
     },
     "flow": {

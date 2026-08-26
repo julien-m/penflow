@@ -42,6 +42,12 @@ from .pen import (
     validate_pen_context_against_contract,
 )
 from .pencil_sync import PencilSyncError, sync_pencil_to_disk
+from .pipeline_context_gates import (
+    gate_generated_flow_docs as _gate_generated_flow_docs,
+)
+from .pipeline_context_gates import (
+    gate_semantic_context_coverage as _gate_semantic_context_coverage,
+)
 from .reference_fidelity import validate_reference_fidelity
 from .semantic import write_semantic_tree
 from .semantic_mapping import write_pencil_context_map
@@ -161,6 +167,14 @@ def run_pipeline(
         lambda: _gate_validate_flow_contract(paths["contract"], strict),
     )
     record_gate(
+        "generated-flow-docs",
+        report_dir / "generated-flow-docs.json",
+        lambda: _gate_generated_flow_docs(paths["contract"], paths["flow_contract_dir"]),
+    )
+    if int(gates["generated-flow-docs"]["exit"]) != 0:
+        _validate_gate_citations(gates, identity)
+        return _finalize_run_summary(workspace, strict, gates, identity)
+    record_gate(
         "export-semantic-tree",
         paths["semantic_tree"],
         lambda: _gate_export_semantic_tree(paths["contract"], paths["semantic_tree"], strict),
@@ -179,6 +193,17 @@ def run_pipeline(
             paths["pen"], paths["semantic_tree"], paths["context_map"]
         ),
     )
+    record_gate(
+        "semantic-context-coverage",
+        paths["semantic_coverage"],
+        lambda: _gate_semantic_context_coverage(
+            paths["contract"], paths["pen"], paths["semantic_coverage"], strict
+        ),
+    )
+    coverage_exit = int(gates["semantic-context-coverage"]["exit"])
+    if coverage_exit == 2 or (strict and coverage_exit != 0):
+        _validate_gate_citations(gates, identity)
+        return _finalize_run_summary(workspace, strict, gates, identity)
     record_gate(
         "validate-pen",
         report_dir / "validate-pen.json",
@@ -267,17 +292,7 @@ def run_pipeline(
     )
 
     _validate_gate_citations(gates, identity)
-    exit_code = _aggregate_exit(gates)
-    summary = {
-        "kind": "penflow-run-summary",
-        "status": GATE_STATUS_PASS if exit_code == 0 else GATE_STATUS_FAIL,
-        "target": str(workspace),
-        "strict": strict,
-        "exit": exit_code,
-        "gates": gates,
-    } | deepcopy(identity)
-    _write_json(workspace / RUN_REPORT, summary)
-    return summary
+    return _finalize_run_summary(workspace, strict, gates, identity)
 
 
 def _workspace_paths(workspace: Path) -> dict[str, Path]:
@@ -288,6 +303,7 @@ def _workspace_paths(workspace: Path) -> dict[str, Path]:
         "pen": workspace / "ui.pen",
         "semantic_tree": workspace / "semantic-ui-tree.json",
         "context_map": workspace / "pencil-context-map.json",
+        "semantic_coverage": workspace / "semantic-context-coverage.json",
         "expected_tree": workspace / "expected-ui-tree.json",
         "actual_tree": workspace / "actual-ui-tree.json",
         "theme": workspace / "theme.css",
@@ -569,7 +585,10 @@ def _gate_map_pencil_context(
     if not passed:
         return {"status": GATE_STATUS_FAIL, "issues": issues}, 1
     report = write_pencil_context_map(pen_path, semantic_tree_path, context_map_path)
-    return report | {"out": str(context_map_path)}, 0 if report["status"] == GATE_STATUS_PASS else 1
+    return report | {
+        "out": str(context_map_path),
+        "coverage": "forward-only",
+    }, 0 if report["status"] == GATE_STATUS_PASS else 1
 
 
 def _gate_validate_pen(
@@ -857,3 +876,22 @@ def _aggregate_exit(gates: dict[str, dict[str, Any]]) -> int:
     if any(exit_code != 0 for exit_code in exits):
         return 1
     return 0
+
+
+def _finalize_run_summary(
+    workspace: Path,
+    strict: bool,
+    gates: dict[str, dict[str, Any]],
+    identity: dict[str, Any],
+) -> dict[str, Any]:
+    exit_code = _aggregate_exit(gates)
+    summary = {
+        "kind": "penflow-run-summary",
+        "status": GATE_STATUS_PASS if exit_code == 0 else GATE_STATUS_FAIL,
+        "target": str(workspace),
+        "strict": strict,
+        "exit": exit_code,
+        "gates": gates,
+    } | deepcopy(identity)
+    _write_json(workspace / RUN_REPORT, summary)
+    return summary

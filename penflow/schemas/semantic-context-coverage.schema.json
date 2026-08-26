@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://penflow.dev/schemas/semantic-context-coverage.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "version", "status", "generator", "inputs", "summary", "buckets"],
+  "properties": {
+    "kind": {"const": "penflow-semantic-context-coverage"},
+    "version": {"const": 1},
+    "status": {"enum": ["PASS", "FAIL", "LEGACY_PARTIAL"]},
+    "generator": {"type": "string", "minLength": 1},
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "pencil"],
+      "properties": {
+        "contract": {"$ref": "#/$defs/input"},
+        "pencil": {"$ref": "#/$defs/input"}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anchored_unique", "blocking", "classification_conflict",
+        "contract_anchor_duplicate", "contract_anchor_missing", "contract_total",
+        "decorative", "inherited", "out_of_scope_metadata", "pencil_records_seen",
+        "pencil_total", "semantic", "semantic_resolved", "unclassified"
+      ],
+      "properties": {
+        "anchored_unique": {"type": "integer", "minimum": 0},
+        "blocking": {"type": "integer", "minimum": 0},
+        "classification_conflict": {"type": "integer", "minimum": 0},
+        "contract_anchor_duplicate": {"type": "integer", "minimum": 0},
+        "contract_anchor_missing": {"type": "integer", "minimum": 0},
+        "contract_total": {"type": "integer", "minimum": 0},
+        "decorative": {"type": "integer", "minimum": 0},
+        "inherited": {"type": "integer", "minimum": 0},
+        "out_of_scope_metadata": {"type": "integer", "minimum": 0},
+        "pencil_records_seen": {"type": "integer", "minimum": 0},
+        "pencil_total": {"type": "integer", "minimum": 0},
+        "semantic": {"type": "integer", "minimum": 0},
+        "semantic_resolved": {"type": "integer", "minimum": 0},
+        "unclassified": {"type": "integer", "minimum": 0}
+      }
+    },
+    "buckets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_missing_in_pencil", "pencil_missing_in_contract", "pencil_unclassified",
+        "decorative_exclusions", "valid_inheritance", "behavior_incomplete", "reference_invalid"
+      ],
+      "properties": {
+        "contract_missing_in_pencil": {"$ref": "#/$defs/findings"},
+        "pencil_missing_in_contract": {"$ref": "#/$defs/findings"},
+        "pencil_unclassified": {"$ref": "#/$defs/findings"},
+        "decorative_exclusions": {"$ref": "#/$defs/findings"},
+        "valid_inheritance": {"$ref": "#/$defs/findings"},
+        "behavior_incomplete": {"$ref": "#/$defs/findings"},
+        "reference_invalid": {"$ref": "#/$defs/findings"}
+      }
+    }
+  },
+  "$defs": {
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/finding"}},
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code", "document", "node_id", "node_path", "semantic_id", "contract_path",
+        "owner_screen", "severity", "blocking", "message", "correction"
+      ],
+      "properties": {
+        "code": {"type": "string", "minLength": 1},
+        "document": {"enum": ["contract", "pencil"]},
+        "node_id": {"type": ["string", "null"]},
+        "node_path": {"type": ["string", "null"]},
+        "semantic_id": {"type": ["string", "null"]},
+        "contract_path": {"type": ["string", "null"]},
+        "owner_screen": {"type": ["string", "null"]},
+        "severity": {"enum": ["error", "info"]},
+        "blocking": {"type": "boolean"},
+        "message": {"type": "string", "minLength": 1},
+        "correction": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

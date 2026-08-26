@@ -123,9 +123,11 @@ def test_run_pipeline_returns_single_gate_summary_json(tmp_path: Path) -> None:
     assert (workspace / "run-report.json").exists()
     assert list(summary["gates"]) == [
         "validate-flow-contract",
+        "generated-flow-docs",
         "export-semantic-tree",
         "pencil-sync",
         "map-pencil-context",
+        "semantic-context-coverage",
         "validate-pen",
         "export-expected",
         "lint-tokens",
@@ -138,6 +140,7 @@ def test_run_pipeline_returns_single_gate_summary_json(tmp_path: Path) -> None:
         "validate-actual-provenance",
     ]
     assert summary["gates"]["validate-actual-provenance"]["status"] == "PASS"
+    assert summary["gates"]["semantic-context-coverage"]["status"] == "LEGACY_PARTIAL"
     assert summary["gates"]["pencil-sync"]["status"] == "SKIP"
     assert summary["gates"]["reference-fidelity"]["status"] == "SKIP"
     assert summary["gates"]["code-ir"]["report_path"] == str(workspace / "code-ir.json")
@@ -256,9 +259,63 @@ def test_fresh_demo_cli_bootstrap_and_run_pass(fresh_demo_cli) -> None:
     assert (workspace / "actual-ui-tree.json").is_file()
     assert run_result.returncode == 0
     assert run_payload["exit"] == 0
-    assert len(run_payload["gates"]) == 14
+    assert len(run_payload["gates"]) == 16
     assert run_payload["gates"]["validate-actual-provenance"]["exit"] == 0
     assert all(gate["exit"] == 0 for gate in run_payload["gates"].values())
+
+
+# @spec FR-009: Strict gate order and fail-fast — .specs/features/076-exhaustive-bidirectional-semantic-context/spec.md#fr-009
+def test_strict_semantic_coverage_stops_before_validate_pen(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = copy_full_workspace(tmp_path)
+    pen_path = workspace / "ui.pen"
+    pen = json.loads(pen_path.read_text(encoding="utf-8"))
+    pen["children"][0]["children"].append(
+        {
+            "id": "undeclared-control",
+            "type": "frame",
+            "context": {
+                "classification": "semantic",
+                "semantic_id": "checkout.undeclared-control",
+                "test_id": "undeclared-control",
+                "role": "button",
+                "intent": "undeclared_action",
+            },
+        }
+    )
+    pen_path.write_text(json.dumps(pen), encoding="utf-8")
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("validate-pen must not execute after coverage failure")
+
+    monkeypatch.setattr(pipeline_module, "_gate_validate_pen", forbidden)
+
+    summary = run_pipeline(workspace, strict=True)
+
+    assert summary["exit"] == 1
+    assert summary["gates"]["map-pencil-context"]["exit"] == 0
+    assert summary["gates"]["semantic-context-coverage"]["exit"] == 1
+    assert "validate-pen" not in summary["gates"]
+
+
+# @spec FR-013: Passive generated-doc freshness gate — .specs/features/076-exhaustive-bidirectional-semantic-context/spec.md#fr-013
+def test_generated_docs_failure_stops_before_semantic_export(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = copy_full_workspace(tmp_path)
+    (workspace / "flow-ui-contract" / "screens" / "checkout.md").unlink()
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("semantic export must not execute after stale docs")
+
+    monkeypatch.setattr(pipeline_module, "_gate_export_semantic_tree", forbidden)
+
+    summary = run_pipeline(workspace)
+
+    assert summary["exit"] == 1
+    assert summary["gates"]["generated-flow-docs"]["exit"] == 1
+    assert "export-semantic-tree" not in summary["gates"]
 
 
 def test_fresh_demo_cli_missing_actual_fails_closed(fresh_demo_cli) -> None:

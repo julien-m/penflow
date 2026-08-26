@@ -32,7 +32,7 @@
       "id": "checkout",
       "intent": null,
       "role": "screen",
-      "test_id": null,
+      "test_id": "checkout-screen",
       "text": "Order summary",
       "type": "frame"
     },
@@ -42,7 +42,7 @@
       "id": "checkout.order-summary",
       "intent": null,
       "role": "text",
-      "test_id": null,
+      "test_id": "checkout-order-summary",
       "text": "Order summary",
       "type": "text"
     },
@@ -52,7 +52,7 @@
       "id": "checkout.selected-payment-method",
       "intent": null,
       "role": "text",
-      "test_id": null,
+      "test_id": "checkout-selected-payment-method",
       "text": "Selected payment method",
       "type": "text"
     },
@@ -201,7 +201,7 @@
   },
   "flow": {
     "id": "checkout",
-    "name": "Checkout"
+    "name": "checkout"
   },
   "inputs": {
     "context_map": "examples/full/pencil-context-map.json",
@@ -229,9 +229,11 @@
             "source_map": {
               "context": {
                 "binding": "checkout.order_summary",
+                "classification": "semantic",
                 "entity": "checkout",
                 "role": "text",
                 "semantic_id": "checkout.order-summary",
+                "test_id": "checkout-order-summary",
                 "variant": "heading"
               },
               "contract": "examples/full/flow-ui-contract/contract.json",
@@ -240,6 +242,7 @@
               "pencil_path": "0.0",
               "semantic_id": "checkout.order-summary"
             },
+            "test_id": "checkout-order-summary",
             "text": "Order summary",
             "type": "text"
           },
@@ -255,9 +258,11 @@
             "source_map": {
               "context": {
                 "binding": "checkout.selected_payment_method",
+                "classification": "semantic",
                 "entity": "checkout",
                 "role": "text",
                 "semantic_id": "checkout.selected-payment-method",
+                "test_id": "checkout-selected-payment-method",
                 "variant": "body"
               },
               "contract": "examples/full/flow-ui-contract/contract.json",
@@ -266,6 +271,7 @@
               "pencil_path": "0.1",
               "semantic_id": "checkout.selected-payment-method"
             },
+            "test_id": "checkout-selected-payment-method",
             "text": "Selected payment method",
             "type": "text"
           },
@@ -285,6 +291,9 @@
                 "role": "text",
                 "source_map": {
                   "context": {
+                    "classification": "inherited",
+                    "inherits_from": "checkout.pay-now",
+                    "relation": "content",
                     "variant": "label"
                   },
                   "pencil_node_id": "payNowLabel",
@@ -305,6 +314,7 @@
             "source_map": {
               "context": {
                 "binding": "checkout.selected_payment_method",
+                "classification": "semantic",
                 "entity": "checkout",
                 "intent": "submit_payment",
                 "role": "button",
@@ -330,8 +340,10 @@
         "semantic_id": "checkout",
         "source_map": {
           "context": {
+            "classification": "semantic",
             "role": "screen",
-            "semantic_id": "checkout"
+            "semantic_id": "checkout",
+            "test_id": "checkout-screen"
           },
           "contract": "examples/full/flow-ui-contract/contract.json",
           "contract_path": "$.nodes[0]",
@@ -339,13 +351,16 @@
           "pencil_path": "0",
           "semantic_id": "checkout"
         },
+        "test_id": "checkout-screen",
         "text": "Order summary",
         "type": "frame"
       },
       "source_map": {
         "context": {
+          "classification": "semantic",
           "role": "screen",
-          "semantic_id": "checkout"
+          "semantic_id": "checkout",
+          "test_id": "checkout-screen"
         },
         "contract": "examples/full/flow-ui-contract/contract.json",
         "contract_path": "$.nodes[0]",
@@ -354,7 +369,7 @@
         "semantic_id": "checkout"
       },
       "states": [],
-      "test_id": null,
+      "test_id": "checkout-screen",
       "viewport": {
         "height": 844,
         "width": 390
@@ -363,7 +378,10 @@
   ],
   "source": "pencil-context",
   "test_ids": [
-    "checkout-pay-now"
+    "checkout-order-summary",
+    "checkout-pay-now",
+    "checkout-screen",
+    "checkout-selected-payment-method"
   ],
   "version": 1
 }

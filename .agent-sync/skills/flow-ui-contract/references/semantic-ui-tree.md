@@ -3,12 +3,12 @@
 
 # Semantic UI Tree Formation
 
-Use this reference when an agent must understand how flow/screen specs become `semantic-ui-tree.json`. The normal workflow is still command-driven: author flow/screen Markdown, then run `penflow export-semantic-tree`. Do not hand-write `semantic-ui-tree.json` except for fixtures, tests, or debugging.
+Use this reference when an agent must understand how canonical `contract.json` becomes `semantic-ui-tree.json`. Author/review JSON, generate human docs with `penflow export-flow-docs`, then run `penflow export-semantic-tree`. Do not hand-write production semantic trees or generated Markdown.
 
 ## Sources
 
-- Flow specs: `<target>/flow-ui-contract/flows/*.md`
-- Screen specs: `<target>/flow-ui-contract/screens/*.md`
+- Canonical source: `<target>/flow-ui-contract/contract.json`
+- Generated projections: `<target>/flow-ui-contract/flows/*.md`, `<target>/flow-ui-contract/screens/*.md`, and `generated-docs.json`
 - Schema: **Read** [`../../../../penflow/schemas/semantic-ui-tree.schema.json`](../../../../penflow/schemas/semantic-ui-tree.schema.json)
 - Example: **Read** [`../../../../examples/demo/semantic-ui-tree.json`](../../../../examples/demo/semantic-ui-tree.json)
 
@@ -34,8 +34,9 @@ semantic-ui-tree
 
 ## Formation Rules
 
-- `flows/*.md` becomes `flows[]`: frontmatter and headings provide `id`, `title`, `priority`; declared screen order becomes `steps[]`; declared navigation becomes `transitions[]`; the first canonical screen becomes `entry_screen`.
-- `screens/*.md` becomes `screens[]`: frontmatter provides `id`, `flow_id`, `surface`, and viewport hints; visible hierarchy becomes `root` plus recursive `children`.
+- Canonical `contract.json` `flows[]` become semantic-tree `flows[]`: declared ids, titles, priorities, steps, entry screens, and transitions are copied deterministically. Generated `flows/*.md` only document those bytes.
+- Canonical `contract.json` `screens[]` become semantic-tree `screens[]`: ids, flow ids, surfaces, viewport hints, and recursive roots are copied deterministically. Generated `screens/*.md` never produce the tree.
+- Explicit legacy migration only: `flows/*.md` becomes `flows[]` and `screens/*.md` becomes `screens[]`; this compatibility parser is not a v2 authoring route. Legacy visible hierarchy becomes `root` plus recursive `children` before promotion into canonical JSON.
 - Every screen root is a semantic node with `role: "screen"`; nested UI elements become semantic nodes with roles such as `container`, `text`, `button`, `input`, `list`, `modal`, or `alert`.
 - Visible labels become `text`; user-facing purpose becomes `intent`; data dependencies become `binding` and `entity`; repeated data regions set `repeat`; stable automation hooks become `test_id`.
 - Screen-level and node-level rules become `states[]`, `validations[]`, and `side_effects[]`. Unknown business logic must be written as `[NEEDS CLARIFICATION]`, not invented.
@@ -44,14 +45,21 @@ semantic-ui-tree
 
 ## Pencil Context Propagation
 
-`draft-pen-from-tree` creates Pencil nodes from semantic nodes and writes the semantic fields into Pencil `context`. `enrich-pen` preserves existing layout, matches semantic nodes to existing Pencil nodes, and writes the same context. `map-pencil-context` records any ambiguous or missing mapping for review.
+`draft-pen-from-tree` and `enrich-pen` propagate semantic fields into Pencil `context`. Before strict downstream work, explicitly classify every authored node and run `map-pencil-context --strict-coverage --contract ... --coverage-out ...`; forward-only anchor matching is diagnostic, not exhaustive proof.
+
+```text
+classification=semantic; semantic_id=checkout-form; test_id=checkout-form-screen; role=screen
+classification=semantic; semantic_id=pay-button; test_id=pay-button; role=button; intent=submit_payment
+classification=inherited; inherits_from=pay-button; relation=content
+classification=decorative; decorative_owner=pay-button; decorative_reason=duplicates-label
+```
 
 ## Tree Distinctions
 
 | Tree | Producer | Purpose |
 |---|---|---|
-| `semantic-ui-tree.json` | Penflow from `flow-ui-contract/*.md` | Before-code product intent and business context. |
+| `semantic-ui-tree.json` | Penflow from canonical `flow-ui-contract/contract.json` | Before-code product intent and business context. |
 | `expected-ui-tree.json` | Penflow from contextualized `.pen` | Design-derived contract used as compare baseline. |
 | `actual-ui-tree.json` | External runtime adapter | After-code runtime observation validated and compared by Penflow. |
 
-Penflow compares `expected-ui-tree.json` and `actual-ui-tree.json`; it does not compare runtime output directly against flow Markdown.
+Penflow compares `expected-ui-tree.json` and `actual-ui-tree.json`; it does not compare runtime output directly against generated flow Markdown.

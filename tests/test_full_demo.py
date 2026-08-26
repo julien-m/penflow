@@ -15,11 +15,13 @@ from penflow.cli import main
 
 FULL_DEMO_FILES = [
     "flow-ui-contract/contract.json",
+    "flow-ui-contract/generated-docs.json",
     "flow-ui-contract/flows/checkout.md",
     "flow-ui-contract/screens/checkout.md",
     "semantic-ui-tree.json",
     "ui.pen",
     "pencil-context-map.json",
+    "semantic-context-coverage.json",
     "expected-ui-tree.json",
     "code-ir.json",
     "actual-ui-tree.json",
@@ -89,6 +91,36 @@ def test_demo_semantic_enrichment_and_mapping_are_idempotent(full_demo_project) 
     )
     for relative_path in ("semantic-ui-tree.json", "ui.pen", "pencil-context-map.json"):
         assert (out / relative_path).read_bytes() == snapshot[relative_path]
+
+
+def test_demo_generated_docs_and_coverage_are_fresh(full_demo_project) -> None:
+    out, snapshot = full_demo_project
+
+    assert (
+        _run_project_command(
+            out,
+            "export-flow-docs",
+            str(out / "flow-ui-contract/contract.json"),
+            "--out",
+            str(out / "flow-ui-contract"),
+            "--check",
+        )
+        == 0
+    )
+    assert (
+        _run_project_command(
+            out,
+            "audit-context-coverage",
+            str(out / "ui.pen"),
+            "--contract",
+            str(out / "flow-ui-contract/contract.json"),
+            "--out",
+            str(out / "semantic-context-coverage.json"),
+        )
+        == 0
+    )
+    for relative in ("flow-ui-contract/generated-docs.json", "semantic-context-coverage.json"):
+        assert (out / relative).read_bytes() == snapshot[relative]
 
 
 def test_demo_expected_tree_and_code_ir_are_idempotent(full_demo_project) -> None:

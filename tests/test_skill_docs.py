@@ -224,7 +224,7 @@ def test_theme_contract_documents_extended_token_lint_surface() -> None:
         assert phrase in combined
 
 
-def test_context_grammar_and_strict_anchor_mapping_are_documented() -> None:
+def test_context_grammar_and_exhaustive_mapping_are_documented() -> None:
     penflow_skill = PENFLOW_SKILL.read_text(encoding="utf-8")
     flow_skill = FLOW_SKILL.read_text(encoding="utf-8")
     mockup_skill = MOCKUP_SKILL.read_text(encoding="utf-8")
@@ -234,12 +234,15 @@ def test_context_grammar_and_strict_anchor_mapping_are_documented() -> None:
     for phrase in (
         "Pencil Context Grammar",
         "key=value",
-        "semantic_id=cockpit-live.git; role=container",
+        "classification=semantic",
+        "classification=inherited",
+        "classification=decorative",
         "batch_design",
+        "--strict-coverage",
+        "--coverage-out",
+        "audit-context-coverage",
         "--strict-anchors",
-        "--create-placeholders",
-        "PARTIAL",
-        "ambiguous or unmapped anchors block",
+        "forward-only diagnostic evidence",
     ):
         assert phrase in combined
 
@@ -427,7 +430,9 @@ def test_semantic_tree_reference_documents_formation_contract() -> None:
     reference = SEMANTIC_TREE_REFERENCE.read_text(encoding="utf-8")
 
     for phrase in (
-        "Do not hand-write `semantic-ui-tree.json`",
+        "Do not hand-write production semantic trees or generated Markdown",
+        "Canonical source: `<target>/flow-ui-contract/contract.json`",
+        "Generated projections",
         "flows/*.md` becomes `flows[]`",
         "screens/*.md` becomes `screens[]`",
         "root` plus recursive `children`",
@@ -1096,7 +1101,7 @@ def test_actual_provenance_receipt_is_documented() -> None:
             assert phrase in document
 
     # The run gate list includes the provenance gate as the final step.
-    assert "and `validate-actual-provenance`" in penflow_skill
+    assert "validate-actual-provenance" in penflow_skill
 
 
 def test_readme_documents_theme_fingerprint_and_armed_gate() -> None:

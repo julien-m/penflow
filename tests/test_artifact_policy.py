@@ -83,6 +83,8 @@ def test_command_registry_matches_the_normative_closed_sets() -> None:
             "verify-export-operation",
             "export-expected",
             "export-semantic-tree",
+            "export-flow-docs",
+            "audit-context-coverage",
             "migrate-flow-contract",
             "draft-pen-from-tree",
             "enrich-pen",
