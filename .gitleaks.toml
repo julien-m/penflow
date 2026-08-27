@@ -1,0 +1,15 @@
+title = "Penflow Gitleaks policy"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Historical LiveSpec prose containing a non-secret workflow phrase"
+condition = "AND"
+commits = ["a5c64c5460df983c8ecb0adf6800267148013110"]
+paths = ['''^\.specs/features/076-exhaustive-bidirectional-semantic-context/progress\.md$''']
+regexTarget = "line"
+regexes = ['''complete context-key list, placeholders/PARTIAL contract, detailed run lineage/failure guarantees''']
