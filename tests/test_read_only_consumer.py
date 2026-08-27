@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 import ast
+import base64
 import json
+import os
+import sys
 from pathlib import Path
 
 import pytest
@@ -71,6 +74,56 @@ def test_manifest_is_exhaustive_and_never_follows_symlink(tmp_path: Path) -> Non
             "xattrs",
             "sha256",
         } <= set(entry)
+
+
+def test_manifest_uses_portable_no_follow_xattr_api(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _consumer(tmp_path / "consumer")
+    calls: list[tuple[str, str, bool]] = []
+
+    def list_xattr(path: str, *, follow_symlinks: bool) -> list[str]:
+        calls.append(("list", path, follow_symlinks))
+        return ["user.penflow"] if path == str(root / "ui.pen") else []
+
+    def get_xattr(path: str, name: str, *, follow_symlinks: bool) -> bytes:
+        calls.append((name, path, follow_symlinks))
+        return b"portable"
+
+    monkeypatch.setattr(os, "listxattr", list_xattr, raising=False)
+    monkeypatch.setattr(os, "getxattr", get_xattr, raising=False)
+
+    entries = {
+        entry["path"]: entry for entry in ReadOnlyConsumerFilesystem(root).manifest()["entries"]
+    }
+
+    assert entries["ui.pen"]["xattrs"] == [
+        {
+            "name": "user.penflow",
+            "value_base64": base64.b64encode(b"portable").decode("ascii"),
+        }
+    ]
+    assert calls
+    assert all(follow_symlinks is False for _, _, follow_symlinks in calls)
+
+
+def test_manifest_never_uses_macos_xattr_command_on_other_platforms(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _consumer(tmp_path / "consumer")
+    filesystem = ReadOnlyConsumerFilesystem(root)
+
+    monkeypatch.delattr(os, "listxattr", raising=False)
+    monkeypatch.delattr(os, "getxattr", raising=False)
+    monkeypatch.setattr(sys, "platform", "linux")
+    monkeypatch.setattr(
+        filesystem,
+        "_command_xattr",
+        lambda *arguments: pytest.fail(f"unexpected native xattr call: {arguments}"),
+    )
+
+    with pytest.raises(ReadOnlyConsumerError, match="xattr API unavailable"):
+        filesystem._xattrs(str(root))
 
 
 def test_guard_self_test_records_blocked_decoy_and_fresh_guard_stays_empty(

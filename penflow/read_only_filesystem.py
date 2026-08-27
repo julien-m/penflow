@@ -9,6 +9,7 @@ import json
 import os
 import stat
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -109,16 +110,37 @@ class ReadOnlyConsumerFilesystem:
         }
 
     def _xattrs(self, path: str) -> list[dict[str, str]]:
-        names = sorted(name for name in self._xattr("-s", path).stdout.splitlines() if name)
+        list_xattr = getattr(os, "listxattr", None)
+        get_xattr = getattr(os, "getxattr", None)
+        if callable(list_xattr) and callable(get_xattr):
+            try:
+                names = sorted(list_xattr(path, follow_symlinks=False))
+                return [
+                    {
+                        "name": name,
+                        "value_base64": base64.b64encode(
+                            get_xattr(path, name, follow_symlinks=False)
+                        ).decode("ascii"),
+                    }
+                    for name in names
+                ]
+            except OSError as exc:
+                raise ReadOnlyConsumerError("cannot inventory xattrs") from exc
+
+        if sys.platform != "darwin":
+            raise ReadOnlyConsumerError("xattr API unavailable on this platform")
+        names = sorted(name for name in self._command_xattr("-s", path).stdout.splitlines() if name)
         values: list[dict[str, str]] = []
         for name in names:
-            result = self._xattr("-p", "-s", "-x", name, path)
+            result = self._command_xattr("-p", "-s", "-x", name, path)
             raw = bytes.fromhex("".join(result.stdout.split()))
             values.append({"name": name, "value_base64": base64.b64encode(raw).decode("ascii")})
         return values
 
     @staticmethod
-    def _xattr(*arguments: str) -> subprocess.CompletedProcess[str]:
+    def _command_xattr(*arguments: str) -> subprocess.CompletedProcess[str]:
+        # Some macOS Python builds omit the stdlib xattr API, so retain the native
+        # no-follow command as a bounded fallback while Linux uses the stdlib path.
         try:
             return subprocess.run(
                 ["/usr/bin/xattr", *arguments],
