@@ -9,7 +9,10 @@ id = "generic-api-key"
 [[rules.allowlists]]
 description = "Historical LiveSpec prose containing a non-secret workflow phrase"
 condition = "AND"
+# This immutable commit is the sole historical revision containing the false-positive prose.
 commits = ["a5c64c5460df983c8ecb0adf6800267148013110"]
+# Anchor the exception to the exact Feature 076 progress file, never a directory-wide scope.
 paths = ['''^\.specs/features/076-exhaustive-bidirectional-semantic-context/progress\.md$''']
 regexTarget = "line"
+# Match only the documented non-secret phrase that triggered generic-api-key on that line.
 regexes = ['''complete context-key list, placeholders/PARTIAL contract, detailed run lineage/failure guarantees''']
