@@ -1,0 +1,226 @@
+{
+  "version": 2,
+  "kind": "penflow-flow-contract",
+  "contract_id": "static-alias-fixture",
+  "actors": [
+    {
+      "id": "reader",
+      "name": "Reader"
+    }
+  ],
+  "entities": [],
+  "screens": [
+    {
+      "id": "alias-screen",
+      "flow_id": "alias-flow",
+      "title": "Information",
+      "surface": "web-desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "states": [
+        {
+          "id": "alias-state"
+        }
+      ],
+      "root_node": "alias-screen.root",
+      "static": true,
+      "static_reason": "Read-only information, closed through a dedicated native system return."
+    }
+  ],
+  "nodes": [
+    {
+      "id": "alias-screen.root",
+      "screen_id": "alias-screen",
+      "semantic_id": "alias-screen",
+      "test_id": "alias-screen-test",
+      "role": "screen",
+      "children": [
+        "alias-screen.title"
+      ]
+    },
+    {
+      "id": "alias-screen.title",
+      "screen_id": "alias-screen",
+      "semantic_id": "alias-screen.title",
+      "role": "text",
+      "text": "Information"
+    }
+  ],
+  "guards": [],
+  "permissions": [],
+  "mutations": [],
+  "actions": [],
+  "flows": [
+    {
+      "id": "alias-flow",
+      "entry_screen": "alias-screen"
+    }
+  ],
+  "transitions": [],
+  "needs_review": false,
+  "needs_clarification": [],
+  "system_returns": [
+    {
+      "id": "leave",
+      "screen_id": "alias-screen",
+      "event": "exit",
+      "source": {
+        "requirement_id": "brainstorm:return:surface:product-page:exit",
+        "source_pointer": "product-contract.json#/surfaces/0/return_path",
+        "text_sha256": "397f64ac37faa7f4b859d78960f521d29cf97559d4b9e4eeb8116726c5d790ff"
+      },
+      "destination": {
+        "kind": "closed"
+      }
+    }
+  ],
+  "outcome_expectations": [
+    {
+      "obligation_id": "node:alias-screen",
+      "source_pointer": "/nodes/0",
+      "category": "structure",
+      "assertions": [
+        {
+          "operator": "equals",
+          "pointer": "/after/semantic_id",
+          "expected": "alias-screen",
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/after/role",
+          "expected": "screen",
+          "capability": "ui"
+        }
+      ]
+    },
+    {
+      "obligation_id": "node:alias-screen.title",
+      "source_pointer": "/nodes/1",
+      "category": "structure",
+      "assertions": [
+        {
+          "operator": "equals",
+          "pointer": "/after/semantic_id",
+          "expected": "alias-screen.title",
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/after/role",
+          "expected": "text",
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/after/text",
+          "expected": "Information",
+          "capability": "ui"
+        }
+      ]
+    },
+    {
+      "obligation_id": "state:alias-screen:alias-state",
+      "source_pointer": "/screens/0/states/0",
+      "category": "structure",
+      "assertions": [
+        {
+          "operator": "equals",
+          "pointer": "/after/state",
+          "expected": "alias-state",
+          "capability": "ui"
+        }
+      ]
+    },
+    {
+      "obligation_id": "system-return:leave",
+      "source_pointer": "/system_returns/0",
+      "category": "transition",
+      "assertions": [
+        {
+          "operator": "equals",
+          "pointer": "/result/actor_id",
+          "expected": "reader",
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/result/action_id",
+          "expected": "leave",
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/result/outcome",
+          "expected": "success",
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/before/visible",
+          "expected": true,
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/after/visible",
+          "expected": false,
+          "capability": "ui"
+        }
+      ]
+    }
+  ],
+  "requirements": {
+    "source_kind": "brainstorm-product-v1",
+    "source_refs": [
+      {
+        "path": "/private/var/folders/l_/t1s_zytx2fqb0dkzz40d3v7m0000gn/T/brainstorm-c51-source-pmnfyqvo/consumer/handoff/penflow/product-contract/.freeze-history/12d506dce0393897d041cd50ed31f5ec63737e31f347ea3c230daf24fd6d6b91.json",
+        "sha256": "12d506dce0393897d041cd50ed31f5ec63737e31f347ea3c230daf24fd6d6b91"
+      },
+      {
+        "path": "/private/var/folders/l_/t1s_zytx2fqb0dkzz40d3v7m0000gn/T/brainstorm-c51-source-pmnfyqvo/consumer/handoff/penflow/product-contract/.freeze-history/2002b96ab8d95fc007d959f560eb57a8feb1fdcb5e16a4440cbab8bf9391c9a5.json",
+        "sha256": "2002b96ab8d95fc007d959f560eb57a8feb1fdcb5e16a4440cbab8bf9391c9a5"
+      },
+      {
+        "path": "/private/var/folders/l_/t1s_zytx2fqb0dkzz40d3v7m0000gn/T/brainstorm-c51-source-pmnfyqvo/consumer/handoff/penflow/product-contract/product-contract.accepted.json",
+        "sha256": "89bd746968a29f57b9989aa78f580afd6dc910e7c23d626a0b66d7bfd7021065"
+      },
+      {
+        "path": "/private/var/folders/l_/t1s_zytx2fqb0dkzz40d3v7m0000gn/T/brainstorm-c51-source-pmnfyqvo/consumer/handoff/penflow/product-contract/product-contract.freeze.json",
+        "sha256": "2002b96ab8d95fc007d959f560eb57a8feb1fdcb5e16a4440cbab8bf9391c9a5"
+      },
+      {
+        "path": "/private/var/folders/l_/t1s_zytx2fqb0dkzz40d3v7m0000gn/T/brainstorm-c51-source-pmnfyqvo/consumer/handoff/penflow/product-contract/product-contract.json",
+        "sha256": "8a4743cc5e418d2be1670ed9d08ebb555c6b2c8a2b455cd0dde0fd18f8f80dcb"
+      },
+      {
+        "path": "/private/var/folders/l_/t1s_zytx2fqb0dkzz40d3v7m0000gn/T/brainstorm-c51-source-pmnfyqvo/consumer/handoff/penflow/product-contract/product-contract.md",
+        "sha256": "33542951521f6d092558a1cf2724357d1727fb95fd5fca2d6092acddb21b2fba"
+      }
+    ],
+    "bindings": [
+      {
+        "requirement_id": "brainstorm:flow:product-flow",
+        "obligation_id": "node:alias-screen"
+      },
+      {
+        "requirement_id": "brainstorm:surface:product-page",
+        "obligation_id": "node:alias-screen"
+      },
+      {
+        "requirement_id": "brainstorm:surface:product-page",
+        "obligation_id": "node:alias-screen.title"
+      },
+      {
+        "requirement_id": "brainstorm:state:product-page:product-state",
+        "obligation_id": "state:alias-screen:alias-state"
+      },
+      {
+        "requirement_id": "brainstorm:return:surface:product-page:exit",
+        "obligation_id": "system-return:leave"
+      }
+    ]
+  }
+}

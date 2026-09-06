@@ -1,3 +1,4 @@
+# @spec FR-005: Reconcile exact identity-bound semantics bidirectionally through contract, Pencil, semantic tree and IR. — .specs/features/077-complete-verification-workflow/spec.md#fr-005
 # @spec FR-003: Bidirectional reconciliation — .specs/features/076-exhaustive-bidirectional-semantic-context/spec.md#fr-003
 # @spec FR-008: Strict coverage report — .specs/features/076-exhaustive-bidirectional-semantic-context/spec.md#fr-008
 """Deterministic bidirectional semantic-context coverage."""
@@ -8,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .context import Context, validate_context
+from .contract_semantics import canonical_node_slots
 from .flow_contract import contract_registries, validate_flow_contract_v2
 from .json_filesystem import write_json_atomically
 from .pencil_graph import PencilGraphNode, inventory_pencil_graph
@@ -195,9 +197,10 @@ def _semantic_checks(
             context,
             "semantic anchor belongs to the wrong screen",
         )
-    authored = node.node.get("content")
+    _business_slot_checks(node, context, contract_node, registries, buckets)
+    authored = _authored_copy(node.node, context.semantic_id)
     expected = contract_node.get("text")
-    if isinstance(authored, str) and isinstance(expected, str) and authored != expected:
+    if isinstance(expected, str) and authored != expected:
         _node_finding(
             buckets,
             "reference_invalid",
@@ -206,6 +209,21 @@ def _semantic_checks(
             context,
             f"authored copy differs: {authored!r} != {expected!r}",
         )
+
+
+def _authored_copy(node: dict[str, Any], semantic_id: str | None) -> Any:
+    if "content" in node:
+        return node["content"]
+    contents = []
+    for child in node.get("children", []):
+        inherited = Context.from_raw(child.get("context"))
+        if (
+            inherited.classification == "inherited"
+            and inherited.inherits_from == semantic_id
+            and inherited.relation == "content"
+        ):
+            contents.append(child.get("content"))
+    return contents[0] if len(contents) == 1 else None
 
 
 def _owner_check(
@@ -292,3 +310,31 @@ def _contract_findings(contract: dict[str, Any], buckets: dict[str, list[dict[st
             message=issue["message"],
             correction="repair the canonical contract reference or behavior slot",
         )
+
+
+def _business_slot_checks(
+    node: PencilGraphNode,
+    context: Context,
+    contract_node: dict[str, Any],
+    registries: dict[str, Any],
+    buckets: dict[str, list[dict[str, Any]]],
+) -> None:
+    expected_slots = canonical_node_slots(contract_node, registries["actions"])
+    observed_slots = {
+        "role": context.role,
+        "action": context.intent,
+        "binding": context.binding,
+        "entity": context.entity,
+        "permission": context.permission,
+    }
+    for key, actual in observed_slots.items():
+        expected_value = expected_slots.get(key)
+        if (expected_value or actual) and actual != expected_value:
+            _node_finding(
+                buckets,
+                "reference_invalid",
+                f"pencil.{key}_mismatch",
+                node,
+                context,
+                f"Pencil {key} differs from the same contract identity",
+            )

@@ -1,0 +1,10 @@
+{
+  "change_request": null,
+  "freeze": {
+    "path": ".freeze-history/2002b96ab8d95fc007d959f560eb57a8feb1fdcb5e16a4440cbab8bf9391c9a5.json",
+    "sha256": "2002b96ab8d95fc007d959f560eb57a8feb1fdcb5e16a4440cbab8bf9391c9a5"
+  },
+  "kind": "product-contract-acceptance",
+  "previous": null,
+  "version": 1
+}

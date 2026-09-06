@@ -1,0 +1,51 @@
+{
+  "kind": "test-protocol-fixture",
+  "source_root": "/private/var/folders/l_/t1s_zytx2fqb0dkzz40d3v7m0000gn/T/brainstorm-c51-multi-0zp5aqai/consumer",
+  "description": "Exact consumer CLI approved change-request and second freeze; aliases and two-root flow. No runtime/native evidence. Only C20 source paths rebased by tests.",
+  "files": [
+    {
+      "path": "handoff/penflow/flow-ui-contract/contract.json",
+      "sha256": "b72752bca6467c071b6106329ee37c39192c9d7284e589e63c2d4de30cb799b3"
+    },
+    {
+      "path": "handoff/penflow/product-contract/.freeze-history/12d506dce0393897d041cd50ed31f5ec63737e31f347ea3c230daf24fd6d6b91.json",
+      "sha256": "12d506dce0393897d041cd50ed31f5ec63737e31f347ea3c230daf24fd6d6b91"
+    },
+    {
+      "path": "handoff/penflow/product-contract/.freeze-history/2002b96ab8d95fc007d959f560eb57a8feb1fdcb5e16a4440cbab8bf9391c9a5.json",
+      "sha256": "2002b96ab8d95fc007d959f560eb57a8feb1fdcb5e16a4440cbab8bf9391c9a5"
+    },
+    {
+      "path": "handoff/penflow/product-contract/.freeze-history/2541b09b5e527c1e29472ebf318c33bbbb6c24c5b670a2c05504f8cc1e17c949.json",
+      "sha256": "2541b09b5e527c1e29472ebf318c33bbbb6c24c5b670a2c05504f8cc1e17c949"
+    },
+    {
+      "path": "handoff/penflow/product-contract/.freeze-history/6599c286ea1b31479bcdd986212af65320327658cdd595c0bcc003e9d01cd1bd.json",
+      "sha256": "6599c286ea1b31479bcdd986212af65320327658cdd595c0bcc003e9d01cd1bd"
+    },
+    {
+      "path": "handoff/penflow/product-contract/.freeze-history/f9a85b9afe523b9755e2c3a56cab3dce2325319d436821b61a9faf1692203ca7.json",
+      "sha256": "f9a85b9afe523b9755e2c3a56cab3dce2325319d436821b61a9faf1692203ca7"
+    },
+    {
+      "path": "handoff/penflow/product-contract/product-contract.accepted.json",
+      "sha256": "9e1b08d7b03924fbabc22f0d4a38fb1648a9a95758fdced5f534960d60fa0a38"
+    },
+    {
+      "path": "handoff/penflow/product-contract/product-contract.change-request.json",
+      "sha256": "f9a85b9afe523b9755e2c3a56cab3dce2325319d436821b61a9faf1692203ca7"
+    },
+    {
+      "path": "handoff/penflow/product-contract/product-contract.freeze.json",
+      "sha256": "2541b09b5e527c1e29472ebf318c33bbbb6c24c5b670a2c05504f8cc1e17c949"
+    },
+    {
+      "path": "handoff/penflow/product-contract/product-contract.json",
+      "sha256": "af877466e0f36773282448038dd5497b1338020ff3d6ad4bfec6d66c7ec4f5f6"
+    },
+    {
+      "path": "handoff/penflow/product-contract/product-contract.md",
+      "sha256": "2fce5ae24f81734de34536441858ee3ddbfe40e21df815b00b0b3c6ada7a67df"
+    }
+  ]
+}

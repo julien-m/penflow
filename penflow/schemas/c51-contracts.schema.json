@@ -1,0 +1,2709 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:penflow:c51:contracts:v1",
+  "$ref": "#/$defs/report",
+  "$defs": {
+    "file": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "project_root": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workspace": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "project_root",
+        "workspace"
+      ],
+      "additionalProperties": false
+    },
+    "issue": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": [
+            "error",
+            "warning",
+            "info"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gate_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "obligation_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "severity",
+        "path",
+        "message",
+        "gate_id",
+        "obligation_id"
+      ],
+      "additionalProperties": false
+    },
+    "build-manifest": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "penflow-build-manifest"
+        },
+        "version": {
+          "const": 1
+        },
+        "scope": {
+          "type": "object",
+          "properties": {
+            "project_root": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "project_root"
+          ],
+          "additionalProperties": false
+        },
+        "build": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "artifacts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/file"
+              },
+              "minItems": 1
+            }
+          },
+          "required": [
+            "id",
+            "artifacts"
+          ],
+          "additionalProperties": false
+        },
+        "producer": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "entrypoint": {
+              "$ref": "#/$defs/file"
+            },
+            "invocation_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "id",
+            "entrypoint",
+            "invocation_id"
+          ],
+          "additionalProperties": false
+        },
+        "capture": {
+          "type": "object",
+          "properties": {
+            "session_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            },
+            "scenario_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "session_ids",
+            "scenario_ids"
+          ],
+          "additionalProperties": false
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/file"
+          },
+          "minItems": 1
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/file"
+          },
+          "minItems": 1
+        },
+        "issued_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "kind",
+        "version",
+        "scope",
+        "build",
+        "producer",
+        "capture",
+        "sources",
+        "evidence",
+        "issued_at"
+      ],
+      "additionalProperties": false
+    },
+    "assertion": {
+      "type": "object",
+      "properties": {
+        "operator": {
+          "enum": [
+            "equals",
+            "not_equals",
+            "exists",
+            "absent",
+            "matches",
+            "contains",
+            "changed",
+            "unchanged",
+            "greater_than",
+            "less_than"
+          ]
+        },
+        "pointer": {
+          "type": "string",
+          "pattern": "^(/.*)?$"
+        },
+        "expected": {
+          "$ref": "#/$defs/json-value"
+        },
+        "capability": {
+          "enum": [
+            "ui",
+            "network",
+            "storage"
+          ]
+        }
+      },
+      "required": [
+        "operator",
+        "pointer",
+        "expected",
+        "capability"
+      ],
+      "additionalProperties": false
+    },
+    "observation": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "penflow-outcome-observation"
+        },
+        "version": {
+          "const": 1
+        },
+        "contract_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "build_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "producer_invocation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "obligation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "screen_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "semantic_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instance_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "category": {
+          "enum": [
+            "action",
+            "permission",
+            "validation",
+            "transition",
+            "effect",
+            "persistence",
+            "result"
+          ]
+        },
+        "before": {
+          "$ref": "#/$defs/json-value"
+        },
+        "after": {
+          "$ref": "#/$defs/json-value"
+        },
+        "result": {
+          "$ref": "#/$defs/json-value"
+        },
+        "evidence": {
+          "$ref": "#/$defs/file"
+        },
+        "capability": {
+          "enum": [
+            "ui",
+            "network",
+            "storage"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "version",
+        "contract_sha256",
+        "build_id",
+        "producer_invocation_id",
+        "scenario_id",
+        "session_id",
+        "obligation_id",
+        "screen_id",
+        "semantic_id",
+        "instance_key",
+        "category",
+        "before",
+        "after",
+        "result",
+        "evidence",
+        "capability"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "capability": {
+                "const": "ui"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "before": {
+                "$ref": "#/$defs/ui-facts"
+              },
+              "after": {
+                "$ref": "#/$defs/ui-facts"
+              },
+              "result": {
+                "$ref": "#/$defs/outcome-result"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": {
+                "const": "network"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "before": {
+                "$ref": "#/$defs/request-facts"
+              },
+              "after": {
+                "$ref": "#/$defs/response-facts"
+              },
+              "result": {
+                "$ref": "#/$defs/outcome-result"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": {
+                "const": "storage"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "before": {
+                "$ref": "#/$defs/storage-facts"
+              },
+              "after": {
+                "$ref": "#/$defs/storage-facts"
+              },
+              "result": {
+                "$ref": "#/$defs/storage-result"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "category": {
+                "const": "persistence"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "capability": {
+                "const": "storage"
+              },
+              "result": {
+                "properties": {
+                  "restart": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "requirement": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_pointer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "text_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "id",
+        "source_pointer",
+        "text_sha256"
+      ],
+      "additionalProperties": false
+    },
+    "projection": {
+      "type": "object",
+      "properties": {
+        "source_kind": {
+          "enum": [
+            "livespec-fr-ac-v1",
+            "brainstorm-product-v1"
+          ]
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/file"
+          },
+          "minItems": 1
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/requirement"
+          },
+          "minItems": 1
+        },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/approved-binding"
+          },
+          "minItems": 0
+        },
+        "uncovered": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "source_kind",
+        "sources",
+        "requirements",
+        "bindings",
+        "uncovered"
+      ],
+      "additionalProperties": false
+    },
+    "gate": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "applicable": {
+          "type": "boolean"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "BLOCKED",
+            "NOT_APPLICABLE",
+            "ADVISORY",
+            "HISTORICAL"
+          ]
+        },
+        "source_pointer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string"
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/file"
+          },
+          "minItems": 0
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/issue"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "id",
+        "applicable",
+        "required",
+        "status",
+        "source_pointer",
+        "reason",
+        "evidence",
+        "issues"
+      ],
+      "additionalProperties": false
+    },
+    "obligation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "enum": [
+            "structure",
+            "action",
+            "permission",
+            "validation",
+            "transition",
+            "effect",
+            "persistence",
+            "result"
+          ]
+        },
+        "requirement_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "BLOCKED"
+          ]
+        },
+        "observation_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/file"
+          },
+          "minItems": 0
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/issue"
+          },
+          "minItems": 0
+        },
+        "expected": {
+          "$ref": "#/$defs/expected-outcome"
+        }
+      },
+      "required": [
+        "id",
+        "category",
+        "requirement_ids",
+        "status",
+        "observation_refs",
+        "issues",
+        "expected"
+      ],
+      "additionalProperties": false
+    },
+    "report": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "penflow-verification-report"
+        },
+        "version": {
+          "const": 1
+        },
+        "profile": {
+          "anyOf": [
+            {
+              "enum": [
+                "design",
+                "implementation"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/scope"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "policy_version": {
+          "const": 1
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/file"
+          },
+          "minItems": 0
+        },
+        "gates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/gate"
+          },
+          "minItems": 0
+        },
+        "obligations": {
+          "type": "object",
+          "properties": {
+            "required": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "verified": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "missing": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/obligation"
+              },
+              "minItems": 0
+            }
+          },
+          "required": [
+            "required",
+            "verified",
+            "missing",
+            "items"
+          ],
+          "additionalProperties": false
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/file"
+          },
+          "minItems": 0
+        },
+        "build": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/file"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/issue"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "kind",
+        "version",
+        "profile",
+        "status",
+        "scope",
+        "policy_version",
+        "sources",
+        "gates",
+        "obligations",
+        "evidence",
+        "build",
+        "issues"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "PASS"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "profile": {
+                "enum": [
+                  "design",
+                  "implementation"
+                ]
+              },
+              "scope": {
+                "$ref": "#/$defs/scope"
+              },
+              "sources": {
+                "minItems": 1
+              },
+              "evidence": {
+                "minItems": 1
+              },
+              "obligations": {
+                "properties": {
+                  "required": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "verified": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "missing": {
+                    "const": 0
+                  },
+                  "items": {
+                    "minItems": 1
+                  }
+                }
+              },
+              "issues": {
+                "maxItems": 0
+              },
+              "gates": {
+                "minItems": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "PASS"
+              },
+              "profile": {
+                "const": "design"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "build": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "PASS"
+              },
+              "profile": {
+                "const": "implementation"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "build": {
+                "$ref": "#/$defs/file"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "validation": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "penflow-verification-validation"
+        },
+        "version": {
+          "const": 1
+        },
+        "status": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        },
+        "required_profile": {
+          "enum": [
+            "design",
+            "implementation"
+          ]
+        },
+        "profile": {
+          "anyOf": [
+            {
+              "enum": [
+                "design",
+                "implementation"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "report_sha256": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/scope"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "build_manifest": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/file"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/issue"
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "kind",
+        "version",
+        "status",
+        "required_profile",
+        "profile",
+        "report_sha256",
+        "scope",
+        "build_manifest",
+        "issues"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "PASS"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "profile": {
+                "enum": [
+                  "design",
+                  "implementation"
+                ]
+              },
+              "report_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "scope": {
+                "$ref": "#/$defs/scope"
+              },
+              "issues": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "PASS"
+              },
+              "required_profile": {
+                "const": "design"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "profile": {
+                "const": "design"
+              },
+              "build_manifest": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "PASS"
+              },
+              "required_profile": {
+                "const": "implementation"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "profile": {
+                "const": "implementation"
+              },
+              "build_manifest": {
+                "$ref": "#/$defs/file"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "json-value": {
+      "anyOf": [
+        {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/json-value"
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/json-value"
+          }
+        }
+      ]
+    },
+    "bbox": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number",
+          "minimum": 0
+        },
+        "height": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "additionalProperties": false
+    },
+    "ui-facts": {
+      "type": "object",
+      "properties": {
+        "screen_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "semantic_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "text": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "value": {
+          "$ref": "#/$defs/json-value"
+        },
+        "bbox": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/bbox"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/json-value"
+          }
+        },
+        "navigation": {
+          "$ref": "#/$defs/navigation-facts"
+        }
+      },
+      "required": [
+        "screen_id",
+        "state",
+        "semantic_id",
+        "role",
+        "visible",
+        "enabled",
+        "text",
+        "value",
+        "bbox",
+        "properties"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "navigation"
+            ],
+            "properties": {
+              "navigation": {
+                "properties": {
+                  "surface_present": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "surface_present"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "visible": {
+                "const": false
+              },
+              "state": {
+                "type": "null"
+              },
+              "bbox": {
+                "type": "null"
+              },
+              "enabled": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "state": {
+                "type": "string",
+                "minLength": 1
+              },
+              "bbox": {
+                "$ref": "#/$defs/bbox"
+              },
+              "enabled": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "outcome-result": {
+      "type": "object",
+      "properties": {
+        "actor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome": {
+          "enum": [
+            "allowed",
+            "denied",
+            "invalid",
+            "error",
+            "success",
+            "idempotent"
+          ]
+        }
+      },
+      "required": [
+        "actor_id",
+        "action_id",
+        "outcome"
+      ],
+      "additionalProperties": false
+    },
+    "storage-facts": {
+      "type": "object",
+      "properties": {
+        "store_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "exists": {
+          "type": "boolean"
+        },
+        "value": {
+          "$ref": "#/$defs/json-value"
+        },
+        "process_instance": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "store_id",
+        "key",
+        "exists",
+        "value",
+        "process_instance"
+      ],
+      "additionalProperties": false
+    },
+    "storage-result": {
+      "type": "object",
+      "properties": {
+        "actor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome": {
+          "enum": [
+            "allowed",
+            "denied",
+            "invalid",
+            "error",
+            "success",
+            "idempotent"
+          ]
+        },
+        "readback": {
+          "$ref": "#/$defs/storage-facts"
+        },
+        "restart": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "before_process": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "after_process": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "before_process",
+                "after_process"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "actor_id",
+        "action_id",
+        "outcome",
+        "readback",
+        "restart"
+      ],
+      "additionalProperties": false
+    },
+    "request-facts": {
+      "type": "object",
+      "properties": {
+        "actor_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE",
+            "HEAD",
+            "OPTIONS"
+          ]
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "body": {
+          "$ref": "#/$defs/json-value"
+        }
+      },
+      "required": [
+        "actor_id",
+        "method",
+        "url",
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "response-facts": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "body": {
+          "$ref": "#/$defs/json-value"
+        }
+      },
+      "required": [
+        "status",
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "expected-outcome": {
+      "type": "object",
+      "properties": {
+        "obligation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_pointer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assertions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/assertion"
+          },
+          "minItems": 1
+        },
+        "category": {
+          "enum": [
+            "structure",
+            "action",
+            "permission",
+            "validation",
+            "transition",
+            "effect",
+            "persistence",
+            "result"
+          ]
+        }
+      },
+      "required": [
+        "obligation_id",
+        "source_pointer",
+        "assertions",
+        "category"
+      ],
+      "additionalProperties": false
+    },
+    "approved-binding": {
+      "type": "object",
+      "properties": {
+        "requirement_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "obligation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "enum": [
+            "structure",
+            "action",
+            "permission",
+            "validation",
+            "transition",
+            "effect",
+            "persistence",
+            "result"
+          ]
+        },
+        "expected": {
+          "$ref": "#/$defs/expected-outcome"
+        }
+      },
+      "required": [
+        "requirement_id",
+        "obligation_id",
+        "category",
+        "expected"
+      ],
+      "additionalProperties": false
+    },
+    "approval-inputs": {
+      "type": "object",
+      "properties": {
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/approved-source"
+          },
+          "minItems": 1
+        },
+        "contract": {
+          "$ref": "#/$defs/file"
+        },
+        "projection_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "selection_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "plans": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/approved-source"
+          },
+          "minItems": 1
+        },
+        "verification_policy": {
+          "$ref": "#/$defs/file"
+        }
+      },
+      "required": [
+        "sources",
+        "plans",
+        "contract",
+        "projection_sha256",
+        "selection_sha256"
+      ],
+      "additionalProperties": false
+    },
+    "review-approval": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "livespec-penflow-review-approval"
+        },
+        "version": {
+          "const": 1
+        },
+        "command": {
+          "const": "spec-plan"
+        },
+        "feature": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "selection": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "inputs": {
+          "$ref": "#/$defs/approval-inputs"
+        },
+        "review": {
+          "type": "object",
+          "properties": {
+            "invocation_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "producer_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "input_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "output": {
+              "$ref": "#/$defs/file"
+            },
+            "verdict": {
+              "const": "PASS"
+            },
+            "blocking_count": {
+              "const": 0
+            },
+            "findings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "severity": {
+                    "enum": [
+                      "BLOCKING",
+                      "WARNING",
+                      "INFO"
+                    ]
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "requirement_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 0
+                  }
+                },
+                "required": [
+                  "severity",
+                  "message",
+                  "requirement_ids"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0
+            }
+          },
+          "required": [
+            "invocation_id",
+            "producer_id",
+            "input_sha256",
+            "output",
+            "verdict",
+            "blocking_count",
+            "findings"
+          ],
+          "additionalProperties": false
+        },
+        "prior_receipt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/file"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "old_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "new_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "removed_requirement_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 0
+              },
+              "changed_binding_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 0
+              }
+            },
+            "required": [
+              "source_path",
+              "old_sha256",
+              "new_sha256",
+              "removed_requirement_ids",
+              "changed_binding_ids"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "snapshot": {
+          "$ref": "#/$defs/file"
+        },
+        "disposition": {
+          "enum": [
+            "active",
+            "retired"
+          ]
+        },
+        "retired_features": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "kind",
+        "version",
+        "command",
+        "feature",
+        "scope",
+        "selection",
+        "inputs",
+        "review",
+        "prior_receipt",
+        "changes",
+        "snapshot",
+        "disposition",
+        "retired_features"
+      ],
+      "additionalProperties": false,
+      "$comment": "Machine validation also enforces sorted selection and retired_features, retired_features subset selection, disposition active iff selection minus retired_features is nonempty, and plans covering the selected features exactly."
+    },
+    "requirements-baseline": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "livespec-penflow-requirements-baseline"
+        },
+        "version": {
+          "const": 1
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "selection": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "approval_receipts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/file"
+          },
+          "minItems": 1
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/approved-source"
+          },
+          "minItems": 1
+        },
+        "contract": {
+          "$ref": "#/$defs/file"
+        },
+        "projection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/projection"
+            },
+            {
+              "$ref": "#/$defs/retired-projection"
+            }
+          ]
+        },
+        "previous": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/file"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "disposition": {
+          "enum": [
+            "active",
+            "retired"
+          ]
+        },
+        "retired_features": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "kind",
+        "version",
+        "scope",
+        "selection",
+        "approval_receipts",
+        "sources",
+        "contract",
+        "projection",
+        "previous",
+        "disposition",
+        "retired_features"
+      ],
+      "additionalProperties": false,
+      "$comment": "Machine validation also enforces sorted selection and retired_features, retired_features subset selection, disposition active iff selection minus retired_features is nonempty, and plans covering the selected features exactly.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "retired"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "projection": {
+                "$ref": "#/$defs/retired-projection"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "projection": {
+                "$ref": "#/$defs/projection"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "approved-source": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "semantic_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "reviewed_snapshot": {
+          "$ref": "#/$defs/file"
+        }
+      },
+      "required": [
+        "path",
+        "sha256",
+        "semantic_sha256",
+        "reviewed_snapshot"
+      ],
+      "additionalProperties": false
+    },
+    "review-snapshot": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "livespec-penflow-review-snapshot"
+        },
+        "version": {
+          "const": 1
+        },
+        "command": {
+          "const": "spec-plan"
+        },
+        "feature": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "selection": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "inputs": {
+          "$ref": "#/$defs/approval-inputs"
+        },
+        "projection": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/projection"
+            },
+            {
+              "$ref": "#/$defs/retired-projection"
+            }
+          ]
+        },
+        "prior_receipt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/file"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "old_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "new_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "removed_requirement_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 0
+              },
+              "changed_binding_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 0
+              }
+            },
+            "required": [
+              "source_path",
+              "old_sha256",
+              "new_sha256",
+              "removed_requirement_ids",
+              "changed_binding_ids"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "disposition": {
+          "enum": [
+            "active",
+            "retired"
+          ]
+        },
+        "retired_features": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "kind",
+        "version",
+        "command",
+        "feature",
+        "scope",
+        "selection",
+        "inputs",
+        "projection",
+        "prior_receipt",
+        "changes",
+        "disposition",
+        "retired_features"
+      ],
+      "additionalProperties": false,
+      "$comment": "Machine validation also enforces sorted selection and retired_features, retired_features subset selection, disposition active iff selection minus retired_features is nonempty, and plans covering the selected features exactly.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "retired"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "projection": {
+                "$ref": "#/$defs/retired-projection"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "projection": {
+                "$ref": "#/$defs/projection"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "review-result": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "livespec-penflow-review-result"
+        },
+        "version": {
+          "const": 1
+        },
+        "snapshot": {
+          "$ref": "#/$defs/file"
+        },
+        "review": {
+          "type": "object",
+          "properties": {
+            "invocation_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "producer_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "input_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "output": {
+              "$ref": "#/$defs/file"
+            },
+            "verdict": {
+              "enum": [
+                "PASS",
+                "BLOCKING"
+              ]
+            },
+            "blocking_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "findings": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "severity": {
+                    "enum": [
+                      "BLOCKING",
+                      "WARNING",
+                      "INFO"
+                    ]
+                  },
+                  "message": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "requirement_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 0
+                  }
+                },
+                "required": [
+                  "severity",
+                  "message",
+                  "requirement_ids"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 0
+            }
+          },
+          "required": [
+            "invocation_id",
+            "producer_id",
+            "input_sha256",
+            "output",
+            "verdict",
+            "blocking_count",
+            "findings"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "kind",
+        "version",
+        "snapshot",
+        "review"
+      ],
+      "additionalProperties": false
+    },
+    "contract-requirements": {
+      "type": "object",
+      "properties": {
+        "source_kind": {
+          "enum": [
+            "livespec-fr-ac-v1",
+            "brainstorm-product-v1"
+          ]
+        },
+        "source_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/file"
+          },
+          "minItems": 1
+        },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "requirement_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "obligation_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "requirement_id",
+              "obligation_id"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "source_kind",
+        "source_refs",
+        "bindings"
+      ],
+      "additionalProperties": false
+    },
+    "retired-projection": {
+      "type": "object",
+      "properties": {
+        "source_kind": {
+          "const": "livespec-fr-ac-v1"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/file"
+          },
+          "minItems": 0,
+          "maxItems": 0
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/requirement"
+          },
+          "minItems": 0,
+          "maxItems": 0
+        },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/approved-binding"
+          },
+          "minItems": 0,
+          "maxItems": 0
+        },
+        "uncovered": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "maxItems": 0
+        }
+      },
+      "required": [
+        "source_kind",
+        "sources",
+        "requirements",
+        "bindings",
+        "uncovered"
+      ],
+      "additionalProperties": false
+    },
+    "system-return": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "screen_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "enum": [
+            "back",
+            "dismiss",
+            "close",
+            "exit"
+          ]
+        },
+        "source": {
+          "type": "object",
+          "properties": {
+            "requirement_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_pointer": {
+              "type": "string",
+              "minLength": 1
+            },
+            "text_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "requirement_id",
+            "source_pointer",
+            "text_sha256"
+          ],
+          "additionalProperties": false
+        },
+        "destination": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "screen"
+                },
+                "screen_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "state": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "kind",
+                "screen_id",
+                "state"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "closed"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "const": "history"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "screen_id",
+        "event",
+        "source",
+        "destination"
+      ],
+      "additionalProperties": false
+    },
+    "navigation-facts": {
+      "type": "object",
+      "properties": {
+        "context_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event": {
+          "enum": [
+            "back",
+            "dismiss",
+            "close",
+            "exit"
+          ]
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "previous_url": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "surface_present": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "context_id",
+        "event_id",
+        "event",
+        "url",
+        "previous_url",
+        "surface_present"
+      ],
+      "additionalProperties": false
+    },
+    "runtime-facts": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "penflow-runtime-facts"
+        },
+        "version": {
+          "const": 1
+        },
+        "contract_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "build_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "producer_invocation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "screen_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "semantic_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instance_key": {
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "before": {
+          "$ref": "#/$defs/json-value"
+        },
+        "after": {
+          "$ref": "#/$defs/json-value"
+        },
+        "result": {
+          "$ref": "#/$defs/json-value"
+        },
+        "capability": {
+          "enum": [
+            "ui",
+            "network",
+            "storage"
+          ]
+        },
+        "raw_evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/file"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "version",
+        "contract_sha256",
+        "build_id",
+        "producer_invocation_id",
+        "scenario_id",
+        "session_id",
+        "screen_id",
+        "semantic_id",
+        "instance_key",
+        "before",
+        "after",
+        "result",
+        "capability",
+        "raw_evidence"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "capability": {
+                "const": "ui"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "before": {
+                "$ref": "#/$defs/ui-facts"
+              },
+              "after": {
+                "$ref": "#/$defs/ui-facts"
+              },
+              "result": {
+                "$ref": "#/$defs/outcome-result"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": {
+                "const": "network"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "before": {
+                "$ref": "#/$defs/request-facts"
+              },
+              "after": {
+                "$ref": "#/$defs/response-facts"
+              },
+              "result": {
+                "$ref": "#/$defs/outcome-result"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "capability": {
+                "const": "storage"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "before": {
+                "$ref": "#/$defs/storage-facts"
+              },
+              "after": {
+                "$ref": "#/$defs/storage-facts"
+              },
+              "result": {
+                "$ref": "#/$defs/storage-result"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ui-snapshot": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "contract_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "build_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "producer_invocation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "session_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "const": "penflow-runtime-ui-snapshot"
+        },
+        "facts": {
+          "$ref": "#/$defs/ui-facts"
+        },
+        "raw_evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/file"
+          }
+        }
+      },
+      "required": [
+        "version",
+        "contract_sha256",
+        "build_id",
+        "producer_invocation_id",
+        "scenario_id",
+        "session_id",
+        "kind",
+        "facts",
+        "raw_evidence"
+      ],
+      "additionalProperties": false
+    },
+    "verification-policy": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "const": 1
+        },
+        "generated_docs": {
+          "enum": [
+            "required",
+            "not_applicable"
+          ]
+        },
+        "native_geometry": {
+          "enum": [
+            "required",
+            "not_applicable"
+          ]
+        },
+        "homologous_references": {
+          "enum": [
+            "required",
+            "not_applicable"
+          ]
+        },
+        "native_export": {
+          "enum": [
+            "required",
+            "not_applicable"
+          ]
+        }
+      },
+      "required": [
+        "version",
+        "generated_docs",
+        "native_geometry",
+        "homologous_references",
+        "native_export"
+      ],
+      "additionalProperties": false
+    },
+    "verification-policy-source": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "penflow-verification-policy-source"
+        },
+        "version": {
+          "const": 1
+        },
+        "workflow": {
+          "$ref": "#/$defs/file"
+        },
+        "decisions": {
+          "$ref": "#/$defs/verification-policy"
+        },
+        "inherited_authority": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/file"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "version",
+        "workflow",
+        "decisions",
+        "inherited_authority"
+      ],
+      "additionalProperties": false
+    },
+    "brainstorm-authority-import": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "penflow-brainstorm-authority-import"
+        },
+        "version": {
+          "const": 1
+        },
+        "origin_scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "workspace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "report": {
+          "$ref": "#/$defs/file"
+        },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "source_path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            },
+            "required": [
+              "source_path",
+              "path",
+              "sha256"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "version",
+        "origin_scope",
+        "workspace",
+        "report",
+        "files"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

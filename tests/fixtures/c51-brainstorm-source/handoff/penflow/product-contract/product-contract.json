@@ -1,0 +1,46 @@
+{
+  "kind": "product-contract",
+  "version": 1,
+  "product": "static-product-fixture",
+  "flows": [
+    {
+      "id": "product-flow",
+      "entry_surface": "product-page",
+      "return_paths": []
+    }
+  ],
+  "surfaces": [
+    {
+      "id": "product-page",
+      "flow_id": "product-flow",
+      "kind": "screen",
+      "role": "landing",
+      "surface": "web-desktop",
+      "user_facing": true,
+      "product_justification": "Static information page closed through the native exit event.",
+      "return_path": "exit",
+      "states": [
+        {
+          "id": "product-state",
+          "description": "Static information is visible."
+        }
+      ],
+      "references": [
+        {
+          "source": "linear.app/onboarding",
+          "surface": "web-desktop",
+          "role": "landing",
+          "state": "product-state",
+          "design_intent": "calm minimal welcome"
+        },
+        {
+          "source": "notion.so/signup",
+          "surface": "web-desktop",
+          "role": "landing",
+          "state": "product-state",
+          "design_intent": "calm minimal welcome"
+        }
+      ]
+    }
+  ]
+}

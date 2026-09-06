@@ -1,3 +1,4 @@
+# @spec FR-013: Remove confirmed dead private code, migrate/deprecate public legacy paths and label partial code generation as scaffold. — .specs/features/077-complete-verification-workflow/spec.md#fr-013
 # @spec(FR-001)
 # @spec(FR-002)
 # @spec(FR-003)
@@ -8,11 +9,23 @@ from __future__ import annotations
 import re
 from typing import Any
 
+SCAFFOLD_NOTICE = "// Penflow scaffold: limited widgets and unimplemented handlers; requires implementation and independent runtime verification."
+
 
 def swiftui(ir: dict[str, Any]) -> str:
+    """Generate a non-certifying SwiftUI scaffold with explicit unimplemented behavior.
+
+    Args:
+        ir: Legacy flat or contextualized Code IR describing the source UI.
+
+    Returns:
+        SwiftUI source scaffold with supported widgets and unimplemented handlers;
+        independent runtime verification is still required.
+    """
     model = _normalize_ir(ir)
     name = _pascal(model["screen"]) + "View"
     lines = [
+        SCAFFOLD_NOTICE,
         "import SwiftUI",
         "",
         f"struct {name}: View {{",
@@ -26,9 +39,19 @@ def swiftui(ir: dict[str, Any]) -> str:
 
 
 def react(ir: dict[str, Any]) -> str:
+    """Generate a non-certifying React scaffold with explicit unimplemented behavior.
+
+    Args:
+        ir: Legacy flat or contextualized Code IR describing the source UI.
+
+    Returns:
+        React source scaffold with supported widgets and unimplemented handlers;
+        independent runtime verification is still required.
+    """
     model = _normalize_ir(ir)
     name = _pascal(model["screen"])
     lines = [
+        SCAFFOLD_NOTICE,
         f"export function {name}() {{",
         "  return (",
         f'    <main data-penflow-id="{model["screen"]}">',
@@ -40,9 +63,19 @@ def react(ir: dict[str, Any]) -> str:
 
 
 def rust_dioxus(ir: dict[str, Any]) -> str:
+    """Generate a non-certifying Dioxus scaffold with explicit unimplemented behavior.
+
+    Args:
+        ir: Legacy flat or contextualized Code IR describing the source UI.
+
+    Returns:
+        Dioxus source scaffold with supported widgets and unimplemented handlers;
+        independent runtime verification is still required.
+    """
     model = _normalize_ir(ir)
     name = _pascal(model["screen"])
     lines = [
+        SCAFFOLD_NOTICE,
         "use dioxus::prelude::*;",
         "",
         "#[component]",

@@ -20,6 +20,11 @@ from .cli_governance import (
     _run_project_health_checked,
 )
 from .cli_parser import build_parser
+from .cli_verification import (
+    build_manifest_usage_error,
+    is_verification_request,
+    render_verification_boundary,
+)
 from .cli_reporting import (
     PenflowError,
     _print,
@@ -74,9 +79,15 @@ def main(
     """
     parser = build_parser()
     args = parser.parse_args(argv)
+    if message := build_manifest_usage_error(args):
+        if is_verification_request(args):
+            return render_verification_boundary(args, message)
+        parser.error(message)
     try:
         return _dispatch(args, dependencies)
     except LifecycleBlockedError as error:
+        if is_verification_request(args):
+            return render_verification_boundary(args, error.message)
         _print(
             {
                 "status": "BLOCKED",
@@ -86,8 +97,12 @@ def main(
         )
         return 4
     except (ProjectBoundaryError, ProjectResolutionError) as error:
+        if is_verification_request(args):
+            return render_verification_boundary(args, str(error))
         return _render_project_boundary_error(args, error)
     except CanvasLifecycleError as error:
+        if is_verification_request(args):
+            return render_verification_boundary(args, str(error))
         issues = [finding.to_dict() for finding in error.findings]
         _print({"status": "FAIL", "issues": issues}, bool(getattr(args, "json", False)))
         return 1

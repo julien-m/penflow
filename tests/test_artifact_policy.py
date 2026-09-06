@@ -126,6 +126,7 @@ def test_command_registry_matches_the_normative_closed_sets() -> None:
             "theme-fingerprint",
             "validate-code-ir",
             "validate-report",
+            "authority",
         }
     )
     assert LIFECYCLE_EXEMPT_COMMANDS == frozenset({"doctor", "--help", "--version"})
@@ -138,6 +139,7 @@ def test_command_policy_returns_typed_immutable_entries_and_rejects_unknown() ->
     producer = command_policy_for("run")
     assert producer.category is CommandClassification.PRODUCER
     with pytest.raises(FrozenInstanceError):
-        producer.command = "inspect"  # type: ignore[misc]
+        # Dynamic assignment exercises the frozen dataclass runtime guard beyond static typing.
+        setattr(producer, "command", "inspect")
     with pytest.raises(UnknownCommandError):
         command_policy_for("future-command")

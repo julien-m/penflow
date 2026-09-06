@@ -4,6 +4,11 @@
 
 # Mockup Factory Workflow — Bounded Fix-Re-Audit Loop
 
+## C51 closure
+
+**Read** [`../../../../docs/verification-workflow.md`](../../../../docs/verification-workflow.md) and apply its source review, applicability, native layout and profile protocol. These detailed standalone checks diagnose their own artifacts; final completion requires `penflow run --target <target> --profile design --project <consumer-project-root> --json` and `penflow validate-report <target>/run-report.json --schema --required-profile design --project <consumer-project-root> --json`, both PASS/exit 0. Required warnings and missing renderer evidence block. Pre-review preparation is non-certifying; `PASSED_WITH_WARNINGS` and historical reports never close C51. Reference/C48 applicability comes from reviewed procedure plus authenticated inheritance, never file absence.
+
+
 ## Deterministic Command Chain
 
 The full chain, run in order (strict default exit policy, no `--lenient`):

@@ -9,8 +9,17 @@ import re
 from pathlib import Path
 from typing import Any
 
-from .flow_contract_context import semantic_context_reference_issues
-from .schema_cache import load_schema
+from .contract_references import validate_references
+from .contract_records import (
+    record_items,
+    records_by_id,
+    has_errors,
+    contract_issue,
+    interactive_binding_kind,
+)
+from .schema_cache import validator_for
+from .contract_graph import validate_containment
+from .contract_system_returns import validate_system_returns
 
 ID_RE = re.compile(r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$")
 BINDING_RE = re.compile(r"^[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)+$")
@@ -43,10 +52,15 @@ def validate_flow_contract_v2(contract: Any) -> list[dict[str, Any]]:
     """Validate a strict v2 contract with closed schema and referential checks."""
     issues: list[dict[str, Any]] = []
     if not isinstance(contract, dict):
-        return [_issue("error", "contract.schema.type", "$", "contract must be object")]
+        return [contract_issue("error", "contract.schema.type", "$", "contract must be object")]
     _validate_schema(contract, issues)
-    if not _has_errors(issues):
-        _validate_references(contract, issues)
+    if not has_errors(issues):
+        validate_references(
+            contract, contract_registries(contract), _transition_triggers(contract), issues
+        )
+        _interactive_screen_coverage_issues(contract, issues)
+        issues.extend(validate_containment(contract))
+        issues.extend(validate_system_returns(contract))
     return sorted(issues, key=lambda issue: (issue["path"], issue["code"], issue["message"]))
 
 
@@ -56,16 +70,16 @@ def interactive_coverage_report(contract: Any) -> dict[str, Any]:
         return {"screens": [], "summary": {"covered": 0, "static": 0, "total": 0, "uncovered": 0}}
     transition_triggers = _transition_triggers(contract)
     screens = []
-    for screen in _items(contract, "screens"):
+    for screen in record_items(contract, "screens"):
         screen_id = str(screen.get("id", ""))
         actions = []
-        for node in _items(contract, "nodes"):
+        for node in record_items(contract, "nodes"):
             if (
                 node.get("screen_id") != screen_id
                 or node.get("role") not in VISUALLY_INTERACTIVE_ROLES
             ):
                 continue
-            binding_kind = _interactive_binding_kind(node, transition_triggers)
+            binding_kind = interactive_binding_kind(node, transition_triggers)
             if binding_kind is None:
                 continue
             actions.append(
@@ -105,19 +119,19 @@ def interactive_coverage_report(contract: Any) -> dict[str, Any]:
 
 def contract_registries(contract: dict[str, Any]) -> dict[str, Any]:
     """Return id registries used by downstream artifact validators."""
-    nodes = _by_id(contract, "nodes")
+    nodes = records_by_id(contract, "nodes")
     return {
-        "actors": _by_id(contract, "actors"),
-        "entities": _by_id(contract, "entities"),
-        "screens": _by_id(contract, "screens"),
+        "actors": records_by_id(contract, "actors"),
+        "entities": records_by_id(contract, "entities"),
+        "screens": records_by_id(contract, "screens"),
         "nodes": nodes,
-        "guards": _by_id(contract, "guards"),
-        "permissions": _by_id(contract, "permissions"),
-        "mutations": _by_id(contract, "mutations"),
-        "actions": _by_id(contract, "actions"),
-        "flows": _by_id(contract, "flows"),
-        "transitions": _by_id(contract, "transitions"),
-        "relations": _by_id(contract, "relations"),
+        "guards": records_by_id(contract, "guards"),
+        "permissions": records_by_id(contract, "permissions"),
+        "mutations": records_by_id(contract, "mutations"),
+        "actions": records_by_id(contract, "actions"),
+        "flows": records_by_id(contract, "flows"),
+        "transitions": records_by_id(contract, "transitions"),
+        "relations": records_by_id(contract, "relations"),
         "semantic_ids": {
             str(node["semantic_id"]): node
             for node in nodes.values()
@@ -130,7 +144,7 @@ def contract_registries(contract: dict[str, Any]) -> dict[str, Any]:
         },
         "fields": {
             f"{entity['id']}.{field['id']}"
-            for entity in _items(contract, "entities")
+            for entity in record_items(contract, "entities")
             for field in entity.get("fields", []) or []
             if isinstance(field, dict) and isinstance(field.get("id"), str)
         },
@@ -138,398 +152,32 @@ def contract_registries(contract: dict[str, Any]) -> dict[str, Any]:
 
 
 def _validate_schema(contract: dict[str, Any], issues: list[dict[str, Any]]) -> None:
-    schema = load_schema(SCHEMA_PATH.name)
-    _validate_schema_subset(contract, schema, "$", schema.get("$defs", {}), issues)
-
-
-def _validate_references(contract: dict[str, Any], issues: list[dict[str, Any]]) -> None:
-    registries = contract_registries(contract)
-    transition_triggers = _transition_triggers(contract)
-    _duplicate_id_issues(contract, issues)
-    if contract.get("needs_clarification"):
-        issues.append(
-            _issue(
-                "error",
-                "contract.clarification.unresolved",
-                "$.needs_clarification",
-                "clarification items must be resolved before strict validation",
-            )
+    for error in validator_for(SCHEMA_PATH.name).iter_errors(contract):
+        path = "$" + "".join(
+            f"[{part}]" if isinstance(part, int) else f".{part}" for part in error.absolute_path
         )
-    for index, screen in enumerate(_items(contract, "screens")):
-        if screen.get("flow_id") not in registries["flows"]:
-            _missing("flow", screen.get("flow_id"), f"$.screens[{index}].flow_id", issues)
-        if screen.get("root_node") not in registries["nodes"]:
-            _missing("node", screen.get("root_node"), f"$.screens[{index}].root_node", issues)
-    for index, node in enumerate(_items(contract, "nodes")):
-        path = f"$.nodes[{index}]"
-        if node.get("screen_id") not in registries["screens"]:
-            _missing("screen", node.get("screen_id"), f"{path}.screen_id", issues)
-        if binding := node.get("binding"):
-            if not isinstance(binding, str) or not BINDING_RE.match(binding):
+        keyword = (
+            "additional_property" if error.validator == "additionalProperties" else error.validator
+        )
+        if error.validator == "additionalProperties":
+            for key in sorted(set(error.instance) - set(error.schema.get("properties", {}))):
                 issues.append(
-                    _issue(
-                        "error",
-                        "contract.reference.invalid_binding",
-                        f"{path}.binding",
-                        "binding must use entity.field",
+                    contract_issue(
+                        "error", f"contract.schema.{keyword}", f"{path}.{key}", error.message
                     )
                 )
-            elif binding not in registries["fields"]:
-                _missing("binding_field", binding, f"{path}.binding", issues)
-        if (entity := node.get("entity")) and entity not in registries["entities"]:
-            _missing("entity", entity, f"{path}.entity", issues)
-        if action := node.get("action"):
-            if action not in registries["actions"]:
-                _missing("action", action, f"{path}.action", issues)
-        elif node.get("role") in INTERACTIVE_ROLES and node.get("id") not in transition_triggers:
-            issues.append(
-                _issue(
-                    "error",
-                    "contract.reference.interactive_action_required",
-                    f"{path}.action",
-                    "interactive node requires action or transition trigger",
-                )
-            )
-        if (
-            node.get("role") in VISUALLY_INTERACTIVE_ROLES
-            and _interactive_binding_kind(node, transition_triggers) is None
-        ):
-            issues.append(
-                _issue(
-                    "error",
-                    "contract.interactive_unbound",
-                    f"{path}.action",
-                    "visually interactive node requires an action or transition trigger",
-                )
-            )
-        for child_id in node.get("children", []) or []:
-            if child_id not in registries["nodes"]:
-                _missing("node", child_id, f"{path}.children", issues)
-    for index, action in enumerate(_items(contract, "actions")):
-        path = f"$.actions[{index}]"
-        node = registries["nodes"].get(action.get("node"))
-        if node is None:
-            _missing("node", action.get("node"), f"{path}.node", issues)
-        elif node.get("role") not in INTERACTIVE_ROLES:
-            issues.append(
-                _issue(
-                    "error",
-                    "contract.reference.non_interactive_action",
-                    f"{path}.node",
-                    "action node must be interactive",
-                )
-            )
-        for field, registry_name in (
-            ("guard", "guards"),
-            ("permission", "permissions"),
-            ("mutation", "mutations"),
-            ("success_transition", "transitions"),
-            ("error_transition", "transitions"),
-        ):
-            value = action.get(field)
-            if value and value not in registries[registry_name]:
-                _missing(registry_name[:-1], value, f"{path}.{field}", issues)
-    for index, permission in enumerate(_items(contract, "permissions")):
-        if permission.get("actor") not in registries["actors"]:
-            _missing("actor", permission.get("actor"), f"$.permissions[{index}].actor", issues)
-        if permission.get("action") not in registries["actions"]:
-            _missing("action", permission.get("action"), f"$.permissions[{index}].action", issues)
-        if permission.get("entity") not in registries["entities"]:
-            _missing("entity", permission.get("entity"), f"$.permissions[{index}].entity", issues)
-    screen_states = _screen_states(contract)
-    action_screens = {
-        str(action["id"]): str(node["screen_id"])
-        for action in _items(contract, "actions")
-        if isinstance(action.get("id"), str)
-        for node in [registries["nodes"].get(action.get("node"))]
-        if isinstance(node, dict) and isinstance(node.get("screen_id"), str)
-    }
-    for index, mutation in enumerate(_items(contract, "mutations")):
-        if mutation.get("entity") not in registries["entities"]:
-            _missing("entity", mutation.get("entity"), f"$.mutations[{index}].entity", issues)
-        mutation_actions = [
-            str(action["id"])
-            for action in _items(contract, "actions")
-            if action.get("mutation") == mutation.get("id") and isinstance(action.get("id"), str)
-        ]
-        for state_field in ("success_state", "error_state"):
-            value = mutation.get(state_field)
-            if mutation_actions:
-                for action_id in mutation_actions:
-                    screen_id = action_screens.get(action_id)
-                    if screen_id and value not in screen_states.get(screen_id, set()):
-                        _missing(
-                            "state",
-                            value,
-                            f"$.mutations[{index}].{state_field}",
-                            issues,
-                        )
-            elif not any(value in states for states in screen_states.values()):
-                _missing("state", value, f"$.mutations[{index}].{state_field}", issues)
-    for index, transition in enumerate(_items(contract, "transitions")):
-        path = f"$.transitions[{index}]"
-        if transition.get("flow") not in registries["flows"]:
-            _missing("flow", transition.get("flow"), f"{path}.flow", issues)
-        for field in ("from_screen", "to_screen"):
-            if transition.get(field) not in registries["screens"]:
-                _missing("screen", transition.get(field), f"{path}.{field}", issues)
-        for field in ("from_state", "to_state"):
-            screen_field = "from_screen" if field == "from_state" else "to_screen"
-            screen_id = transition.get(screen_field)
-            states = screen_states.get(str(screen_id), set())
-            if transition.get(field) not in states:
-                _missing("state", transition.get(field), f"{path}.{field}", issues)
-        if transition.get("action") and transition.get("action") not in registries["actions"]:
-            _missing("action", transition.get("action"), f"{path}.action", issues)
-        trigger = transition.get("trigger")
-        if trigger not in registries["actions"]:
-            trigger_node = registries["nodes"].get(trigger)
-            if trigger_node is None:
-                _missing("trigger", trigger, f"{path}.trigger", issues)
-            elif trigger_node.get("role") not in INTERACTIVE_ROLES:
-                issues.append(
-                    _issue(
-                        "error",
-                        "contract.reference.non_interactive_trigger",
-                        f"{path}.trigger",
-                        "transition trigger node must be interactive",
-                    )
-                )
-        _validate_transition_semantics(transition, path, registries, issues)
-    _validate_guard_semantics(contract, issues)
-    _validate_transition_fanout(contract, registries, issues)
-    issues.extend(semantic_context_reference_issues(contract, registries, screen_states))
-    _unused_reference_issues(contract, issues)
-    _interactive_screen_coverage_issues(contract, issues)
-
-
-def _validate_guard_semantics(contract: dict[str, Any], issues: list[dict[str, Any]]) -> None:
-    """Reject partial or route-derived predicates once structured metadata is used."""
-    for index, guard in enumerate(_items(contract, "guards")):
-        path = f"$.guards[{index}]"
-        structured_fields = ("variable", "operator", "value", "source")
-        present = [field for field in structured_fields if field in guard]
-        if present and len(present) != len(structured_fields):
-            issues.append(
-                _issue(
-                    "error",
-                    "contract.guard.incomplete",
-                    path,
-                    "structured guard requires variable, operator, value, and source",
-                )
-            )
-            continue
-        variable = guard.get("variable")
-        if isinstance(variable, str) and variable in NON_CAUSAL_GUARD_VARIABLES:
-            issues.append(
-                _issue(
-                    "error",
-                    "contract.guard.non_causal_variable",
-                    f"{path}.variable",
-                    f"guard variable cannot be derived from route destination: {variable}",
-                )
-            )
-
-
-def _validate_transition_semantics(
-    transition: dict[str, Any],
-    path: str,
-    registries: dict[str, Any],
-    issues: list[dict[str, Any]],
-) -> None:
-    """Validate declared transition causality without executing a UI runtime."""
-    metadata_present = any(field in transition for field in CAUSAL_TRANSITION_FIELDS)
-    if metadata_present:
-        missing = [field for field in CAUSAL_TRANSITION_FIELDS if field not in transition]
-        if missing:
-            issues.append(
-                _issue(
-                    "error",
-                    "contract.transition.causal_metadata_incomplete",
-                    path,
-                    f"causal transition metadata requires kind, label, and causal: missing {missing}",
-                )
-            )
-    kind = transition.get("kind")
-    if kind == "navigation" and transition.get("from_screen") == transition.get("to_screen"):
-        issues.append(
-            _issue(
-                "error",
-                "contract.transition.kind_mismatch",
-                f"{path}.kind",
-                "navigation transition must change screen",
-            )
-        )
-    if kind == "state":
-        if transition.get("from_screen") != transition.get("to_screen"):
-            issues.append(
-                _issue(
-                    "error",
-                    "contract.transition.kind_mismatch",
-                    f"{path}.kind",
-                    "state transition must stay on the same screen",
-                )
-            )
-        if transition.get("from_state") == transition.get("to_state"):
-            code = (
-                "contract.transition.default_unchanged"
-                if transition.get("from_state") == "default"
-                else "contract.transition.state_unchanged"
-            )
-            issues.append(
-                _issue(
-                    "error",
-                    code,
-                    f"{path}.to_state",
-                    "state transition must change state",
-                )
-            )
-    flow_id = transition.get("flow")
-    for field in ("from_screen", "to_screen"):
-        screen = registries["screens"].get(transition.get(field))
-        if isinstance(screen, dict) and screen.get("flow_id") != flow_id:
-            issues.append(
-                _issue(
-                    "error",
-                    "contract.transition.flow_mismatch",
-                    f"{path}.{field}",
-                    f"{field} must belong to transition flow {flow_id}",
-                )
-            )
-    causal = transition.get("causal")
-    if not isinstance(causal, dict):
-        return
-    fanout = causal.get("fanout")
-    if isinstance(fanout, dict) and fanout.get("policy") == "governed":
-        governance = fanout.get("governance")
-        if not isinstance(governance, str) or not governance.strip():
-            issues.append(
-                _issue(
-                    "error",
-                    "contract.transition.fanout_governance_missing",
-                    f"{path}.causal.fanout.governance",
-                    "governed fan-out requires a non-empty governance rule",
-                )
-            )
-    action = registries["actions"].get(transition.get("action"))
-    node = registries["nodes"].get(action.get("node")) if isinstance(action, dict) else None
-    if (
-        not isinstance(node, dict)
-        or node.get("role") not in VISUALLY_INTERACTIVE_ROLES
-        or not isinstance(node.get("test_id"), str)
-        or not node["test_id"].strip()
-    ):
-        issues.append(
-            _issue(
-                "error",
-                "contract.transition.action_not_observable",
-                f"{path}.action",
-                "causal transition action must bind to a visible node with a stable test_id",
-            )
-        )
-
-
-def _validate_transition_fanout(
-    contract: dict[str, Any],
-    registries: dict[str, Any],
-    issues: list[dict[str, Any]],
-) -> None:
-    """Require explicit governance and unique outcomes for incompatible branches."""
-    groups: dict[tuple[str, str, str, str], list[tuple[int, dict[str, Any]]]] = {}
-    for index, transition in enumerate(_items(contract, "transitions")):
-        key = (
-            str(transition.get("from_screen", "")),
-            str(transition.get("from_state", "")),
-            str(transition.get("trigger", "")),
-            str(transition.get("action", "")),
-        )
-        groups.setdefault(key, []).append((index, transition))
-    for transitions in groups.values():
-        destinations = {(item.get("to_screen"), item.get("to_state")) for _, item in transitions}
-        if len(transitions) < 2 or len(destinations) < 2:
-            continue
-        causal_blocks = [
-            item.get("causal") if isinstance(item.get("causal"), dict) else None
-            for _, item in transitions
-        ]
-        # Legacy fan-outs make no causal claim and remain v2-compatible. Once
-        # any branch opts into C44, every incompatible outcome must participate.
-        if all(causal is None for causal in causal_blocks):
-            continue
-        if any(causal is None for causal in causal_blocks):
-            for index, transition in transitions:
-                if not isinstance(transition.get("causal"), dict):
+        elif error.validator == "required":
+            for key in error.validator_value:
+                if key not in error.instance:
                     issues.append(
-                        _issue(
-                            "error",
-                            "contract.transition.fanout_ungoverned",
-                            f"$.transitions[{index}].causal",
-                            "incompatible fan-out requires explicit causal governance",
+                        contract_issue(
+                            "error", f"contract.schema.{keyword}", f"{path}.{key}", error.message
                         )
                     )
-            continue
-        fanouts = [
-            causal.get("fanout") if isinstance(causal, dict) else None for causal in causal_blocks
-        ]
-        groups_and_policies = {
-            (fanout.get("group"), fanout.get("policy"))
-            for fanout in fanouts
-            if isinstance(fanout, dict)
-        }
-        if len(groups_and_policies) != 1:
+        else:
             issues.append(
-                _issue(
-                    "error",
-                    "contract.transition.fanout_governance_mismatch",
-                    f"$.transitions[{transitions[0][0]}].causal.fanout",
-                    "fan-out branches must share one group and policy",
-                )
+                contract_issue("error", f"contract.schema.{keyword}", path, error.message)
             )
-        outcomes: set[str] = set()
-        predicates: set[tuple[str, str, str, str]] = set()
-        for (index, transition), causal, fanout in zip(
-            transitions, causal_blocks, fanouts, strict=True
-        ):
-            outcome = causal.get("outcome") if isinstance(causal, dict) else None
-            if not isinstance(outcome, str) or outcome in outcomes:
-                issues.append(
-                    _issue(
-                        "error",
-                        "contract.transition.fanout_outcome_duplicate",
-                        f"$.transitions[{index}].causal.outcome",
-                        "fan-out outcomes must be non-empty and unique",
-                    )
-                )
-            if isinstance(outcome, str):
-                outcomes.add(outcome)
-            guard = registries["guards"].get(transition.get("guard"))
-            predicate = (
-                str(guard.get("variable", "")) if isinstance(guard, dict) else "",
-                str(guard.get("operator", "")) if isinstance(guard, dict) else "",
-                str(guard.get("value", "")) if isinstance(guard, dict) else "",
-                str(guard.get("source", "")) if isinstance(guard, dict) else "",
-            )
-            if not all(predicate):
-                issues.append(
-                    _issue(
-                        "error",
-                        "contract.transition.causal_guard_incomplete",
-                        f"$.transitions[{index}].guard",
-                        "causal fan-out requires a complete variable/operator/value/source guard",
-                    )
-                )
-            if not isinstance(fanout, dict) or fanout.get("policy") != "exclusive":
-                continue
-            if not all(predicate) or predicate in predicates:
-                issues.append(
-                    _issue(
-                        "error",
-                        "contract.transition.non_exclusive_fanout",
-                        f"$.transitions[{index}].guard",
-                        "exclusive fan-out requires distinct complete guard predicates",
-                    )
-                )
-            predicates.add(predicate)
 
 
 def _interactive_screen_coverage_issues(
@@ -544,239 +192,12 @@ def _interactive_screen_coverage_issues(
         if screen["static"] is True:
             path = f"{path}.static_reason"
             message = "static screen justification must be a non-empty static_reason"
-        issues.append(_issue("error", "contract.interactive_unbound", path, message))
+        issues.append(contract_issue("error", "contract.interactive_unbound", path, message))
 
 
 def _transition_triggers(contract: dict[str, Any]) -> set[str]:
     return {
         str(transition["trigger"])
-        for transition in _items(contract, "transitions")
+        for transition in record_items(contract, "transitions")
         if isinstance(transition.get("trigger"), str)
     }
-
-
-def _interactive_binding_kind(node: dict[str, Any], transition_triggers: set[str]) -> str | None:
-    if isinstance(node.get("action"), str) and node["action"]:
-        return "action"
-    if isinstance(node.get("id"), str) and node["id"] in transition_triggers:
-        return "transition"
-    return None
-
-
-def _duplicate_id_issues(contract: dict[str, Any], issues: list[dict[str, Any]]) -> None:
-    for collection in (
-        "actors",
-        "entities",
-        "screens",
-        "nodes",
-        "guards",
-        "permissions",
-        "mutations",
-        "actions",
-        "flows",
-        "transitions",
-    ):
-        seen: dict[str, int] = {}
-        for index, item in enumerate(_items(contract, collection)):
-            item_id = item.get("id")
-            if isinstance(item_id, str) and item_id in seen:
-                issues.append(
-                    _issue(
-                        "error",
-                        f"contract.reference.duplicate_{collection[:-1]}_id",
-                        f"$.{collection}[{index}].id",
-                        f"duplicate id: {item_id}",
-                    )
-                )
-            if isinstance(item_id, str):
-                seen[item_id] = index
-    for key in ("semantic_id", "test_id"):
-        seen_values: set[str] = set()
-        for index, node in enumerate(_items(contract, "nodes")):
-            value = node.get(key)
-            if not isinstance(value, str):
-                continue
-            if value in seen_values:
-                issues.append(
-                    _issue(
-                        "error",
-                        f"contract.reference.duplicate_{key}",
-                        f"$.nodes[{index}].{key}",
-                        f"duplicate {key}: {value}",
-                    )
-                )
-            seen_values.add(value)
-
-
-def _unused_reference_issues(contract: dict[str, Any], issues: list[dict[str, Any]]) -> None:
-    used_actions = {
-        str(node["action"])
-        for node in _items(contract, "nodes")
-        if isinstance(node.get("action"), str)
-    }
-    used_actions.update(
-        str(t["action"])
-        for t in _items(contract, "transitions")
-        if isinstance(t.get("action"), str)
-    )
-    used_guards = {
-        str(a["guard"]) for a in _items(contract, "actions") if isinstance(a.get("guard"), str)
-    }
-    used_guards.update(
-        str(t["guard"]) for t in _items(contract, "transitions") if isinstance(t.get("guard"), str)
-    )
-    used_mutations = {
-        str(a["mutation"])
-        for a in _items(contract, "actions")
-        if isinstance(a.get("mutation"), str)
-    }
-    for collection, used, code in (
-        ("actions", used_actions, "contract.reference.unused_action"),
-        ("guards", used_guards, "contract.reference.unused_guard"),
-        ("mutations", used_mutations, "contract.reference.unused_mutation"),
-    ):
-        for index, item in enumerate(_items(contract, collection)):
-            if item["id"] not in used and item.get("unused_allowed") is not True:
-                issues.append(
-                    _issue(
-                        "error",
-                        code,
-                        f"$.{collection}[{index}].id",
-                        f"declared {collection[:-1]} is unused: {item['id']}",
-                    )
-                )
-
-
-def _validate_object_id(item: dict[str, Any], path: str, issues: list[dict[str, Any]]) -> None:
-    if not isinstance(item, dict):
-        issues.append(_issue("error", "contract.schema.type", path, "item must be object"))
-        return
-    item_id = item.get("id")
-    if not isinstance(item_id, str):
-        issues.append(_issue("error", "contract.schema.required", f"{path}.id", "id is required"))
-    elif not ID_RE.match(item_id):
-        issues.append(
-            _issue(
-                "error",
-                "contract.schema.id_format",
-                f"{path}.id",
-                "id must be lowercase identifier",
-            )
-        )
-
-
-def _items(contract: dict[str, Any], key: str) -> list[dict[str, Any]]:
-    value = contract.get(key)
-    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
-
-
-def _by_id(contract: dict[str, Any], key: str) -> dict[str, dict[str, Any]]:
-    return {
-        str(item["id"]): item for item in _items(contract, key) if isinstance(item.get("id"), str)
-    }
-
-
-def _screen_states(contract: dict[str, Any]) -> dict[str, set[str]]:
-    return {
-        str(screen["id"]): {
-            str(state["id"])
-            for state in screen.get("states", []) or []
-            if isinstance(state, dict) and isinstance(state.get("id"), str)
-        }
-        for screen in _items(contract, "screens")
-        if isinstance(screen.get("id"), str)
-    }
-
-
-def _validate_schema_subset(
-    value: Any,
-    schema: dict[str, Any],
-    path: str,
-    defs: dict[str, Any],
-    issues: list[dict[str, Any]],
-) -> None:
-    if "$ref" in schema:
-        ref = schema["$ref"]
-        if isinstance(ref, str) and ref.startswith("#/$defs/"):
-            target = defs.get(ref.rsplit("/", 1)[-1])
-            if isinstance(target, dict):
-                _validate_schema_subset(value, target, path, defs, issues)
-                return
-        issues.append(
-            _issue("error", "contract.schema.unsupported_ref", path, f"unsupported ref: {ref}")
-        )
-        return
-    expected_type = schema.get("type")
-    if expected_type and not _matches_json_type(value, expected_type):
-        issues.append(_issue("error", "contract.schema.type", path, f"expected {expected_type}"))
-        return
-    if "const" in schema and value != schema["const"]:
-        issues.append(
-            _issue("error", "contract.schema.const", path, f"expected {schema['const']!r}")
-        )
-    if "enum" in schema and value not in schema["enum"]:
-        issues.append(
-            _issue("error", "contract.schema.enum", path, f"expected one of {schema['enum']}")
-        )
-    if (
-        isinstance(value, str)
-        and isinstance(schema.get("pattern"), str)
-        and re.fullmatch(str(schema["pattern"]), value) is None
-    ):
-        issues.append(
-            _issue("error", "contract.schema.pattern", path, "value does not match pattern")
-        )
-    if isinstance(value, dict):
-        required = schema.get("required", []) if isinstance(schema.get("required"), list) else []
-        for key in required:
-            if isinstance(key, str) and key not in value:
-                issues.append(
-                    _issue(
-                        "error", "contract.schema.required", f"{path}.{key}", f"{key} is required"
-                    )
-                )
-        properties = (
-            schema.get("properties", {}) if isinstance(schema.get("properties"), dict) else {}
-        )
-        if schema.get("additionalProperties") is False:
-            for key in sorted(set(value) - set(properties)):
-                issues.append(
-                    _issue(
-                        "error",
-                        "contract.schema.additional_property",
-                        f"{path}.{key}",
-                        "unknown property",
-                    )
-                )
-        for key, child_schema in properties.items():
-            if key in value and isinstance(child_schema, dict):
-                _validate_schema_subset(value[key], child_schema, f"{path}.{key}", defs, issues)
-    elif isinstance(value, list) and isinstance(schema.get("items"), dict):
-        for index, item in enumerate(value):
-            _validate_schema_subset(item, schema["items"], f"{path}[{index}]", defs, issues)
-
-
-def _matches_json_type(value: Any, expected: str) -> bool:
-    return {
-        "object": isinstance(value, dict),
-        "array": isinstance(value, list),
-        "string": isinstance(value, str),
-        "integer": isinstance(value, int) and not isinstance(value, bool),
-        "number": isinstance(value, (int, float)) and not isinstance(value, bool),
-        "boolean": isinstance(value, bool),
-        "null": value is None,
-    }.get(expected, True)
-
-
-def _missing(kind: str, value: Any, path: str, issues: list[dict[str, Any]]) -> None:
-    issues.append(
-        _issue("error", f"contract.reference.missing_{kind}", path, f"missing {kind}: {value}")
-    )
-
-
-def _has_errors(issues: list[dict[str, Any]]) -> bool:
-    return any(issue["severity"] == "error" for issue in issues)
-
-
-def _issue(severity: str, code: str, path: str, message: str) -> dict[str, str]:
-    return {"severity": severity, "code": code, "path": path, "message": message}

@@ -94,6 +94,58 @@ viewport: "1440x900"
 def test_semantic_tree_from_specs_keeps_escape_and_backdrop_as_non_visual_actions(
     tmp_path: Path,
 ) -> None:
+    specs = _write_modal_specs(tmp_path)
+
+    tree = semantic_tree_from_specs(specs)
+    children = tree["screens"][0]["root"]["children"]
+
+    assert [child["text"] for child in children if child["role"] == "button"] == ["X close button"]
+    assert all(child["text"] != "Escape key" for child in children)
+    assert all(child["text"] != "Backdrop click" for child in children)
+
+
+def test_export_semantic_tree_cli_writes_stable_json(tmp_path: Path) -> None:
+    contract = write_json(tmp_path / "flow-ui-contract" / "contract.json", valid_contract())
+    first = tmp_path / "semantic-ui-tree.json"
+    second = tmp_path / "semantic-ui-tree-second.json"
+
+    assert main(["export-semantic-tree", str(contract), "--out", str(first), "--json"]) == 0
+    assert main(["export-semantic-tree", str(contract), "--out", str(second), "--json"]) == 0
+
+    assert first.read_bytes() == second.read_bytes()
+    exported = json.loads(first.read_text(encoding="utf-8"))
+    assert (
+        exported["screens"][0]["root"]["children"][0]["source_map"]["contract_path"] == "$.nodes[1]"
+    )
+
+
+def test_export_semantic_tree_projects_repeat_model_to_repeat_expression(
+    tmp_path: Path,
+) -> None:
+    contract_data = valid_contract()
+    contract_data["nodes"][1].update(
+        {
+            "role": "list",
+            "repeat_model": {
+                "collection": "checkout.payment_method",
+                "item_model": "checkout",
+                "item_key": "payment_method",
+                "instance_id_template": "checkout.title.{payment_method}",
+            },
+        }
+    )
+    contract = write_json(tmp_path / "flow-ui-contract" / "contract.json", contract_data)
+    out = tmp_path / "semantic-ui-tree.json"
+
+    assert main(["export-semantic-tree", str(contract), "--out", str(out), "--json"]) == 0
+    exported = json.loads(out.read_text(encoding="utf-8"))
+    repeated_node = exported["screens"][0]["root"]["children"][0]
+
+    assert repeated_node["repeat"] == "payment_method in checkout.payment_method"
+    assert validate_semantic_tree(exported) == []
+
+
+def _write_modal_specs(tmp_path: Path) -> Path:
     specs = tmp_path / "flow-ui-contract"
     flows = specs / "flows"
     screens = specs / "screens"
@@ -147,24 +199,4 @@ viewport:
         encoding="utf-8",
     )
 
-    tree = semantic_tree_from_specs(specs)
-    children = tree["screens"][0]["root"]["children"]
-
-    assert [child["text"] for child in children if child["role"] == "button"] == ["X close button"]
-    assert all(child["text"] != "Escape key" for child in children)
-    assert all(child["text"] != "Backdrop click" for child in children)
-
-
-def test_export_semantic_tree_cli_writes_stable_json(tmp_path: Path) -> None:
-    contract = write_json(tmp_path / "flow-ui-contract" / "contract.json", valid_contract())
-    first = tmp_path / "semantic-ui-tree.json"
-    second = tmp_path / "semantic-ui-tree-second.json"
-
-    assert main(["export-semantic-tree", str(contract), "--out", str(first), "--json"]) == 0
-    assert main(["export-semantic-tree", str(contract), "--out", str(second), "--json"]) == 0
-
-    assert first.read_bytes() == second.read_bytes()
-    exported = json.loads(first.read_text(encoding="utf-8"))
-    assert (
-        exported["screens"][0]["root"]["children"][0]["source_map"]["contract_path"] == "$.nodes[1]"
-    )
+    return specs

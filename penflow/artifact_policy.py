@@ -128,10 +128,25 @@ LEGACY_ROOT_POLICIES: Final = tuple(
     )
     for root in RECOGNIZED_LEGACY_ROOTS
 )
+C51_DURABLE_PATTERNS: Final = (
+    "**/run-report.json",
+    "run-report.json",
+    ".specs/penflow-requirements.json",
+    ".specs/penflow-approvals/**",
+    ".specs/testing/runtime-evidence/**",
+    "**/outcome-observations/*.json",
+)
+C51_DURABLE_POLICY: Final = ArtifactPolicy(
+    pattern="C51 retained report/source/runtime authorities",
+    artifact_class=ArtifactClass.DURABLE,
+    cleanup_rule=CleanupRule.NEVER,
+    git_rule=GitRule.ALLOW_TRACKED,
+)
 ARTIFACT_POLICIES: Final = (
     CANONICAL_PEN_POLICY,
     MANAGED_ROOT_POLICY,
     *LEGACY_ROOT_POLICIES,
+    C51_DURABLE_POLICY,
 )
 
 
@@ -187,6 +202,7 @@ READ_ONLY_COMMANDS: Final = frozenset(
         "theme-fingerprint",
         "validate-code-ir",
         "validate-report",
+        "authority",
     }
 )
 LIFECYCLE_EXEMPT_COMMANDS: Final = frozenset({"doctor", "--help", "--version"})
@@ -263,6 +279,12 @@ def artifact_policy_for(relative_path: str | PurePosixPath) -> ArtifactPolicy:
         return CANONICAL_PEN_POLICY
     if normalized.parts[0] == MANAGED_TEMP_ROOT:
         return MANAGED_ROOT_POLICY
+    if (
+        normalized.parts[:3] == (".specs", "testing", "runtime-evidence")
+        or normalized.parts[:2] == (".specs", "penflow-approvals")
+        or any(normalized.match(pattern) for pattern in C51_DURABLE_PATTERNS)
+    ):
+        return C51_DURABLE_POLICY
     for root, policy in zip(RECOGNIZED_LEGACY_ROOTS, LEGACY_ROOT_POLICIES, strict=True):
         if normalized.parts[0] == root:
             return policy

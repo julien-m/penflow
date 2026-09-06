@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -13,9 +14,13 @@ from typing import Any
 from .models import PenNode
 from .pen import parse_pen, validate_pen_context
 from .schema_cache import validator_for
+from .verification_json import canonical_bytes
 
 REQUIRED_ACTUAL_NODE_KEYS = {"id", "role", "bbox"}
 REQUIRED_BBOX_KEYS = {"x", "y", "width", "height"}
+# Measurement safety bound, far beyond practical UI coordinates: reject huge JSON
+# integers before float conversion can overflow. Business JSON values remain unrestricted.
+MAX_ABSOLUTE_OBSERVATION = 1e12
 
 
 def expected_tree_from_pen(path: str | Path) -> dict[str, Any]:
@@ -54,45 +59,24 @@ def validate_actual_tree(tree: dict[str, Any], *, schema: bool = False) -> list[
 
     Args:
         tree: Actual UI tree dict (contract C12).
-        schema: When True, also run JSON Schema validation against
-            ``penflow/schemas/actual-ui-tree.schema.json`` (draft 2020-12) and
-            merge schema errors into the returned issues list. Default ``False``
-            preserves byte-identical v0 behavior shipped by features 007/008.
+        schema: Retained for CLI/API compatibility. Complete schema validation
+            is unconditional since C51; the flag never weakens certification.
 
     Returns:
         List of structured issues ``{severity, path, message}``. Empty list
         means the tree is valid.
     """
-    issues: list[dict[str, Any]] = []
     if not isinstance(tree, dict):
         return [_issue("error", "$", "actual tree must be an object")]
-    if "version" not in tree:
-        issues.append(_issue("error", "$.version", "version is required"))
-    if "screen_id" not in tree and "screens" not in tree:
-        issues.append(_issue("error", "$.screen_id", "screen_id or screens is required"))
-
-    screens = tree.get("screens")
-    if screens is None:
-        screens = [tree]
-    if not isinstance(screens, list):
-        issues.append(_issue("error", "$.screens", "screens must be a list"))
+    try:
+        canonical_bytes(tree)
+    except (ValueError, TypeError, RecursionError) as exc:
+        return [_issue("error", "$", f"invalid finite JSON tree: {exc}")]
+    canonical = normalize_actual_tree(tree)
+    issues = _validate_actual_tree_schema(canonical)
+    if issues:
         return issues
-    for screen_index, screen in enumerate(screens):
-        path = f"$.screens[{screen_index}]"
-        if not isinstance(screen, dict):
-            issues.append(_issue("error", path, "screen must be an object"))
-            continue
-        if not isinstance(screen.get("viewport", {}), dict):
-            issues.append(_issue("error", f"{path}.viewport", "viewport must be an object"))
-        root = screen.get("root") or {"children": screen.get("nodes", [])}
-        issues.extend(_validate_actual_node(root, f"{path}.root"))
-    if schema:
-        # Normalize the legacy flat single-screen form before schema check so
-        # existing v0 fixtures (feature 025) continue to validate against the
-        # canonical {version, screens:[…]} shape declared by C12 (FR-006).
-        canonical = normalize_actual_tree(tree) if isinstance(tree, dict) else tree
-        issues.extend(_validate_actual_tree_schema(canonical))
-    return issues
+    return _tree_identity_issues(canonical)
 
 
 def _validate_actual_tree_schema(tree: Any) -> list[dict[str, Any]]:
@@ -109,17 +93,15 @@ def _validate_actual_tree_schema(tree: Any) -> list[dict[str, Any]]:
     raw_errors = list(validator.iter_errors(tree))
     formatted: list[dict[str, Any]] = []
     for error in raw_errors:
-        formatted.append(
-            _issue(
-                "error",
-                "$"
-                + "".join(
-                    f".{part}" if isinstance(part, str) else f"[{part}]"
-                    for part in error.absolute_path
-                ),
-                error.message,
-            )
+        path = "$" + "".join(
+            f".{part}" if isinstance(part, str) else f"[{part}]" for part in error.absolute_path
         )
+        if error.validator == "required":
+            for key in error.validator_value:
+                if key not in error.instance:
+                    formatted.append(_issue("error", f"{path}.{key}", f"{key} is required"))
+        else:
+            formatted.append(_issue("error", path, error.message))
     formatted.sort(key=lambda item: (item["path"], item["message"]))
     return formatted
 
@@ -128,11 +110,11 @@ def normalize_actual_tree(tree: dict[str, Any]) -> dict[str, Any]:
     if "screens" in tree:
         return tree
     return {
-        "version": tree.get("version", 1),
+        "version": tree.get("version"),
         "screens": [
             {
                 "screen_id": tree.get("screen_id", "screen"),
-                "viewport": tree.get("viewport", {}),
+                **({"viewport": tree["viewport"]} if "viewport" in tree else {}),
                 "root": tree.get("root")
                 or {"id": "root", "role": "container", "children": tree.get("nodes", [])},
             }
@@ -143,38 +125,111 @@ def normalize_actual_tree(tree: dict[str, Any]) -> dict[str, Any]:
 def flatten_nodes(
     node: dict[str, Any], parent_id: str | None = None, order: int = 0
 ) -> list[dict[str, Any]]:
-    semantic_id = node.get("semantic_id") or node.get("id")
-    item = dict(node)
-    item["_semantic_key"] = semantic_id
-    item["_parent_key"] = parent_id
-    item["_order"] = order
-    children = item.pop("children", []) or []
-    flattened = [item]
-    for child_order, child in enumerate(children):
-        if isinstance(child, dict):
-            flattened.extend(flatten_nodes(child, semantic_id, child_order))
+    """Flatten a node subtree in depth-first preorder without mutating its records.
+
+    Args:
+        node: Root node whose children retain their declared sibling order.
+        parent_id: Semantic key of the root's parent, or None for a screen root.
+        order: Root's sibling position; descendants use their child-list indexes.
+
+    Returns:
+        Shallow node copies without children, annotated with _semantic_key (semantic
+        ID or node ID, plus ::instance_id when present), _parent_key and _order.
+        Nested property values remain shared with the input.
+    """
+    flattened: list[dict[str, Any]] = []
+    pending = [(node, parent_id, order)]
+    while pending:
+        current, parent, position = pending.pop()
+        key = current.get("semantic_id") or current.get("id")
+        instance = current.get("instance_id")
+        if instance:
+            key = f"{key}::{instance}"
+        item = dict(current)
+        children = item.pop("children", []) or []
+        item.update(_semantic_key=key, _parent_key=parent, _order=position)
+        flattened.append(item)
+        pending.extend((child, key, i) for i, child in reversed(list(enumerate(children))))
     return flattened
 
 
-def _validate_actual_node(node: Any, path: str) -> list[dict[str, Any]]:
+# @spec FR-006: Unique typed observations — .specs/features/077-complete-verification-workflow/spec.md#fr-006
+def _tree_identity_issues(tree: dict[str, Any]) -> list[dict[str, Any]]:
+    # Check each screen's unique identities, finite geometry, then typed numeric observations.
     issues: list[dict[str, Any]] = []
-    if not isinstance(node, dict):
-        return [_issue("error", path, "node must be an object")]
-    if node.get("id") != "root" or node.keys() & REQUIRED_ACTUAL_NODE_KEYS:
-        for key in REQUIRED_ACTUAL_NODE_KEYS:
-            if key not in node:
-                issues.append(_issue("error", f"{path}.{key}", f"{key} is required"))
-        bbox = node.get("bbox", {})
-        if not isinstance(bbox, dict):
-            issues.append(_issue("error", f"{path}.bbox", "bbox must be an object"))
-        else:
-            for key in REQUIRED_BBOX_KEYS:
-                if key not in bbox:
-                    issues.append(_issue("error", f"{path}.bbox.{key}", f"{key} is required"))
-    for index, child in enumerate(node.get("children", []) or []):
-        issues.extend(_validate_actual_node(child, f"{path}.children[{index}]"))
+    screens: set[str] = set()
+    for index, screen in enumerate(tree["screens"]):
+        path = f"$.screens[{index}]"
+        if screen["screen_id"] in screens:
+            issues.append(_issue("error", path, "duplicate screen identity"))
+        screens.add(screen["screen_id"])
+        for key, value in screen.get("viewport", {}).items():
+            if isinstance(value, (int, float)) and (
+                abs(value) > MAX_ABSOLUTE_OBSERVATION or not math.isfinite(value)
+            ):
+                issues.append(_issue("error", f"{path}.viewport.{key}", "viewport must be finite"))
+        identities: set[str] = set()
+        node_ids: set[str] = set()
+        for node in flatten_nodes(screen["root"]):
+            key = node["_semantic_key"]
+            if key in identities or node["id"] in node_ids:
+                issues.append(_issue("error", path, f"duplicate node identity: {key}"))
+            identities.add(key)
+            node_ids.add(node["id"])
+            for property_name, value in node["bbox"].items():
+                if isinstance(value, (int, float)) and (
+                    abs(value) > MAX_ABSOLUTE_OBSERVATION or not math.isfinite(value)
+                ):
+                    issues.append(_issue("error", path, f"non-finite bbox {property_name}"))
+            issues.extend(_numeric_observation_issues(node, path))
     return issues
 
 
 def _issue(severity: str, path: str, message: str) -> dict[str, Any]:
     return {"severity": severity, "path": path, "message": message}
+
+
+def _numeric_observation_issues(node: dict[str, Any], path: str) -> list[dict[str, Any]]:
+    issues: list[dict[str, Any]] = []
+    tolerance = node.get("context", {}).get("tolerance", {})
+    if not isinstance(tolerance, dict):
+        return [_issue("error", path, "tolerance must be an object")]
+    for key, value in tolerance.items():
+        if key == "color" and value == "exact":
+            continue
+        if key not in {
+            "bbox_px",
+            "radius_px",
+            "font_px",
+            "spacing_px",
+            "order",
+        } or not _finite_nonnegative(value):
+            issues.append(_issue("error", path, f"invalid tolerance {key}"))
+    visual = node.get("visual", {})
+    stroke = visual.get("stroke")
+    if isinstance(stroke, dict):
+        thickness = stroke.get("thickness")
+        if not _finite_nonnegative(thickness) or (
+            "strokeThickness" in visual and visual["strokeThickness"] != thickness
+        ):
+            issues.append(_issue("error", path, "invalid or contradictory stroke thickness"))
+    for key in ("fontSize", "cornerRadius", "gap", "padding", "strokeThickness", "strokeWidth"):
+        if key not in visual:
+            continue
+        raw = visual[key]
+        values = (
+            list(raw.values()) if isinstance(raw, dict) else raw if isinstance(raw, list) else [raw]
+        )
+        if any(not _finite_nonnegative(value) for value in values):
+            issues.append(_issue("error", path, f"invalid visual {key}"))
+    return issues
+
+
+def _finite_nonnegative(value: Any) -> bool:
+    return (
+        not isinstance(value, bool)
+        and isinstance(value, (int, float))
+        and abs(value) <= MAX_ABSOLUTE_OBSERVATION
+        and math.isfinite(value)
+        and value >= 0
+    )

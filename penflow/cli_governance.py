@@ -93,6 +93,10 @@ def _run_governed_producer(args: argparse.Namespace) -> int:
     with LifecycleLock.acquire(context.project_root, owner, operation=f"producer:{command}"):
         preflight = run_project_doctor(context)
         if preflight.exit_code != 0:
+            from .cli_verification import is_verification_request, render_verification_boundary
+
+            if is_verification_request(args):
+                return render_verification_boundary(args, str(preflight.report.to_dict()))
             _print(preflight.report.to_dict(), bool(getattr(args, "json", False)))
             return preflight.exit_code
         canonical_relative = preflight.report.stable_result.canonical_pen
@@ -120,6 +124,10 @@ def _run_project_health_checked(args: argparse.Namespace) -> int:
     context = resolve_project_context(args.project)
     health = run_project_doctor(context)
     if health.exit_code != 0:
+        from .cli_verification import is_verification_request, render_verification_boundary
+
+        if is_verification_request(args):
+            return render_verification_boundary(args, str(health.report.to_dict()))
         _print(health.report.to_dict(), bool(getattr(args, "json", False)))
         return health.exit_code
     args.project = str(context.project_root)

@@ -1,3 +1,4 @@
+# @spec FR-004: Enforce complete JSON Schema and UI graph closure with cycle-safe lossless export. — .specs/features/077-complete-verification-workflow/spec.md#fr-004
 # @spec FR-002: Complete Pencil graph inventory — .specs/features/076-exhaustive-bidirectional-semantic-context/spec.md#fr-002
 """Cycle-safe inventory of every active id-bearing Pencil record."""
 
@@ -15,6 +16,7 @@ KNOWN_NODE_TYPES = {
     "ellipse",
     "frame",
     "group",
+    "icon",
     "icon_font",
     "image",
     "line",

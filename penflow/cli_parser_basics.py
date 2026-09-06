@@ -62,6 +62,17 @@ def _register_doctor_run(sub: Any) -> None:
     run.add_argument("--references", default=None, help="optional references directory")
     run.add_argument("--strict", action="store_true", help="fail on warning-only gates")
     run.add_argument(
+        "--profile",
+        choices=("design", "implementation"),
+        default=None,
+        help="require cumulative C51 workflow certification",
+    )
+    run.add_argument(
+        "--build-manifest",
+        default=None,
+        help="independently supplied implementation runner manifest",
+    )
+    run.add_argument(
         "--strict-closure",
         action="store_true",
         help="read-only fail-closed validation of same-run persistence, actual,"
@@ -161,6 +172,7 @@ def _register_validation_contracts(sub: Any) -> None:
         "--json", action="store_true", help="print machine-readable JSON"
     )
     validate_flow_contract_cmd.add_argument("contract")
+    validate_flow_contract_cmd.add_argument("--require-test-ids", action="store_true")
     _add_lenient(validate_flow_contract_cmd)
     validate_flow_contract_cmd.set_defaults(func=cmd_validate_flow_contract)
 

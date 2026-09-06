@@ -42,7 +42,13 @@ def _pen() -> dict:
     root = _semantic("screen", "checkout", "checkout-screen", "screen")
     title = _semantic("title", "checkout.title", "checkout-title", "text")
     pay = _semantic("pay", "checkout.pay", "checkout-pay", "button")
-    pay["context"]["intent"] = "submit_payment"
+    pay["context"].update(
+        intent="submit_payment",
+        binding="checkout.payment_method",
+        entity="checkout",
+        permission="buyer_can_pay",
+    )
+    title["context"].update(binding="checkout.title", entity="checkout")
     title["content"] = "Checkout"
     pay["content"] = "Pay"
     pay["children"] = [
@@ -57,7 +63,7 @@ def _pen() -> dict:
         },
         {
             "id": "pay-icon",
-            "type": "icon_font",
+            "type": "icon",
             "context": {
                 "classification": "decorative",
                 "decorative_owner": "checkout.pay",

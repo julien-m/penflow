@@ -90,7 +90,20 @@ def load_theme(theme_css_path: str | Path | None = None) -> dict[str, Any]:
     path = Path(theme_css_path)
     if not path.exists():
         raise FileNotFoundError(f"theme CSS not found: {path}")
-    raw_tokens = parse_css_custom_properties(path.read_text(encoding="utf-8"))
+    return theme_from_css(path.read_text(encoding="utf-8"))
+
+
+def theme_from_css(css: str) -> dict[str, Any]:
+    """Parse the same authenticated CSS bytes used by the enclosing source snapshot.
+
+    Args:
+        css: CSS text already authenticated by the caller's source snapshot.
+
+    Returns:
+        A normalized theme with typed Pencil ``variables`` and a ``style`` mapping
+        that preserves defaults for unspecified tokens.
+    """
+    raw_tokens = parse_css_custom_properties(css)
     variables: dict[str, dict[str, Any]] = {}
     style = dict(DEFAULT_STYLE)
     for source_name, (variable_name, variable_type) in THEME_TOKEN_MAP.items():

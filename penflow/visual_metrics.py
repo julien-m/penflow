@@ -14,6 +14,8 @@ from .color import parse_color, resolve_variable
 # so audit-visual can never disagree with compare-tree on what is checkable.
 from .compare import _bbox_is_measurable, _canonical_number, _is_masked, _is_number
 from .tree import flatten_nodes, load_tree
+from .visual_geometry import load_layout_snapshot, layout_snapshot_input, overlay_geometry_nodes
+from .visual_reporting import visual_issue, semantic_id, issue_sort_key, visual_metrics_report
 
 REPORT_KIND = "penflow-visual-metrics-report"
 REPORT_VERSION = 1
@@ -46,35 +48,31 @@ def audit_visual(
     theme: dict[str, Any] | None = None,
     theme_css: str | None = None,
     layout_snapshot: str | Path | dict[str, Any] | None = None,
+    tree_data: dict[str, Any] | None = None,
+    intrinsic_text_ids: frozenset[str] = frozenset(),
 ) -> dict[str, Any]:
     # @spec FR-001: Deterministic visual metrics engine — .specs/features/050-deterministic-visual-metrics-audit/spec.md#fr-001
     """Audit computable visual metrics in an expected UI tree.
-
     Args:
-        tree_path: Path to an `expected-ui-tree.json` (feature 006 shape).
-        theme: Loaded theme (`penflow.theme.load_theme` shape). `None` leaves
-            `$pf-*` fill references unresolved (they degrade to
-            `visual.color.unparsed` info issues).
-        theme_css: Theme CSS path recorded in the report inputs.
-        layout_snapshot: Optional Pencil `snapshot_layout` JSON path or object.
-            When present, its real bboxes are used for geometric checks only;
-            contrast, touch target, and text checks stay on the expected tree.
+        tree_path: Expected tree path recorded in the report.
+        theme: Optional loaded theme with variables; unresolved fills are reported.
+        theme_css: Theme source path recorded in the report.
+        layout_snapshot: Optional measured geometry for overlap and parent bounds.
+        tree_data: Authenticated in-memory tree instead of another file read.
+        intrinsic_text_ids: Source-derived auto text IDs with authenticated native
+            geometry; measured intrinsic width replaces the text estimate only.
 
     Returns:
-        A strict visual metrics report dictionary
-        (`visual-metrics-report.schema.json`).
-
+        A strict, deterministic visual metrics report.
     Raises:
-        ValueError: If the tree is not an object with a ``screens`` list of
-            objects carrying object roots — malformed input fails closed.
+        ValueError: The tree or screen roots have an invalid shape.
     """
-    tree = load_tree(tree_path)
+    tree = load_tree(tree_path) if tree_data is None else tree_data
     if not isinstance(tree, dict) or not isinstance(tree.get("screens"), list):
         raise ValueError(f"expected tree must be an object with a screens list: {tree_path}")
     raw_variables = theme.get("variables") if isinstance(theme, dict) else None
     variables: dict[str, Any] = raw_variables if isinstance(raw_variables, dict) else {}
-    snapshot_bboxes = _load_layout_snapshot(layout_snapshot)
-
+    snapshot_bboxes = load_layout_snapshot(layout_snapshot)
     issues: list[dict[str, Any]] = []
     nodes_checked = 0
     screens_checked = 0
@@ -88,30 +86,22 @@ def audit_visual(
         screens_checked += 1
         nodes = flatten_nodes(root)
         nodes_checked += len(nodes)
-        issues.extend(_audit_screen(screen_id, nodes, variables, snapshot_bboxes=snapshot_bboxes))
-    issues.sort(key=_issue_sort_key)
-
-    errors = sum(1 for issue in issues if issue["severity"] == "error")
-    warnings = sum(1 for issue in issues if issue["severity"] == "warning")
-    infos = sum(1 for issue in issues if issue["severity"] == "info")
-    return {
-        "version": REPORT_VERSION,
-        "kind": REPORT_KIND,
-        "status": "PASS" if errors == 0 else "FAIL",
-        "summary": {
-            "errors": errors,
-            "warnings": warnings,
-            "infos": infos,
-            "nodes_checked": nodes_checked,
-            "screens_checked": screens_checked,
-        },
-        "inputs": {
-            "expected_tree": str(tree_path),
-            "theme_css": theme_css,
-            "layout_snapshot": _layout_snapshot_input(layout_snapshot),
-        },
-        "issues": issues,
+        issues.extend(
+            _audit_screen(
+                screen_id,
+                nodes,
+                variables,
+                snapshot_bboxes=snapshot_bboxes,
+                intrinsic_text_ids=intrinsic_text_ids,
+            )
+        )
+    issues.sort(key=issue_sort_key)
+    inputs = {
+        "expected_tree": str(tree_path),
+        "theme_css": theme_css,
+        "layout_snapshot": layout_snapshot_input(layout_snapshot),
     }
+    return visual_metrics_report(issues, nodes_checked, screens_checked, inputs)
 
 
 def write_visual_metrics_report(report: dict[str, Any], out_path: str | Path) -> None:
@@ -157,6 +147,7 @@ def _audit_screen(
     variables: dict[str, Any],
     *,
     snapshot_bboxes: dict[tuple[str | None, str], dict[str, Any]] | None,
+    intrinsic_text_ids: frozenset[str] = frozenset(),
 ) -> list[dict[str, Any]]:
     by_key: dict[str, dict[str, Any]] = {
         str(node["_semantic_key"]): node for node in nodes if node.get("_semantic_key")
@@ -170,8 +161,9 @@ def _audit_screen(
             continue
         issues.extend(_contrast_issues(screen_id, node, by_key, fills))
         issues.extend(_touch_target_issues(screen_id, node))
-        issues.extend(_text_overflow_issues(screen_id, node))
-    geometry_nodes = _geometry_nodes(screen_id, nodes, snapshot_bboxes)
+        if not (snapshot_bboxes is not None and node.get("pencil_id") in intrinsic_text_ids):
+            issues.extend(_text_overflow_issues(screen_id, node))
+    geometry_nodes = overlay_geometry_nodes(screen_id, nodes, snapshot_bboxes)
     geometry_by_key: dict[str, dict[str, Any]] = {
         str(node["_semantic_key"]): node for node in geometry_nodes if node.get("_semantic_key")
     }
@@ -196,137 +188,6 @@ def _audit_screen(
         )
     )
     return issues
-
-
-def _load_layout_snapshot(
-    layout_snapshot: str | Path | dict[str, Any] | None,
-) -> dict[tuple[str | None, str], dict[str, Any]] | None:
-    if layout_snapshot is None:
-        return None
-    if isinstance(layout_snapshot, (str, Path)):
-        path = Path(layout_snapshot)
-        try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as error:
-            raise ValueError(f"layout snapshot is not valid JSON: {path}: {error}") from error
-        except OSError as error:
-            raise ValueError(f"layout snapshot could not be read: {path}: {error}") from error
-    else:
-        raw = layout_snapshot
-    if not isinstance(raw, dict):
-        raise ValueError("layout snapshot must be a JSON object")
-    bboxes: dict[tuple[str | None, str], dict[str, Any]] = {}
-    _collect_snapshot_bboxes(raw, None, bboxes)
-    return bboxes
-
-
-def _layout_snapshot_input(layout_snapshot: str | Path | dict[str, Any] | None) -> str | None:
-    if isinstance(layout_snapshot, (str, Path)):
-        return str(layout_snapshot)
-    return None
-
-
-def _collect_snapshot_bboxes(
-    item: Any,
-    screen_id: str | None,
-    bboxes: dict[tuple[str | None, str], dict[str, Any]],
-) -> None:
-    if isinstance(item, list):
-        for child in item:
-            _collect_snapshot_bboxes(child, screen_id, bboxes)
-        return
-    if not isinstance(item, dict):
-        return
-    current_screen_id = _snapshot_screen_id(item) or screen_id
-    bbox = _snapshot_bbox_from_item(item)
-    if bbox is not None:
-        for identifier in _snapshot_identifiers(item):
-            bboxes[(current_screen_id, identifier)] = bbox
-    for key in ("screens", "root", "nodes", "children"):
-        if key in item:
-            _collect_snapshot_bboxes(item[key], current_screen_id, bboxes)
-
-
-def _snapshot_screen_id(item: dict[str, Any]) -> str | None:
-    raw = item.get("screen_id") or item.get("screenId")
-    return str(raw) if raw is not None else None
-
-
-def _snapshot_identifiers(item: dict[str, Any]) -> list[str]:
-    identifiers: list[str] = []
-    for key in (
-        "semantic_id",
-        "semanticId",
-        "id",
-        "node_id",
-        "nodeId",
-        "pencil_node_id",
-        "pencilId",
-    ):
-        raw = item.get(key)
-        if raw is not None:
-            identifiers.append(str(raw))
-    return sorted(set(identifiers))
-
-
-def _snapshot_bbox_from_item(item: dict[str, Any]) -> dict[str, Any] | None:
-    raw_bbox = item.get("bbox")
-    if isinstance(raw_bbox, dict):
-        return _normalize_snapshot_bbox(raw_bbox)
-    if _is_number(item.get("width")) and _is_number(item.get("height")):
-        return {
-            "x": _canonical_number(float(item["x"])) if _is_number(item.get("x")) else 0,
-            "y": _canonical_number(float(item["y"])) if _is_number(item.get("y")) else 0,
-            "width": _canonical_number(float(item["width"])),
-            "height": _canonical_number(float(item["height"])),
-        }
-    return None
-
-
-def _normalize_snapshot_bbox(bbox: dict[str, Any]) -> dict[str, Any] | None:
-    if not all(_is_number(bbox.get(key)) for key in ("x", "y", "width", "height")):
-        return None
-    return {
-        "x": _canonical_number(float(bbox["x"])),
-        "y": _canonical_number(float(bbox["y"])),
-        "width": _canonical_number(float(bbox["width"])),
-        "height": _canonical_number(float(bbox["height"])),
-    }
-
-
-def _geometry_nodes(
-    screen_id: str,
-    nodes: list[dict[str, Any]],
-    snapshot_bboxes: dict[tuple[str | None, str], dict[str, Any]] | None,
-) -> list[dict[str, Any]]:
-    if snapshot_bboxes is None:
-        return nodes
-    geometry_nodes: list[dict[str, Any]] = []
-    for node in nodes:
-        geometry_node = dict(node)
-        bbox = _snapshot_bbox_for_node(screen_id, node, snapshot_bboxes)
-        if bbox is not None:
-            geometry_node["bbox"] = bbox
-            geometry_node["_layout_snapshot_bbox"] = True
-        else:
-            geometry_node["_layout_snapshot_bbox"] = False
-        geometry_nodes.append(geometry_node)
-    return geometry_nodes
-
-
-def _snapshot_bbox_for_node(
-    screen_id: str,
-    node: dict[str, Any],
-    snapshot_bboxes: dict[tuple[str | None, str], dict[str, Any]],
-) -> dict[str, Any] | None:
-    candidates = _snapshot_identifiers(node) + [str(node["_semantic_key"])]
-    for identifier in dict.fromkeys(candidates):
-        bbox = snapshot_bboxes.get((screen_id, identifier)) or snapshot_bboxes.get(
-            (None, identifier)
-        )
-        if bbox is not None:
-            return bbox
-    return None
 
 
 def _parse_fills(
@@ -355,7 +216,7 @@ def _parse_fills(
         fills[key] = parsed
         if parsed is None and not _is_masked(node):
             issues.append(
-                _issue(
+                visual_issue(
                     "visual.color.unparsed",
                     "info",
                     screen_id,
@@ -384,7 +245,7 @@ def _contrast_issues(
     background = _nearest_background(node, by_key, fills)
     if background is None:
         return [
-            _issue(
+            visual_issue(
                 "visual.contrast.unresolved",
                 "info",
                 screen_id,
@@ -397,7 +258,7 @@ def _contrast_issues(
     if ratio >= required:
         return []
     return [
-        _issue(
+        visual_issue(
             "visual.contrast.below_aa",
             "error",
             screen_id,
@@ -464,7 +325,7 @@ def _touch_target_issues(screen_id: str, node: dict[str, Any]) -> list[dict[str,
         return []
     if not _bbox_is_measurable(bbox):
         return [
-            _issue(
+            visual_issue(
                 "visual.bbox.unmeasured",
                 "info",
                 screen_id,
@@ -480,7 +341,7 @@ def _touch_target_issues(screen_id: str, node: dict[str, Any]) -> list[dict[str,
         "error" if width < TOUCH_TARGET_ERROR_PX or height < TOUCH_TARGET_ERROR_PX else "warning"
     )
     return [
-        _issue(
+        visual_issue(
             "visual.touch_target.too_small",
             severity,
             screen_id,
@@ -520,14 +381,14 @@ def _overlap_issues(
             for second in siblings[first_index + 1 :]:
                 if _boxes_overlap(first["bbox"], second["bbox"]):
                     issues.append(
-                        _issue(
+                        visual_issue(
                             "visual.bbox.overlap",
                             "error",
                             screen_id,
                             first,
                             f"bbox overlaps sibling {second.get('_semantic_key')}"
                             f" by more than {_canonical_number(GEOMETRY_TOLERANCE_PX)}px",
-                            other_semantic_id=_semantic_id(second),
+                            other_semantic_id=semantic_id(second),
                         )
                     )
     return issues
@@ -581,14 +442,14 @@ def _overflow_issues(
     if not escapes:
         return []
     return [
-        _issue(
+        visual_issue(
             "visual.bbox.overflow",
             "error",
             screen_id,
             node,
             f"bbox escapes parent {parent_key}"
             f" by more than {_canonical_number(GEOMETRY_TOLERANCE_PX)}px",
-            other_semantic_id=_semantic_id(parent),
+            other_semantic_id=semantic_id(parent),
         )
     ]
 
@@ -618,7 +479,7 @@ def _text_overflow_issues(screen_id: str, node: dict[str, Any]) -> list[dict[str
     if estimated_width <= float(bbox["width"]):
         return []
     return [
-        _issue(
+        visual_issue(
             "visual.text.likely_overflow",
             "warning",
             screen_id,
@@ -628,35 +489,3 @@ def _text_overflow_issues(screen_id: str, node: dict[str, Any]) -> list[dict[str
             f" len(text) * fontSize * {TEXT_WIDTH_FACTOR})",
         )
     ]
-
-
-def _semantic_id(node: dict[str, Any]) -> str | None:
-    key = node.get("_semantic_key")
-    return str(key) if key is not None else None
-
-
-def _issue(
-    code: str,
-    severity: str,
-    screen_id: str,
-    node: dict[str, Any],
-    message: str,
-    **extra: Any,
-) -> dict[str, Any]:
-    return {
-        "code": code,
-        "severity": severity,
-        "screen_id": screen_id,
-        "semantic_id": _semantic_id(node),
-        "message": message,
-        **extra,
-    }
-
-
-def _issue_sort_key(issue: dict[str, Any]) -> tuple[str, str, str, str]:
-    return (
-        issue["code"],
-        issue["screen_id"],
-        str(issue.get("semantic_id", "")),
-        issue["message"],
-    )

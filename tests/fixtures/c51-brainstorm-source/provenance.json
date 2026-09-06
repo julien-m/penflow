@@ -1,0 +1,35 @@
+{
+  "kind": "test-protocol-fixture",
+  "source_root": "/private/var/folders/l_/t1s_zytx2fqb0dkzz40d3v7m0000gn/T/brainstorm-c51-source-pmnfyqvo/consumer",
+  "description": "Exact bytes of the consumer real freeze CLI fixture, not native design/runtime evidence. Contract references are rebased only by tests after copying into the independent caller scope.",
+  "files": [
+    {
+      "path": "handoff/penflow/flow-ui-contract/contract.json",
+      "sha256": "ad292f6109369e78c0e42074dd6b3bc3e7a784f70e7e275ff7efd6e276e70c7b"
+    },
+    {
+      "path": "handoff/penflow/product-contract/.freeze-history/12d506dce0393897d041cd50ed31f5ec63737e31f347ea3c230daf24fd6d6b91.json",
+      "sha256": "12d506dce0393897d041cd50ed31f5ec63737e31f347ea3c230daf24fd6d6b91"
+    },
+    {
+      "path": "handoff/penflow/product-contract/.freeze-history/2002b96ab8d95fc007d959f560eb57a8feb1fdcb5e16a4440cbab8bf9391c9a5.json",
+      "sha256": "2002b96ab8d95fc007d959f560eb57a8feb1fdcb5e16a4440cbab8bf9391c9a5"
+    },
+    {
+      "path": "handoff/penflow/product-contract/product-contract.accepted.json",
+      "sha256": "89bd746968a29f57b9989aa78f580afd6dc910e7c23d626a0b66d7bfd7021065"
+    },
+    {
+      "path": "handoff/penflow/product-contract/product-contract.freeze.json",
+      "sha256": "2002b96ab8d95fc007d959f560eb57a8feb1fdcb5e16a4440cbab8bf9391c9a5"
+    },
+    {
+      "path": "handoff/penflow/product-contract/product-contract.json",
+      "sha256": "8a4743cc5e418d2be1670ed9d08ebb555c6b2c8a2b455cd0dde0fd18f8f80dcb"
+    },
+    {
+      "path": "handoff/penflow/product-contract/product-contract.md",
+      "sha256": "33542951521f6d092558a1cf2724357d1727fb95fd5fca2d6092acddb21b2fba"
+    }
+  ]
+}

@@ -123,6 +123,7 @@ def test_infer_role_prefers_context_role_over_type_alias() -> None:
 
 def test_infer_role_aliases_pencil_types() -> None:
     assert infer_role("frame", Context()) == "container"
+    assert infer_role("icon", Context()) == "icon"
     assert infer_role("icon_font", Context()) == "icon"
     assert infer_role("rectangle", Context()) == "shape"
     assert infer_role("ref", Context()) == "component"

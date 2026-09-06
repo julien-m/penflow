@@ -10,161 +10,14 @@ from pathlib import Path
 
 import pytest
 
+from tests.contract_factory import valid_contract as valid_contract
+
 from penflow.cli import main
 from penflow.flow_contract import (
     interactive_coverage_report,
     load_flow_contract_v2,
     validate_flow_contract_v2,
 )
-
-
-def valid_contract() -> dict:
-    return {
-        "version": 2,
-        "kind": "penflow-flow-contract",
-        "contract_id": "checkout-contract",
-        "actors": [{"id": "buyer", "name": "Buyer"}],
-        "entities": [
-            {
-                "id": "checkout",
-                "fields": [
-                    {"id": "title", "type": "string"},
-                    {"id": "payment_method", "type": "string"},
-                ],
-            }
-        ],
-        "screens": [
-            {
-                "id": "checkout",
-                "flow_id": "checkout",
-                "title": "Checkout",
-                "surface": "web-desktop",
-                "viewport": {"width": 1440, "height": 900},
-                "states": [{"id": "default"}, {"id": "success"}, {"id": "error"}],
-                "root_node": "checkout.root",
-            }
-        ],
-        "nodes": [
-            {
-                "id": "checkout.root",
-                "screen_id": "checkout",
-                "semantic_id": "checkout",
-                "test_id": "checkout-screen",
-                "role": "screen",
-                "children": ["checkout.title", "checkout.pay"],
-            },
-            {
-                "id": "checkout.title",
-                "screen_id": "checkout",
-                "semantic_id": "checkout.title",
-                "role": "text",
-                "text": "Checkout",
-                "binding": "checkout.title",
-            },
-            {
-                "id": "checkout.pay",
-                "screen_id": "checkout",
-                "semantic_id": "checkout.pay",
-                "test_id": "checkout-pay",
-                "role": "button",
-                "text": "Pay",
-                "binding": "checkout.payment_method",
-                "entity": "checkout",
-                "action": "submit_payment",
-            },
-        ],
-        "guards": [
-            {
-                "id": "payment_ready",
-                "variable": "payment_result",
-                "operator": "equals",
-                "value": "success",
-                "source": "runtime_result",
-            },
-            {
-                "id": "payment_failed",
-                "variable": "payment_result",
-                "operator": "equals",
-                "value": "error",
-                "source": "runtime_result",
-            },
-        ],
-        "permissions": [
-            {
-                "id": "buyer_can_pay",
-                "actor": "buyer",
-                "action": "submit_payment",
-                "entity": "checkout",
-            }
-        ],
-        "mutations": [
-            {
-                "id": "create_payment",
-                "method": "POST",
-                "endpoint": "/payments",
-                "entity": "checkout",
-                "request": {},
-                "response": {},
-                "success_state": "success",
-                "error_state": "error",
-            }
-        ],
-        "actions": [
-            {
-                "id": "submit_payment",
-                "node": "checkout.pay",
-                "trigger": "click",
-                "guard": "payment_ready",
-                "permission": "buyer_can_pay",
-                "mutation": "create_payment",
-                "success_transition": "payment_success",
-                "error_transition": "payment_error",
-            }
-        ],
-        "flows": [{"id": "checkout", "entry_screen": "checkout"}],
-        "transitions": [
-            {
-                "id": "payment_success",
-                "flow": "checkout",
-                "from_screen": "checkout",
-                "to_screen": "checkout",
-                "from_state": "default",
-                "to_state": "success",
-                "trigger": "submit_payment",
-                "action": "submit_payment",
-                "guard": "payment_ready",
-                "kind": "state",
-                "label": "Payment succeeds",
-                "causal": {
-                    "version": 1,
-                    "action_visibility": "user-visible",
-                    "outcome": "success",
-                    "fanout": {"group": "payment_result", "policy": "exclusive"},
-                },
-            },
-            {
-                "id": "payment_error",
-                "flow": "checkout",
-                "from_screen": "checkout",
-                "to_screen": "checkout",
-                "from_state": "default",
-                "to_state": "error",
-                "trigger": "submit_payment",
-                "action": "submit_payment",
-                "guard": "payment_failed",
-                "kind": "state",
-                "label": "Payment fails",
-                "causal": {
-                    "version": 1,
-                    "action_visibility": "user-visible",
-                    "outcome": "error",
-                    "fanout": {"group": "payment_result", "policy": "exclusive"},
-                },
-            },
-        ],
-        "needs_review": False,
-        "needs_clarification": [],
-    }
 
 
 def write_json(path: Path, data: dict) -> Path:
@@ -178,6 +31,21 @@ def test_valid_contract_passes_schema_references_and_cli(tmp_path: Path) -> None
 
     assert validate_flow_contract_v2(load_flow_contract_v2(contract_path)) == []
     assert main(["validate-flow-contract", str(contract_path), "--json"]) == 0
+
+
+def test_contract_accepts_precise_non_empty_mutation_payload_schemas() -> None:
+    contract = valid_contract()
+    mutation = contract["mutations"][0]
+    mutation["request"] = {
+        "payment_method": {"source": "user_input"},
+        "amount_minor": {"type": "integer"},
+    }
+    mutation["response"] = {
+        "payment_id": {"type": "string"},
+        "status": "accepted",
+    }
+
+    assert validate_flow_contract_v2(contract) == []
 
 
 def test_contract_schema_fails_closed_for_unknown_property(tmp_path: Path) -> None:

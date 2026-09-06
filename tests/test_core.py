@@ -200,46 +200,27 @@ def test_compare_ignores_unmeasurable_expected_bbox(tmp_path: Path) -> None:
 
 def test_compare_masks_volatile_nodes_and_dynamic_text(tmp_path: Path) -> None:
     data = sample_pen()
-    data["children"][0]["children"].extend(
-        [
-            {
-                "id": "timer",
-                "type": "text",
-                "content": "12:00",
-                "context": {"semantic_id": "checkout.timer", "role": "timer"},
-            },
-            {
-                "id": "live-total",
-                "type": "text",
-                "content": "$12.00",
-                "context": {
-                    "semantic_id": "checkout.total",
-                    "role": "text",
-                    "variant": "dynamic",
-                },
-            },
-            {
-                "id": "masked-total",
-                "type": "text",
-                "content": "$12.00",
-                "context": {
-                    "semantic_id": "checkout.masked_total",
-                    "role": "text",
-                    "mask_text": True,
-                },
-            },
-            {
-                "id": "volatile-banner",
-                "type": "text",
-                "content": "Limited offer",
-                "context": {
-                    "semantic_id": "checkout.offer",
-                    "role": "text",
-                    "variant": "volatile",
-                },
-            },
-        ]
-    )
+    for node_id, text, context in (
+        ("timer", "12:00", {"semantic_id": "checkout.timer", "role": "timer"}),
+        (
+            "live-total",
+            "$12.00",
+            {"semantic_id": "checkout.total", "role": "text", "variant": "dynamic"},
+        ),
+        (
+            "masked-total",
+            "$12.00",
+            {"semantic_id": "checkout.masked_total", "role": "text", "mask_text": True},
+        ),
+        (
+            "volatile-banner",
+            "Limited offer",
+            {"semantic_id": "checkout.offer", "role": "text", "variant": "volatile"},
+        ),
+    ):
+        data["children"][0]["children"].append(
+            {"id": node_id, "type": "text", "content": text, "context": context}
+        )
     pen_path = write_json(tmp_path / "ui.pen", data)
     expected = expected_tree_from_pen(pen_path)
     root = expected["screens"][0]["root"]
@@ -353,12 +334,13 @@ def test_compare_padding_element_wise_deviation_beyond_tolerance() -> None:
     assert "node.visual.padding" not in _issue_codes(within)
 
 
-def test_compare_padding_opaque_values_compare_exact() -> None:
+def test_compare_padding_unmeasured_values_fail_schema() -> None:
     same = _compare_visuals({"padding": "large"}, {"padding": "large"})
-    assert "node.visual.padding" not in _issue_codes(same)
+    assert same["status"] == "FAIL"
+    assert "expected.schema" in _issue_codes(same)
 
     different = _compare_visuals({"padding": "large"}, {"padding": [16, 16, 16]})
-    assert "node.visual.padding" in _issue_codes(different)
+    assert "expected.schema" in _issue_codes(different)
 
 
 def test_compare_spacing_px_override_via_context_tolerance() -> None:
@@ -374,15 +356,16 @@ def test_compare_spacing_px_override_via_context_tolerance() -> None:
     assert "node.visual.gap" in _issue_codes(exact)
 
 
-def test_compare_layout_spacing_absent_keys_emit_no_issues() -> None:
+def test_compare_layout_spacing_requires_expected_properties() -> None:
     # Neither side defines layout keys (pre-048 trees).
     assert _compare_visuals({"fill": "#FFFFFF"}, {"fill": "#FFFFFF"})["issues"] == []
 
-    # Key present on only one side stays silent in both directions.
+    # C51 requires declared expected properties; extra observed properties remain harmless.
     one_side = _compare_visuals(
         {"gap": 16, "layout": "vertical", "alignItems": "stretch", "padding": 16}, {}
     )
-    assert one_side["issues"] == []
+    assert one_side["status"] == "FAIL"
+    assert len(one_side["issues"]) == 4
     other_side = _compare_visuals(
         {}, {"gap": 16, "layout": "vertical", "alignItems": "stretch", "padding": 16}
     )

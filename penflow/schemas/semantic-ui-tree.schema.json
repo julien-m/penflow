@@ -6,7 +6,14 @@
   "description": "Pre-Pencil semantic contract produced from flow/screen specs. It captures product intent before .pen drafting or enrichment and before post-implementation runtime UI trees.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["version", "kind", "tree_id", "source", "flows", "screens"],
+  "required": [
+    "version",
+    "kind",
+    "tree_id",
+    "source",
+    "flows",
+    "screens"
+  ],
   "properties": {
     "version": {
       "type": "integer",
@@ -36,13 +43,38 @@
       "items": {
         "$ref": "#/$defs/screen"
       }
+    },
+    "system_returns": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:penflow:c51:contracts:v1#/$defs/system-return"
+      }
+    },
+    "requirements": {
+      "$ref": "urn:penflow:c51:contracts:v1#/$defs/contract-requirements"
+    },
+    "outcome_expectations": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:penflow:c51:contracts:v1#/$defs/expected-outcome"
+      }
+    },
+    "verification_policy": {
+      "$ref": "urn:penflow:c51:contracts:v1#/$defs/verification-policy"
     }
   },
   "$defs": {
     "flow": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "title", "entry_screen", "steps", "transitions", "source_map"],
+      "required": [
+        "id",
+        "title",
+        "entry_screen",
+        "steps",
+        "transitions",
+        "source_map"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -54,7 +86,11 @@
         },
         "priority": {
           "type": "string",
-          "enum": ["P1", "P2", "P3"]
+          "enum": [
+            "P1",
+            "P2",
+            "P3"
+          ]
         },
         "entry_screen": {
           "type": "string",
@@ -80,7 +116,11 @@
     "flowStep": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "screen_id", "intent"],
+      "required": [
+        "id",
+        "screen_id",
+        "intent"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -102,7 +142,11 @@
     "transition": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["from", "to", "trigger"],
+      "required": [
+        "from",
+        "to",
+        "trigger"
+      ],
       "properties": {
         "id": {
           "type": "string"
@@ -127,7 +171,11 @@
         },
         "kind": {
           "type": "string",
-          "enum": ["navigation", "state", "environment"]
+          "enum": [
+            "navigation",
+            "state",
+            "environment"
+          ]
         },
         "label": {
           "type": "string"
@@ -135,19 +183,42 @@
         "causal": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["version", "action_visibility", "outcome", "fanout"],
+          "required": [
+            "version",
+            "action_visibility",
+            "outcome",
+            "fanout"
+          ],
           "properties": {
-            "version": {"const": 1},
-            "action_visibility": {"const": "user-visible"},
-            "outcome": {"type": "string"},
+            "version": {
+              "const": 1
+            },
+            "action_visibility": {
+              "const": "user-visible"
+            },
+            "outcome": {
+              "type": "string"
+            },
             "fanout": {
               "type": "object",
               "additionalProperties": false,
-              "required": ["group", "policy"],
+              "required": [
+                "group",
+                "policy"
+              ],
               "properties": {
-                "group": {"type": "string"},
-                "policy": {"enum": ["exclusive", "governed"]},
-                "governance": {"type": "string"}
+                "group": {
+                  "type": "string"
+                },
+                "policy": {
+                  "enum": [
+                    "exclusive",
+                    "governed"
+                  ]
+                },
+                "governance": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -157,7 +228,17 @@
     "screen": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "flow_id", "surface", "viewport", "root", "states", "validations", "side_effects", "source_map"],
+      "required": [
+        "id",
+        "flow_id",
+        "surface",
+        "viewport",
+        "root",
+        "states",
+        "validations",
+        "side_effects",
+        "source_map"
+      ],
       "properties": {
         "id": {
           "type": "string",
@@ -169,7 +250,13 @@
         },
         "surface": {
           "type": "string",
-          "enum": ["mobile", "web", "landing", "showcase", "admin"]
+          "enum": [
+            "mobile",
+            "web",
+            "landing",
+            "showcase",
+            "admin"
+          ]
         },
         "viewport": {
           "$ref": "#/$defs/viewport"
@@ -203,7 +290,11 @@
     "semanticNode": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["semantic_id", "role", "source_map"],
+      "required": [
+        "semantic_id",
+        "role",
+        "source_map"
+      ],
       "properties": {
         "semantic_id": {
           "type": "string",
@@ -211,7 +302,28 @@
         },
         "role": {
           "type": "string",
-          "enum": ["screen", "container", "component", "text", "button", "link", "input", "select", "toggle", "form", "list", "list_item", "image", "icon", "navigation", "tab", "modal", "alert", "timer", "shape"]
+          "enum": [
+            "screen",
+            "container",
+            "component",
+            "text",
+            "button",
+            "link",
+            "input",
+            "select",
+            "toggle",
+            "form",
+            "list",
+            "list_item",
+            "image",
+            "icon",
+            "navigation",
+            "tab",
+            "modal",
+            "alert",
+            "timer",
+            "shape"
+          ]
         },
         "intent": {
           "type": "string"
@@ -258,13 +370,19 @@
           "items": {
             "$ref": "#/$defs/semanticNode"
           }
+        },
+        "permission": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
     "state": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "properties": {
         "name": {
           "type": "string"
@@ -277,7 +395,9 @@
     "validation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["rule"],
+      "required": [
+        "rule"
+      ],
       "properties": {
         "rule": {
           "type": "string"
@@ -293,7 +413,9 @@
     "sideEffect": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["effect"],
+      "required": [
+        "effect"
+      ],
       "properties": {
         "effect": {
           "type": "string"
@@ -320,7 +442,10 @@
           "type": "string"
         },
         "pencil_node_id": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "notes": {
           "type": "array",
@@ -333,7 +458,10 @@
     "viewport": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["width", "height"],
+      "required": [
+        "width",
+        "height"
+      ],
       "properties": {
         "width": {
           "type": "number"

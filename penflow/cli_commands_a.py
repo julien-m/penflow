@@ -139,6 +139,10 @@ def cmd_inspect(args: argparse.Namespace) -> int:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
+    if getattr(args, "profile", None):
+        from .cli_verification import run_verification_command
+
+        return run_verification_command(args)
     dependencies = _dependencies(args)
     if args.strict_closure:
         try:
@@ -272,6 +276,10 @@ def cmd_validate_flow_contract(args: argparse.Namespace) -> int:
     # @spec FR-004: Primary strict contract CLI — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-004
     contract = load_flow_contract_v2(args.contract)
     issues = validate_flow_contract_v2(contract)
+    if getattr(args, "require_test_ids", False):
+        from .contract_preparation import contract_test_id_issues
+
+        issues.extend(contract_test_id_issues(contract))
     code = _exit_code(issues, _is_lenient(args))
     _print(
         {

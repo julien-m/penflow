@@ -23,167 +23,464 @@
     "needs_clarification"
   ],
   "properties": {
-    "version": {"const": 2},
-    "kind": {"const": "penflow-flow-contract"},
-    "contract_id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-    "actors": {"type": "array", "items": {"$ref": "#/$defs/namedIdObject"}},
-    "entities": {"type": "array", "items": {"$ref": "#/$defs/entity"}},
-    "screens": {"type": "array", "items": {"$ref": "#/$defs/screen"}},
-    "nodes": {"type": "array", "items": {"$ref": "#/$defs/node"}},
-    "guards": {"type": "array", "items": {"$ref": "#/$defs/guard"}},
-    "permissions": {"type": "array", "items": {"$ref": "#/$defs/permission"}},
-    "mutations": {"type": "array", "items": {"$ref": "#/$defs/mutation"}},
-    "actions": {"type": "array", "items": {"$ref": "#/$defs/action"}},
-    "flows": {"type": "array", "items": {"$ref": "#/$defs/flow"}},
-    "transitions": {"type": "array", "items": {"$ref": "#/$defs/transition"}},
-    "relations": {"type": "array", "items": {"$ref": "#/$defs/relation"}},
-    "needs_review": {"type": "boolean"},
-    "needs_clarification": {"type": "array", "items": {"type": "string"}}
+    "version": {
+      "const": 2
+    },
+    "kind": {
+      "const": "penflow-flow-contract"
+    },
+    "contract_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+    },
+    "actors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/namedIdObject"
+      }
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/entity"
+      }
+    },
+    "screens": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/screen"
+      },
+      "minItems": 1
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/node"
+      },
+      "minItems": 1
+    },
+    "guards": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/guard"
+      }
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/permission"
+      }
+    },
+    "mutations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/mutation"
+      }
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/action"
+      }
+    },
+    "flows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/flow"
+      },
+      "minItems": 1
+    },
+    "transitions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/transition"
+      }
+    },
+    "relations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/relation"
+      }
+    },
+    "needs_review": {
+      "type": "boolean"
+    },
+    "needs_clarification": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "requirements": {
+      "$ref": "urn:penflow:c51:contracts:v1#/$defs/contract-requirements"
+    },
+    "outcome_expectations": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:penflow:c51:contracts:v1#/$defs/expected-outcome"
+      }
+    },
+    "system_returns": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:penflow:c51:contracts:v1#/$defs/system-return"
+      }
+    },
+    "verification_policy": {
+      "$ref": "urn:penflow:c51:contracts:v1#/$defs/verification-policy"
+    }
   },
   "$defs": {
     "idObject": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "properties": {
-        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"}
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        }
       }
     },
     "namedIdObject": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "properties": {
-        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "name": {"type": "string"}
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "name": {
+          "type": "string"
+        }
       }
     },
     "usageObject": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "properties": {
-        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "unused_allowed": {"type": "boolean"}
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "unused_allowed": {
+          "type": "boolean"
+        }
       }
     },
     "guard": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "properties": {
-        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "variable": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(?:[._-][a-z0-9_]+)*$"},
-        "operator": {"enum": ["equals", "not_equals", "in", "exists"]},
-        "value": {"type": "string"},
-        "source": {"enum": ["user_input", "runtime_result", "environment", "session"]},
-        "unused_allowed": {"type": "boolean"}
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "variable": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(?:[._-][a-z0-9_]+)*$"
+        },
+        "operator": {
+          "enum": [
+            "equals",
+            "not_equals",
+            "in",
+            "exists"
+          ]
+        },
+        "value": {
+          "type": "string"
+        },
+        "source": {
+          "enum": [
+            "user_input",
+            "runtime_result",
+            "environment",
+            "session"
+          ]
+        },
+        "unused_allowed": {
+          "type": "boolean"
+        }
       }
     },
     "causalTransition": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["version", "action_visibility", "outcome", "fanout"],
+      "required": [
+        "version",
+        "action_visibility",
+        "outcome",
+        "fanout"
+      ],
       "properties": {
-        "version": {"const": 1},
-        "action_visibility": {"const": "user-visible"},
-        "outcome": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "fanout": {"$ref": "#/$defs/causalFanout"}
+        "version": {
+          "const": 1
+        },
+        "action_visibility": {
+          "const": "user-visible"
+        },
+        "outcome": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "fanout": {
+          "$ref": "#/$defs/causalFanout"
+        }
       }
     },
     "causalFanout": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["group", "policy"],
+      "required": [
+        "group",
+        "policy"
+      ],
       "properties": {
-        "group": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "policy": {"enum": ["exclusive", "governed"]},
-        "governance": {"type": "string", "pattern": ".*\\S.*"}
+        "group": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "policy": {
+          "enum": [
+            "exclusive",
+            "governed"
+          ]
+        },
+        "governance": {
+          "type": "string",
+          "pattern": ".*\\S.*"
+        }
       },
       "allOf": [
         {
-          "if": {"properties": {"policy": {"const": "governed"}}, "required": ["policy"]},
-          "then": {"required": ["governance"]}
+          "if": {
+            "properties": {
+              "policy": {
+                "const": "governed"
+              }
+            },
+            "required": [
+              "policy"
+            ]
+          },
+          "then": {
+            "required": [
+              "governance"
+            ]
+          }
         }
       ]
     },
     "entity": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "fields"],
+      "required": [
+        "id",
+        "fields"
+      ],
       "properties": {
-        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "fields": {"type": "array", "items": {"$ref": "#/$defs/field"}}
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/field"
+          }
+        }
       }
     },
     "field": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "type"],
+      "required": [
+        "id",
+        "type"
+      ],
       "properties": {
-        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "type": {"type": "string"}
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "type": {
+          "type": "string"
+        }
       }
     },
     "screen": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "flow_id", "states", "root_node"],
+      "required": [
+        "id",
+        "flow_id",
+        "states",
+        "root_node"
+      ],
       "properties": {
-        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "flow_id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "title": {"type": "string"},
-        "surface": {"type": "string"},
-        "viewport": {"$ref": "#/$defs/viewport"},
-        "states": {"type": "array", "items": {"$ref": "#/$defs/idObject"}},
-        "root_node": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "static": {"type": "boolean"},
-        "static_reason": {"type": "string", "pattern": ".*\\S.*"}
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "flow_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "title": {
+          "type": "string"
+        },
+        "surface": {
+          "type": "string"
+        },
+        "viewport": {
+          "$ref": "#/$defs/viewport"
+        },
+        "states": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/idObject"
+          }
+        },
+        "root_node": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "static": {
+          "type": "boolean"
+        },
+        "static_reason": {
+          "type": "string",
+          "pattern": ".*\\S.*"
+        }
       }
     },
     "viewport": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["width", "height"],
+      "required": [
+        "width",
+        "height"
+      ],
       "properties": {
-        "width": {"type": "integer"},
-        "height": {"type": "integer"}
+        "width": {
+          "type": "integer"
+        },
+        "height": {
+          "type": "integer"
+        }
       }
     },
     "node": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "screen_id", "semantic_id", "role"],
+      "required": [
+        "id",
+        "screen_id",
+        "semantic_id",
+        "role"
+      ],
       "properties": {
-        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "screen_id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "semantic_id": {"type": "string"},
-        "test_id": {"type": "string"},
-        "role": {"type": "string"},
-        "text": {"type": "string"},
-        "binding": {"type": "string"},
-        "entity": {"type": "string"},
-        "action": {"type": "string"},
-        "kind": {"enum": ["screen_root", "section", "element", "shared_component"]},
-        "owner": {"$ref": "#/$defs/owner"},
-        "parent": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "repeat_model": {"$ref": "#/$defs/repeatModel"},
-        "copy_id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "states": {"type": "array", "items": {"type": "string"}},
-        "children": {"type": "array", "items": {"type": "string"}}
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "screen_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "semantic_id": {
+          "type": "string"
+        },
+        "test_id": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "binding": {
+          "type": "string"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "screen_root",
+            "section",
+            "element",
+            "shared_component"
+          ]
+        },
+        "owner": {
+          "$ref": "#/$defs/owner"
+        },
+        "parent": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "repeat_model": {
+          "$ref": "#/$defs/repeatModel"
+        },
+        "copy_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "states": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     },
     "owner": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["scope"],
+      "required": [
+        "scope"
+      ],
       "properties": {
-        "scope": {"enum": ["screen", "shared_component"]},
-        "screen": {"type": "string"},
+        "scope": {
+          "enum": [
+            "screen",
+            "shared_component"
+          ]
+        },
+        "screen": {
+          "type": "string"
+        },
         "section": {
           "oneOf": [
-            {"type": "string"},
-            {"$ref": "#/$defs/noneReference"}
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/noneReference"
+            }
           ]
         }
       }
@@ -191,139 +488,517 @@
     "noneReference": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["kind", "reason"],
+      "required": [
+        "kind",
+        "reason"
+      ],
       "properties": {
-        "kind": {"const": "none"},
-        "reason": {"type": "string", "pattern": ".*\\S.*"}
+        "kind": {
+          "const": "none"
+        },
+        "reason": {
+          "type": "string",
+          "pattern": ".*\\S.*"
+        }
       }
     },
     "repeatModel": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["collection", "item_model", "item_key", "instance_id_template"],
+      "required": [
+        "collection",
+        "item_model",
+        "item_key",
+        "instance_id_template"
+      ],
       "properties": {
-        "collection": {"type": "string"},
-        "item_model": {"type": "string"},
-        "item_key": {"type": "string"},
-        "instance_id_template": {"type": "string", "pattern": ".*\\{[^}]+\\}.*"}
+        "collection": {
+          "type": "string"
+        },
+        "item_model": {
+          "type": "string"
+        },
+        "item_key": {
+          "type": "string"
+        },
+        "instance_id_template": {
+          "type": "string",
+          "pattern": ".*\\{[^}]+\\}.*"
+        }
       }
     },
     "relation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "kind", "source", "target", "effect"],
+      "required": [
+        "id",
+        "kind",
+        "source",
+        "target",
+        "effect"
+      ],
       "properties": {
-        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "kind": {"enum": ["selection", "ownership", "navigation", "data_dependency", "state_dependency", "instance"]},
-        "source": {"type": "string"},
-        "target": {"type": "string"},
-        "effect": {"type": "string", "pattern": ".*\\S.*"}
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "kind": {
+          "enum": [
+            "selection",
+            "ownership",
+            "navigation",
+            "data_dependency",
+            "state_dependency",
+            "instance"
+          ]
+        },
+        "source": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "effect": {
+          "type": "string",
+          "pattern": ".*\\S.*"
+        }
       }
     },
     "permission": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "actor", "action", "entity"],
+      "required": [
+        "id",
+        "actor",
+        "action",
+        "entity"
+      ],
       "properties": {
-        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "actor": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "action": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "entity": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"}
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "actor": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "action": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "entity": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        }
       }
     },
     "mutation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "method", "endpoint", "entity", "request", "response", "success_state", "error_state"],
+      "required": [
+        "id",
+        "method",
+        "endpoint",
+        "entity",
+        "request",
+        "response",
+        "success_state",
+        "error_state"
+      ],
       "properties": {
-        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "method": {"enum": ["GET", "POST", "PUT", "PATCH", "DELETE"]},
-        "endpoint": {"type": "string"},
-        "entity": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "request": {"type": "object", "additionalProperties": false},
-        "response": {"type": "object", "additionalProperties": false},
-        "success_state": {"type": "string"},
-        "error_state": {"type": "string"},
-        "unused_allowed": {"type": "boolean"}
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ]
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "entity": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "request": {
+          "type": "object"
+        },
+        "response": {
+          "type": "object"
+        },
+        "success_state": {
+          "type": "string"
+        },
+        "error_state": {
+          "type": "string"
+        },
+        "unused_allowed": {
+          "type": "boolean"
+        }
       }
     },
     "action": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "node", "trigger", "guard", "permission", "mutation", "success_transition", "error_transition"],
+      "required": [
+        "id",
+        "node",
+        "trigger"
+      ],
       "properties": {
-        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "node": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "trigger": {"type": "string"},
-        "guard": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "permission": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "mutation": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "success_transition": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "error_transition": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "kind": {"enum": ["navigation", "state_change", "data_mutation", "system"]},
-        "event": {"type": "string"},
-        "intent": {"type": "string"},
-        "source_node": {"type": "string"},
-        "validation": {"type": "string"},
-        "binding_ref": {"$ref": "#/$defs/bindingReference"},
-        "payload": {"type": "object"},
-        "side_effects": {"type": "array", "items": {"type": "string"}},
-        "destination": {"$ref": "#/$defs/destination"},
-        "success": {"type": "object"},
-        "failure": {"type": "object"},
-        "loading": {"type": "object"},
-        "unavailable": {"type": "object"},
-        "unused_allowed": {"type": "boolean"}
-      }
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "node": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "trigger": {
+          "type": "string"
+        },
+        "guard": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "permission": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "mutation": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "success_transition": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "error_transition": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "kind": {
+          "enum": [
+            "navigation",
+            "state_change",
+            "data_mutation",
+            "system"
+          ]
+        },
+        "event": {
+          "type": "string"
+        },
+        "intent": {
+          "type": "string"
+        },
+        "source_node": {
+          "type": "string"
+        },
+        "validation": {
+          "type": "string"
+        },
+        "binding_ref": {
+          "$ref": "#/$defs/bindingReference"
+        },
+        "payload": {
+          "type": "object"
+        },
+        "side_effects": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "destination": {
+          "$ref": "#/$defs/destination"
+        },
+        "success": {
+          "type": "object"
+        },
+        "failure": {
+          "type": "object"
+        },
+        "loading": {
+          "type": "object"
+        },
+        "unavailable": {
+          "type": "object"
+        },
+        "unused_allowed": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "state_change"
+              },
+              "event": {
+                "const": "change"
+              }
+            },
+            "required": [
+              "kind",
+              "event"
+            ],
+            "not": {
+              "required": [
+                "mutation"
+              ]
+            }
+          },
+          "then": {
+            "required": [
+              "binding_ref"
+            ],
+            "properties": {
+              "trigger": {
+                "enum": [
+                  "input",
+                  "change"
+                ]
+              },
+              "binding_ref": {
+                "required": [
+                  "access"
+                ],
+                "properties": {
+                  "access": {
+                    "enum": [
+                      "write",
+                      "read_write"
+                    ]
+                  }
+                }
+              }
+            },
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "mutation"
+                  ]
+                },
+                {
+                  "required": [
+                    "side_effects"
+                  ]
+                },
+                {
+                  "required": [
+                    "destination"
+                  ]
+                },
+                {
+                  "required": [
+                    "success_transition"
+                  ]
+                },
+                {
+                  "required": [
+                    "error_transition"
+                  ]
+                }
+              ]
+            }
+          },
+          "else": {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "navigation"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "not": {
+                "required": [
+                  "mutation"
+                ]
+              }
+            },
+            "then": {
+              "required": [
+                "destination"
+              ],
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "mutation"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "side_effects"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "success_transition"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "error_transition"
+                    ]
+                  }
+                ]
+              }
+            },
+            "else": {
+              "required": [
+                "id",
+                "node",
+                "trigger",
+                "guard",
+                "permission",
+                "mutation",
+                "success_transition",
+                "error_transition"
+              ]
+            }
+          }
+        }
+      ]
     },
     "bindingReference": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["entity", "field"],
+      "required": [
+        "entity",
+        "field"
+      ],
       "properties": {
-        "entity": {"type": "string"},
-        "field": {"type": "string"},
-        "access": {"enum": ["read", "write", "read_write", "transmit"]},
-        "unit": {"type": "string"},
-        "provenance": {"type": "string"}
+        "entity": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "access": {
+          "enum": [
+            "read",
+            "write",
+            "read_write",
+            "transmit"
+          ]
+        },
+        "unit": {
+          "type": "string"
+        },
+        "provenance": {
+          "type": "string"
+        }
       }
     },
     "destination": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["screen", "state"],
+      "required": [
+        "screen",
+        "state"
+      ],
       "properties": {
-        "screen": {"type": "string"},
-        "state": {"type": "string"},
-        "transition": {"type": "string"}
+        "screen": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "transition": {
+          "type": "string"
+        }
       }
     },
     "flow": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "entry_screen"],
+      "required": [
+        "id",
+        "entry_screen"
+      ],
       "properties": {
-        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "entry_screen": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"}
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "entry_screen": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        }
       }
     },
     "transition": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "flow", "from_screen", "to_screen", "from_state", "to_state", "trigger", "action"],
+      "required": [
+        "id",
+        "flow",
+        "from_screen",
+        "to_screen",
+        "from_state",
+        "to_state",
+        "trigger",
+        "action"
+      ],
       "properties": {
-        "id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "flow": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "from_screen": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "to_screen": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "from_state": {"type": "string"},
-        "to_state": {"type": "string"},
-        "trigger": {"type": "string"},
-        "action": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "guard": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"},
-        "kind": {"enum": ["navigation", "state", "environment"]},
-        "label": {"type": "string", "pattern": ".*\\S.*"},
-        "causal": {"$ref": "#/$defs/causalTransition"}
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "flow": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "from_screen": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "to_screen": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "from_state": {
+          "type": "string"
+        },
+        "to_state": {
+          "type": "string"
+        },
+        "trigger": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "guard": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+        },
+        "kind": {
+          "enum": [
+            "navigation",
+            "state",
+            "environment"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "pattern": ".*\\S.*"
+        },
+        "causal": {
+          "$ref": "#/$defs/causalTransition"
+        }
       }
     }
   }

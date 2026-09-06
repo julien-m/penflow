@@ -22,6 +22,8 @@ VISUAL_KEYS = {
     "fill",
     "stroke",
     "strokeThickness",
+    "strokeWidth",
+    "strokeAlignment",
     "cornerRadius",
     "fontSize",
     "fontFamily",
@@ -216,119 +218,67 @@ def validate_pen_context_against_contract(
     issues = validate_pen_context(roots)
     registries = contract_registries(contract)
     seen: dict[str, set[str]] = {
-        "semantic_ids": set(),
-        "test_ids": set(),
-        "actions": set(),
-        "permissions": set(),
-        "fields": set(),
-        "entities": set(),
+        key: set()
+        for key in ("semantic_ids", "test_ids", "actions", "permissions", "fields", "entities")
+    }
+    screen_states = {
+        screen["id"]: {state["id"] for state in screen.get("states", [])}
+        for screen in contract.get("screens", [])
     }
     for node in all_nodes(roots):
-        context = node.context
-        semantic_id = context.semantic_id
-        if semantic_id:
-            seen["semantic_ids"].add(str(semantic_id))
-        if semantic_id and semantic_id not in registries["semantic_ids"]:
-            issues.append(
-                ContextIssue(
-                    "error",
-                    "contract.semantic_id_missing",
-                    "semantic_id is absent from contract nodes",
-                    node.id,
-                    semantic_id,
-                )
-            )
-        if context.intent and context.intent in registries["actions"]:
-            seen["actions"].add(str(context.intent))
-            permission = registries["actions"][str(context.intent)].get("permission")
-            if permission:
-                seen["permissions"].add(str(permission))
-        if context.test_id:
-            seen["test_ids"].add(str(context.test_id))
-        if context.test_id and context.test_id not in registries["test_ids"]:
-            issues.append(
-                ContextIssue(
-                    "error",
-                    "contract.test_id_missing",
-                    "test_id is absent from contract nodes",
-                    node.id,
-                    semantic_id,
-                )
-            )
-        if context.action:
-            seen["actions"].add(str(context.action))
-            permission = registries["actions"].get(str(context.action), {}).get("permission")
-            if permission:
-                seen["permissions"].add(str(permission))
-        if context.action and context.action not in registries["actions"]:
-            issues.append(
-                ContextIssue(
-                    "error",
-                    "contract.action_missing",
-                    "action is absent from contract actions",
-                    node.id,
-                    semantic_id,
-                )
-            )
-        if context.permission:
-            seen["permissions"].add(str(context.permission))
-        if context.permission and context.permission not in registries["permissions"]:
-            issues.append(
-                ContextIssue(
-                    "error",
-                    "contract.permission_missing",
-                    "permission is absent from contract permissions",
-                    node.id,
-                    semantic_id,
-                )
-            )
-        if context.binding:
-            seen["fields"].add(str(context.binding))
-        if context.binding and context.binding not in registries["fields"]:
-            issues.append(
-                ContextIssue(
-                    "error",
-                    "contract.binding_missing",
-                    "binding field is absent from contract entities",
-                    node.id,
-                    semantic_id,
-                )
-            )
-        if context.entity:
-            seen["entities"].add(str(context.entity))
-        if context.entity and context.entity not in registries["entities"]:
-            issues.append(
-                ContextIssue(
-                    "error",
-                    "contract.entity_missing",
-                    "entity is absent from contract entities",
-                    node.id,
-                    semantic_id,
-                )
-            )
-        contract_node = registries["semantic_ids"].get(str(semantic_id)) if semantic_id else None
-        contract_screen_id = (
-            contract_node.get("screen_id") if isinstance(contract_node, dict) else None
-        )
-        if contract_screen_id:
-            screen_states = {
-                str(state["id"])
-                for screen in contract.get("screens", []) or []
-                if isinstance(screen, dict) and screen.get("id") == contract_screen_id
-                for state in screen.get("states", []) or []
-                if isinstance(state, dict) and isinstance(state.get("id"), str)
-            }
-            for state in _node_state_names(node):
-                if state not in screen_states:
-                    issues.append(
-                        ContextIssue(
-                            "error",
-                            "contract.state_missing",
-                            "state is absent from contract screen states",
-                            node.id,
-                            semantic_id,
-                        )
+        issues.extend(_contract_node_context(node, registries, seen))
+        contract_node = registries["semantic_ids"].get(node.semantic_id)
+        screen_id = contract_node.get("screen_id") if isinstance(contract_node, dict) else None
+        if screen_id:
+            for state in _node_state_names(node) - screen_states.get(screen_id, set()):
+                issues.append(
+                    ContextIssue(
+                        "error",
+                        "contract.state_missing",
+                        "state is absent from contract screen states",
+                        node.id,
+                        node.semantic_id,
                     )
+                )
+    return issues + _unmapped_contract_context(registries, seen)
+
+
+def _contract_node_context(
+    node: PenNode, registries: dict[str, Any], seen: dict[str, set[str]]
+) -> list[ContextIssue]:
+    context = node.context
+    issues = []
+    fields = (
+        ("semantic_id", "semantic_ids", "semantic_id is absent from contract nodes"),
+        ("test_id", "test_ids", "test_id is absent from contract nodes"),
+        ("action", "actions", "action is absent from contract actions"),
+        ("permission", "permissions", "permission is absent from contract permissions"),
+        ("binding", "fields", "binding field is absent from contract entities"),
+        ("entity", "entities", "entity is absent from contract entities"),
+    )
+    for field, registry, message in fields:
+        value = getattr(context, field)
+        if value:
+            seen[registry].add(str(value))
+            if value not in registries[registry]:
+                issues.append(
+                    ContextIssue(
+                        "error", f"contract.{field}_missing", message, node.id, context.semantic_id
+                    )
+                )
+    for value in (context.intent, context.action):
+        if value and value in registries["actions"]:
+            seen["actions"].add(str(value))
+            permission = registries["actions"][str(value)].get("permission")
+            if permission:
+                seen["permissions"].add(str(permission))
+    return issues
+
+
+def _unmapped_contract_context(
+    registries: dict[str, Any], seen: dict[str, set[str]]
+) -> list[ContextIssue]:
+    issues = []
     required = {
         "semantic_ids": set(registries["semantic_ids"]),
         "test_ids": set(registries["test_ids"]),

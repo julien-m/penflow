@@ -1,4 +1,6 @@
 <!-- LiveSpec traceability anchors -->
+
+For current certification, **read** [the C51 workflow](verification-workflow.md). Existing adoption commands below prepare or inspect artifacts; automatic design/implementation closure uses the exact required profile and independent runtime build manifest. Generated code is a scaffold with incomplete handlers and cannot certify implementation.
 <!-- @spec(FR-007) -->
 <!-- @spec(FR-012) -->
 <!-- @spec(FR-013) -->

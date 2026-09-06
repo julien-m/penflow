@@ -48,7 +48,7 @@
               "type": "text"
             }
           ],
-          "context": "binding=checkout.selected_payment_method; classification=semantic; entity=checkout; intent=submit_payment; role=button; semantic_id=checkout.pay-now; test_id=checkout-pay-now",
+          "context": "binding=checkout.selected_payment_method; classification=semantic; entity=checkout; intent=submit_payment; permission=buyer_can_pay; role=button; semantic_id=checkout.pay-now; test_id=checkout-pay-now",
           "cornerRadius": 8,
           "fill": "#0057FF",
           "gap": 8,

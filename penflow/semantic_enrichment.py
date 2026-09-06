@@ -241,7 +241,7 @@ def _enrich_node(pen_node: dict[str, Any], semantic_node: dict[str, Any]) -> Non
 
 
 def _context_from_semantic_node(node: dict[str, Any]) -> dict[str, Any]:
-    keys = ("semantic_id", "role", "intent", "binding", "repeat", "entity", "test_id")
+    keys = ("semantic_id", "role", "intent", "binding", "repeat", "entity", "test_id", "permission")
     return {key: node[key] for key in keys if node.get(key)}
 
 

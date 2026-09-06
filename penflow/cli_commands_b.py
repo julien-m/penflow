@@ -20,7 +20,7 @@ from .codegen import react, rust_dioxus, swiftui
 from .compare import compare_tree_files
 from .consistency import check_consistency, write_consistency_report
 from .contracts import (
-    _raise_if_no_context,
+    raise_if_no_context,
     assert_contextualized_pen_input,
     code_ir_from_contract,
     code_ir_from_pen,
@@ -318,7 +318,7 @@ def cmd_code_ir(args: argparse.Namespace) -> int:
         context_map=args.context_map,
         contract=args.contract,
     )
-    _raise_if_no_context(ir["screens"], args.from_context)
+    raise_if_no_context(ir["screens"], args.from_context)
     issues = validate_code_ir(ir)
     errors = [issue for issue in issues if issue.get("severity") == "error"]
     if errors:
@@ -345,7 +345,15 @@ def cmd_codegen(args: argparse.Namespace) -> int:
     ir = load_tree(args.ir)
     generators = {"swiftui": swiftui, "react": react, "rust": rust_dioxus}
     Path(args.out).write_text(generators[args.target](ir), encoding="utf-8")
-    _print({"status": "PASS", "out": args.out}, args.json)
+    _print(
+        {
+            "status": "PASS",
+            "out": args.out,
+            "fidelity": "scaffold",
+            "certifies_implementation": False,
+        },
+        args.json,
+    )
     return 0
 
 
@@ -389,6 +397,10 @@ def cmd_fix_report(args: argparse.Namespace) -> int:
 
 
 def cmd_validate_report(args: argparse.Namespace) -> int:
+    if getattr(args, "required_profile", None):
+        from .cli_verification import validate_verification_command
+
+        return validate_verification_command(args)
     # @spec FR-009: Structured report schema validation — .specs/features/045-penflow-json-only-strict-contract-v2/spec.md#fr-009
     report = load_tree(args.report)
     issues = _validate_report_schema(report, args.report) if args.schema else []

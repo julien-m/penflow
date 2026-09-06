@@ -1,0 +1,11 @@
+{
+  "applied_at": "2026-09-05T10:20:14Z",
+  "approved_at": "2026-09-05T10:20:14Z",
+  "kind": "product-contract-change-request",
+  "new_hash": "9e05b8d425d7ee70d679828beddcb1578adb25171e8987373ba132b15b856b60",
+  "old_hash": "92f77e1f9140d540f1dddee1539baf7f3e5b31394f17e7add7f8dc098b2ed214",
+  "reason": "Explicit fixture extension to two screens in one flow",
+  "requested_at": "2026-09-05T10:20:14Z",
+  "status": "applied",
+  "version": 1
+}

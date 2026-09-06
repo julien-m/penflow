@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from jsonschema import Draft202012Validator
+from referencing import Registry, Resource
 
 SCHEMAS_DIR = Path(__file__).parent / "schemas"
 
@@ -67,7 +68,16 @@ def validator_for(name: str) -> Draft202012Validator:
     Raises:
         FileNotFoundError: If no bundled schema has that name.
     """
-    return Draft202012Validator(_load(name))
+    schema = _load(name)
+    if name in {
+        "flow-contract-v2.schema.json",
+        "code-ir.schema.json",
+        "semantic-ui-tree.schema.json",
+    }:
+        c51 = _load("c51-contracts.schema.json")
+        registry = Registry().with_resource(c51["$id"], Resource.from_contents(c51))
+        return Draft202012Validator(schema, registry=registry)
+    return Draft202012Validator(schema)
 
 
 def clear_cache() -> None:

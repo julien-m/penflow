@@ -16,6 +16,16 @@ description: Use the Penflow CLI for Pencil .pen context validation, semantic/ex
 
 Use this skill when a task mentions Penflow, Pencil `.pen`, flow specs, `semantic-ui-tree.json`, Pencil `context`, `expected-ui-tree.json`, `actual-ui-tree.json`, code IR, compare reports, or structural design/runtime validation.
 
+## C51 workflow authority
+
+<!-- @spec(FR-015) -->
+**Read** [`../../../docs/verification-workflow.md`](../../../docs/verification-workflow.md) before accepting workflow completion. The existing workflow automatically prepares explicit test IDs before source review, binds actual upstream requirements and plan/workflow applicability, and selects `design` after review/native design or `implementation` after the external runner. Pre-review preparation is non-certifying; reuse unchanged design evidence instead of repeating Mockup Factory. Missing requirements, outcomes, native capabilities or review history block; no extra user-maintained ledger or manual verification step.
+
+- Final design: `penflow run --target <target> --profile design --project <consumer-project-root> --json`, then `penflow validate-report <target>/run-report.json --schema --required-profile design --project <consumer-project-root> --json`.
+- Final implementation: the same commands with `implementation` and the actual caller-supplied `--build-manifest <runner-path>` on both calls. Require exact-profile PASS, empty issues, report hash/scope/build concordance and exits 0.
+- Standalone commands, audit scores, `PASSED_WITH_WARNINGS`, masks, `--lenient`, missing-file heuristics and historical C47 never substitute for C51. The legacy sequences below remain preparation/diagnostics; C51 alone decides cumulative closure and normalizes native geometry.
+- Native lifecycle fields must survive actual Save/C46 before draft/archive variants are trusted. Pencil 2.14 accepting metadata without persisting it does not create a lifecycle revision; keep the valid active canvas and report the unsupported capability.
+
 ## Purpose
 
 Penflow is a deterministic, runtime-agnostic CLI that connects product flow intent, Pencil design contracts, codegen handoff data, and post-implementation runtime verification.

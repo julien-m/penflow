@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Penflow TEST payment pilot</title>
+<style>
+@font-face { font-family: Inter; font-style: normal; font-weight: 400; src: url('/inter-regular.woff2') format('woff2'); }
+@font-face { font-family: Inter; font-style: normal; font-weight: 600; src: url('/inter-semibold.woff2') format('woff2'); }
+* { box-sizing: border-box; }
+body { margin: 0; font: 16px/1.5 Inter, sans-serif; color: #1a1a1a; background: #ffffff; }
+main { display: flex; flex-direction: column; gap: 24px; align-items: flex-start; width: 100%; min-height: 100vh; padding: 32px; }
+section { display: flex; flex-direction: column; gap: 24px; align-items: flex-start; width: 480px; }
+form { display: contents; }
+label { display: flex; flex-direction: column; gap: 8px; align-items: stretch; width: 100%; }
+h1 { width: 100%; margin: 0; font: 600 32px/1.25 Inter, sans-serif; }
+input, button { display: flex; flex-direction: row; gap: 8px; align-items: center; width: 100%; height: 48px; border-radius: 8px; }
+input { padding: 12px 16px; border: 1px solid #6b6b6b; background: #ffffff; color: #1a1a1a; font: 400 16px/1.4 Inter, sans-serif; appearance: textfield; }
+input::-webkit-inner-spin-button, input::-webkit-outer-spin-button { appearance: none; margin: 0; }
+button { justify-content: center; padding: 12px 24px; border: 0; background: #0066cc; color: #ffffff; font: 600 16px/1.4 Inter, sans-serif; }
+output { width: 100%; font: 400 16px/1.5 Inter, sans-serif; }
+input:focus-visible, button:focus-visible { outline: 2px solid #0066cc; outline-offset: 2px; }
+[hidden] { display: none; }
+</style>
+<main data-semantic="checkout" data-role="screen" data-screen="checkout" data-state="default" data-test-id="checkout-screen">
+  <section>
+  <h1 data-test-id="checkout-title" data-entity="checkout" data-semantic="checkout.title" data-role="text" data-binding="checkout.title">Checkout</h1>
+  <form novalidate>
+    <label>Amount<input id="amount" data-semantic="checkout.amount" data-role="input" type="number" min="1" required value="10" data-binding="checkout.amount" data-entity="checkout" data-action="edit_amount" data-test-id="checkout-amount"></label>
+    <button data-semantic="checkout.pay" data-role="button" type="submit" data-binding="checkout.payment_method" data-entity="checkout" data-action="submit_payment" data-test-id="checkout-pay">Pay</button>
+  </form>
+  <output data-test-id="checkout-result" data-semantic="checkout.result" data-role="text" aria-live="polite" data-binding="checkout.result" data-entity="checkout">Ready</output>
+  </section>
+</main>
+<script>
+const root = document.querySelector('main');
+const scenario = new URLSearchParams(location.search);
+document.querySelector('form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const actor = scenario.get('actor') || 'buyer';
+  const valid = document.querySelector('#amount').validity.valid;
+  if (!valid || actor !== 'buyer') {
+    root.dataset.state = 'error';
+    document.querySelector('output').textContent = !valid ? 'invalid' : 'denied';
+    return;
+  }
+  const response = await fetch('/payments', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Actor': actor,
+      'X-Test-Failure': scenario.get('service') === 'failure' ? 'yes' : (scenario.get('service') === 'storage' ? 'storage' : 'no')},
+    body: JSON.stringify({amount: Number(document.querySelector('#amount').value)})
+  });
+  const result = await response.json();
+  const ready = ['success', 'idempotent'].includes(result.outcome);
+  const failed = result.outcome === 'error';
+  window.dispatchEvent(new CustomEvent('pilot:result', { detail: { response: result, guard_results: { payment_ready: ready, payment_failed: failed } } }));
+  root.dataset.state = ready ? 'success' : 'error';
+  document.querySelector('output').textContent = result.outcome;
+});
+if (['/details', '/receipt'].includes(location.pathname)) {
+  const screen = location.pathname.slice(1);
+  root.dataset.screen = screen;
+  root.dataset.semantic = screen;
+  root.dataset.state = 'default';
+  root.dataset.testId = `${screen}-screen`;
+  document.querySelector('h1').dataset.semantic = `${screen}.title`;
+  document.querySelector('h1').removeAttribute('data-binding');
+  document.querySelector('h1').removeAttribute('data-entity');
+  document.querySelector('h1').dataset.testId = `${screen}-title`;
+  document.querySelector('h1').textContent = screen === 'details' ? 'Payment details' : 'Payment receipt';
+  document.querySelector('form').remove();
+  document.querySelector('output').remove();
+}
+</script>
+</html>

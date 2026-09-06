@@ -17,6 +17,7 @@ from .artifact_policy import (
     RECOGNIZED_LEGACY_ROOTS,
 )
 from .doctor_context import GitGateway, ProjectContext
+from .doctor_authority import archived_authority_canvas
 from .doctor_git import _git_path_finding, _managed_git_paths
 from .doctor_models import DoctorFinding, _Inspection, _Repair
 from .pen import parse_pen, validate_pen_context
@@ -48,6 +49,9 @@ def _inspect_pen_files(
     context: ProjectContext,
 ) -> tuple[str | None, tuple[DoctorFinding, ...], tuple[_Repair, ...]]:
     candidates, findings = _inventory_pen_paths(context.project_root)
+    historical, authority_findings = archived_authority_canvas(context.project_root)
+    candidates = tuple(path for path in candidates if path not in historical)
+    findings = (*findings, *authority_findings)
     if findings:
         return _canonical_from_candidates(context.project_root, candidates, findings)
     if not candidates:
@@ -169,18 +173,38 @@ def _is_pen_like_name(name: str) -> bool:
 
 
 def _plan_pen_initialization(root: Path) -> _Repair | DoctorFinding:
-    parent = root / "penflow"
-    if parent.exists() or parent.is_symlink():
-        metadata = parent.lstat()
+    candidates = [root / "penflow", root / "handoff/penflow"]
+    prepared = [
+        path
+        for path in candidates
+        if path.exists() or path.is_symlink() or (path.parent != root and path.parent.is_symlink())
+    ]
+    if len(prepared) > 1:
+        return DoctorFinding(
+            "pen.initialization_workspace_ambiguous",
+            "error",
+            None,
+            None,
+            "both canonical workspaces are prepared; initialization cannot select one",
+        )
+    parent = prepared[0] if prepared else candidates[0]
+    for directory in (parent, *parent.parents):
+        if directory == root:
+            break
+        if not directory.exists() and not directory.is_symlink():
+            continue
+        metadata = directory.lstat()
         if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISDIR(metadata.st_mode):
             return DoctorFinding(
                 "pen.initialization_parent_unsafe",
                 "error",
-                "penflow",
+                directory.relative_to(root).as_posix(),
                 None,
                 "canonical initialization parent is not a regular directory",
             )
-    return _Repair("pen.initialize", "penflow/ui.pen", EMPTY_PEN_BYTES)
+    return _Repair(
+        "pen.initialize", (parent / "ui.pen").relative_to(root).as_posix(), EMPTY_PEN_BYTES
+    )
 
 
 def _validate_canonical_pen(path: Path) -> str | None:

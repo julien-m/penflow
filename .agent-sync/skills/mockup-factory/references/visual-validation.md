@@ -6,6 +6,11 @@
 
 # Visual Evidence Gate
 
+## C51 closure
+
+**Read** [`../../../../docs/verification-workflow.md`](../../../../docs/verification-workflow.md) and apply its source review, applicability, native layout and profile protocol. These detailed standalone checks diagnose their own artifacts; final completion requires `penflow run --target <target> --profile design --project <consumer-project-root> --json` and `penflow validate-report <target>/run-report.json --schema --required-profile design --project <consumer-project-root> --json`, both PASS/exit 0. Required warnings and missing renderer evidence block. Pre-review preparation is non-certifying; `PASSED_WITH_WARNINGS` and historical reports never close C51. Reference/C48 applicability comes from reviewed procedure plus authenticated inheritance, never file absence.
+
+
 Run this gate after the deterministic Penflow anchors pass and before final PASS. It proves the mockup was rendered as a user-visible Pencil screen and that a vision pass answered the vision-only questions — Penflow never runs vision; it validates the evidence packet.
 
 **The gate is the `penflow validate-visual-evidence` exit code, not prose.** No narrative claim of visual quality may substitute for exit 0.
@@ -19,7 +24,7 @@ Use Pencil MCP or an equivalent Pencil renderer. All artifacts go to `.mockup-va
    - Browser annotation: run `visual-preview url /absolute/path/.mockup-validation/visual-evidence/checkoutScreen.png` when available.
 
    Browser preview is for annotation and iteration only. Preview URLs are not canonical proof and must not be written into `manifest.json` or `vision-report.json`; the canonical proof remains `penflow validate-visual-evidence` exit 0. If visual-preview is unavailable or fails, keep the Markdown image, record browser preview unavailable in operator notes/status, and continue the evidence packet without downgrading it solely for the missing preview channel.
-2. **Dump the layout snapshot** — capture `snapshot_layout` per screen and write `layout-snapshot.json`: `{"screens": [{"screen_id", "pencil_node_id", "width", "height"}]}`. Penflow cross-checks each screen against the expected root bbox within ±4px (`evidence.snapshot.bbox_mismatch`).
+2. **Dump the layout snapshot** — preserve the actual `snapshot_layout` tool response and write `layout-snapshot.json` as the authenticated C51 native envelope described in the linked workflow, including every node and parent measurement. Also derive `screens: [{screen_id, pencil_node_id, width, height}]` from the same native roots for the C45 cross-check (`evidence.snapshot.bbox_mismatch`); an isolated hand-written screen-size list does not prove C51 geometry.
 3. **Run the vision pass (screenshot inspection)** — inspect each exported screen (e.g. via `get_screenshot`) and answer **ONLY** the five locked vision categories, one evidence sentence each (≥ 10 characters), per screen:
    - `visual_balance`
    - `rendering_artifacts`
@@ -98,7 +103,7 @@ All four categories are required per referenced screen: `layout_match`, `palette
 
 ## Vision Report
 
-`vision-report.json` example (validates via `penflow validate-report vision-report.json --schema`):
+Historical illustrative `vision-report.json` excerpt (incomplete, non-certifying). Current C45 requires every criterion to be PASS, `blocking: true`, and carry its complete structured proof; use the bundled schema and actual image/receipt facts rather than copying this excerpt:
 
 ```json
 {

@@ -1,0 +1,404 @@
+{
+  "version": 2,
+  "kind": "penflow-flow-contract",
+  "contract_id": "multi-screen-alias-fixture",
+  "actors": [
+    {
+      "id": "reader",
+      "name": "Reader"
+    }
+  ],
+  "entities": [],
+  "screens": [
+    {
+      "id": "alias-screen",
+      "flow_id": "alias-flow",
+      "title": "Information",
+      "surface": "web-desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "states": [
+        {
+          "id": "alias-state"
+        }
+      ],
+      "root_node": "alias-screen.root",
+      "static": true,
+      "static_reason": "Read-only information, closed through a dedicated native system return."
+    },
+    {
+      "id": "alias-secondary-screen",
+      "flow_id": "alias-flow",
+      "title": "Information",
+      "surface": "web-desktop",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "states": [
+        {
+          "id": "alias-secondary-state"
+        }
+      ],
+      "root_node": "alias-secondary-screen.root",
+      "static": true,
+      "static_reason": "Read-only information, closed through a dedicated native system return."
+    }
+  ],
+  "nodes": [
+    {
+      "id": "alias-screen.root",
+      "screen_id": "alias-screen",
+      "semantic_id": "alias-screen",
+      "test_id": "alias-screen-test",
+      "role": "screen",
+      "children": [
+        "alias-screen.title"
+      ]
+    },
+    {
+      "id": "alias-screen.title",
+      "screen_id": "alias-screen",
+      "semantic_id": "alias-screen.title",
+      "role": "text",
+      "text": "Information"
+    },
+    {
+      "id": "alias-secondary-screen.root",
+      "screen_id": "alias-secondary-screen",
+      "semantic_id": "alias-secondary-screen",
+      "test_id": "alias-secondary-screen-test",
+      "role": "screen",
+      "children": [
+        "alias-secondary-screen.title"
+      ]
+    },
+    {
+      "id": "alias-secondary-screen.title",
+      "screen_id": "alias-secondary-screen",
+      "semantic_id": "alias-secondary-screen.title",
+      "role": "text",
+      "text": "Second information"
+    }
+  ],
+  "guards": [],
+  "permissions": [],
+  "mutations": [],
+  "actions": [],
+  "flows": [
+    {
+      "id": "alias-flow",
+      "entry_screen": "alias-screen"
+    }
+  ],
+  "transitions": [],
+  "needs_review": false,
+  "needs_clarification": [],
+  "system_returns": [
+    {
+      "id": "leave",
+      "screen_id": "alias-screen",
+      "event": "exit",
+      "source": {
+        "requirement_id": "brainstorm:return:surface:product-page:exit",
+        "source_pointer": "product-contract.json#/surfaces/0/return_path",
+        "text_sha256": "397f64ac37faa7f4b859d78960f521d29cf97559d4b9e4eeb8116726c5d790ff"
+      },
+      "destination": {
+        "kind": "closed"
+      }
+    },
+    {
+      "id": "leave-secondary",
+      "screen_id": "alias-secondary-screen",
+      "event": "exit",
+      "source": {
+        "requirement_id": "brainstorm:return:surface:product-secondary-page:exit",
+        "source_pointer": "product-contract.json#/surfaces/1/return_path",
+        "text_sha256": "397f64ac37faa7f4b859d78960f521d29cf97559d4b9e4eeb8116726c5d790ff"
+      },
+      "destination": {
+        "kind": "closed"
+      }
+    }
+  ],
+  "outcome_expectations": [
+    {
+      "obligation_id": "node:alias-screen",
+      "source_pointer": "/nodes/0",
+      "category": "structure",
+      "assertions": [
+        {
+          "operator": "equals",
+          "pointer": "/after/semantic_id",
+          "expected": "alias-screen",
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/after/role",
+          "expected": "screen",
+          "capability": "ui"
+        }
+      ]
+    },
+    {
+      "obligation_id": "node:alias-screen.title",
+      "source_pointer": "/nodes/1",
+      "category": "structure",
+      "assertions": [
+        {
+          "operator": "equals",
+          "pointer": "/after/semantic_id",
+          "expected": "alias-screen.title",
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/after/role",
+          "expected": "text",
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/after/text",
+          "expected": "Information",
+          "capability": "ui"
+        }
+      ]
+    },
+    {
+      "obligation_id": "node:alias-secondary-screen",
+      "source_pointer": "/nodes/2",
+      "category": "structure",
+      "assertions": [
+        {
+          "operator": "equals",
+          "pointer": "/after/semantic_id",
+          "expected": "alias-secondary-screen",
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/after/role",
+          "expected": "screen",
+          "capability": "ui"
+        }
+      ]
+    },
+    {
+      "obligation_id": "node:alias-secondary-screen.title",
+      "source_pointer": "/nodes/3",
+      "category": "structure",
+      "assertions": [
+        {
+          "operator": "equals",
+          "pointer": "/after/semantic_id",
+          "expected": "alias-secondary-screen.title",
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/after/role",
+          "expected": "text",
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/after/text",
+          "expected": "Second information",
+          "capability": "ui"
+        }
+      ]
+    },
+    {
+      "obligation_id": "state:alias-screen:alias-state",
+      "source_pointer": "/screens/0/states/0",
+      "category": "structure",
+      "assertions": [
+        {
+          "operator": "equals",
+          "pointer": "/after/state",
+          "expected": "alias-state",
+          "capability": "ui"
+        }
+      ]
+    },
+    {
+      "obligation_id": "state:alias-secondary-screen:alias-secondary-state",
+      "source_pointer": "/screens/1/states/0",
+      "category": "structure",
+      "assertions": [
+        {
+          "operator": "equals",
+          "pointer": "/after/state",
+          "expected": "alias-secondary-state",
+          "capability": "ui"
+        }
+      ]
+    },
+    {
+      "obligation_id": "system-return:leave",
+      "source_pointer": "/system_returns/0",
+      "category": "transition",
+      "assertions": [
+        {
+          "operator": "equals",
+          "pointer": "/result/actor_id",
+          "expected": "reader",
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/result/action_id",
+          "expected": "leave",
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/result/outcome",
+          "expected": "success",
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/before/visible",
+          "expected": true,
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/after/visible",
+          "expected": false,
+          "capability": "ui"
+        }
+      ]
+    },
+    {
+      "obligation_id": "system-return:leave-secondary",
+      "source_pointer": "/system_returns/1",
+      "category": "transition",
+      "assertions": [
+        {
+          "operator": "equals",
+          "pointer": "/result/actor_id",
+          "expected": "reader",
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/result/action_id",
+          "expected": "leave-secondary",
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/result/outcome",
+          "expected": "success",
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/before/visible",
+          "expected": true,
+          "capability": "ui"
+        },
+        {
+          "operator": "equals",
+          "pointer": "/after/visible",
+          "expected": false,
+          "capability": "ui"
+        }
+      ]
+    }
+  ],
+  "requirements": {
+    "source_kind": "brainstorm-product-v1",
+    "source_refs": [
+      {
+        "path": "/private/var/folders/l_/t1s_zytx2fqb0dkzz40d3v7m0000gn/T/brainstorm-c51-multi-0zp5aqai/consumer/handoff/penflow/product-contract/.freeze-history/12d506dce0393897d041cd50ed31f5ec63737e31f347ea3c230daf24fd6d6b91.json",
+        "sha256": "12d506dce0393897d041cd50ed31f5ec63737e31f347ea3c230daf24fd6d6b91"
+      },
+      {
+        "path": "/private/var/folders/l_/t1s_zytx2fqb0dkzz40d3v7m0000gn/T/brainstorm-c51-multi-0zp5aqai/consumer/handoff/penflow/product-contract/.freeze-history/2002b96ab8d95fc007d959f560eb57a8feb1fdcb5e16a4440cbab8bf9391c9a5.json",
+        "sha256": "2002b96ab8d95fc007d959f560eb57a8feb1fdcb5e16a4440cbab8bf9391c9a5"
+      },
+      {
+        "path": "/private/var/folders/l_/t1s_zytx2fqb0dkzz40d3v7m0000gn/T/brainstorm-c51-multi-0zp5aqai/consumer/handoff/penflow/product-contract/.freeze-history/2541b09b5e527c1e29472ebf318c33bbbb6c24c5b670a2c05504f8cc1e17c949.json",
+        "sha256": "2541b09b5e527c1e29472ebf318c33bbbb6c24c5b670a2c05504f8cc1e17c949"
+      },
+      {
+        "path": "/private/var/folders/l_/t1s_zytx2fqb0dkzz40d3v7m0000gn/T/brainstorm-c51-multi-0zp5aqai/consumer/handoff/penflow/product-contract/.freeze-history/6599c286ea1b31479bcdd986212af65320327658cdd595c0bcc003e9d01cd1bd.json",
+        "sha256": "6599c286ea1b31479bcdd986212af65320327658cdd595c0bcc003e9d01cd1bd"
+      },
+      {
+        "path": "/private/var/folders/l_/t1s_zytx2fqb0dkzz40d3v7m0000gn/T/brainstorm-c51-multi-0zp5aqai/consumer/handoff/penflow/product-contract/.freeze-history/f9a85b9afe523b9755e2c3a56cab3dce2325319d436821b61a9faf1692203ca7.json",
+        "sha256": "f9a85b9afe523b9755e2c3a56cab3dce2325319d436821b61a9faf1692203ca7"
+      },
+      {
+        "path": "/private/var/folders/l_/t1s_zytx2fqb0dkzz40d3v7m0000gn/T/brainstorm-c51-multi-0zp5aqai/consumer/handoff/penflow/product-contract/product-contract.accepted.json",
+        "sha256": "9e1b08d7b03924fbabc22f0d4a38fb1648a9a95758fdced5f534960d60fa0a38"
+      },
+      {
+        "path": "/private/var/folders/l_/t1s_zytx2fqb0dkzz40d3v7m0000gn/T/brainstorm-c51-multi-0zp5aqai/consumer/handoff/penflow/product-contract/product-contract.change-request.json",
+        "sha256": "f9a85b9afe523b9755e2c3a56cab3dce2325319d436821b61a9faf1692203ca7"
+      },
+      {
+        "path": "/private/var/folders/l_/t1s_zytx2fqb0dkzz40d3v7m0000gn/T/brainstorm-c51-multi-0zp5aqai/consumer/handoff/penflow/product-contract/product-contract.freeze.json",
+        "sha256": "2541b09b5e527c1e29472ebf318c33bbbb6c24c5b670a2c05504f8cc1e17c949"
+      },
+      {
+        "path": "/private/var/folders/l_/t1s_zytx2fqb0dkzz40d3v7m0000gn/T/brainstorm-c51-multi-0zp5aqai/consumer/handoff/penflow/product-contract/product-contract.json",
+        "sha256": "af877466e0f36773282448038dd5497b1338020ff3d6ad4bfec6d66c7ec4f5f6"
+      },
+      {
+        "path": "/private/var/folders/l_/t1s_zytx2fqb0dkzz40d3v7m0000gn/T/brainstorm-c51-multi-0zp5aqai/consumer/handoff/penflow/product-contract/product-contract.md",
+        "sha256": "2fce5ae24f81734de34536441858ee3ddbfe40e21df815b00b0b3c6ada7a67df"
+      }
+    ],
+    "bindings": [
+      {
+        "requirement_id": "brainstorm:flow:product-flow",
+        "obligation_id": "node:alias-screen"
+      },
+      {
+        "requirement_id": "brainstorm:surface:product-page",
+        "obligation_id": "node:alias-screen"
+      },
+      {
+        "requirement_id": "brainstorm:surface:product-page",
+        "obligation_id": "node:alias-screen.title"
+      },
+      {
+        "requirement_id": "brainstorm:state:product-page:product-state",
+        "obligation_id": "state:alias-screen:alias-state"
+      },
+      {
+        "requirement_id": "brainstorm:return:surface:product-page:exit",
+        "obligation_id": "system-return:leave"
+      },
+      {
+        "requirement_id": "brainstorm:flow:product-flow",
+        "obligation_id": "node:alias-secondary-screen"
+      },
+      {
+        "requirement_id": "brainstorm:surface:product-secondary-page",
+        "obligation_id": "node:alias-secondary-screen"
+      },
+      {
+        "requirement_id": "brainstorm:surface:product-secondary-page",
+        "obligation_id": "node:alias-secondary-screen.title"
+      },
+      {
+        "requirement_id": "brainstorm:state:product-secondary-page:product-secondary-state",
+        "obligation_id": "state:alias-secondary-screen:alias-secondary-state"
+      },
+      {
+        "requirement_id": "brainstorm:return:surface:product-secondary-page:exit",
+        "obligation_id": "system-return:leave-secondary"
+      }
+    ]
+  }
+}

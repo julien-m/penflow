@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from .tree import flatten_nodes, load_tree, normalize_actual_tree, validate_actual_tree
 
@@ -50,20 +50,30 @@ def compare_tree_files(
 
 
 def compare_trees(
-    expected: dict[str, Any], actual: dict[str, Any], *, threshold: float = 0.9
+    expected: dict[str, Any],
+    actual: dict[str, Any],
+    *,
+    threshold: float = 0.9,
+    mandatory: bool = False,
 ) -> dict[str, Any]:
-    actual_schema_issues = validate_actual_tree(actual)
+    """Compare validated trees by screen, semantic node identity, geometry, and style.
+
+    Args:
+        expected: Source-derived tree describing the required UI.
+        actual: Observed tree in the same normalized coordinate system.
+        threshold: Minimum passing comparison score; errors still fail the report.
+        mandatory: Disable node/text masks and custom tolerance overrides.
+
+    Returns:
+        A deterministic report with status, score, summary counts, and issues.
+    """
+    # Reject invalid schemas first, then join screens/nodes before comparing their properties.
     issues: list[dict[str, Any]] = []
-    if actual_schema_issues:
-        issues.extend(
-            {
-                "severity": "error",
-                "code": "actual.schema",
-                "semantic_id": issue.get("path"),
-                "message": issue.get("message"),
-            }
-            for issue in actual_schema_issues
-        )
+    for label, tree in (("expected", expected), ("actual", actual)):
+        for issue in validate_actual_tree(tree, schema=True):
+            issues.append(_issue("error", f"{label}.schema", issue["path"], issue["message"]))
+    if issues:
+        return _comparison_report(issues, 0, 0, threshold)
 
     expected_screens = {screen["screen_id"]: screen for screen in expected.get("screens", [])}
     actual_screens = {screen.get("screen_id"): screen for screen in actual.get("screens", [])}
@@ -72,8 +82,6 @@ def compare_trees(
     failed_checks = 0
     for screen_id, expected_screen in expected_screens.items():
         actual_screen = actual_screens.get(screen_id)
-        if actual_screen is None and len(actual_screens) == 1:
-            actual_screen = next(iter(actual_screens.values()))
         if actual_screen is None:
             issues.append(
                 _issue("error", "screen.missing", screen_id, "screen missing in actual tree")
@@ -84,8 +92,9 @@ def compare_trees(
 
         expected_nodes = _index(flatten_nodes(expected_screen["root"]))
         actual_nodes = _index(flatten_nodes(actual_screen.get("root", {})))
+        issues.extend(_unexpected_controls(expected_nodes, actual_nodes))
         for semantic_id, expected_node in expected_nodes.items():
-            if _is_masked(expected_node):
+            if not mandatory and _is_masked(expected_node):
                 continue
             total_checks += 1
             actual_node = actual_nodes.get(semantic_id)
@@ -95,14 +104,21 @@ def compare_trees(
                     _issue("error", "node.missing", semantic_id, "node missing in actual tree")
                 )
                 continue
-            node_issues = compare_node(expected_node, actual_node)
+            node_issues = compare_node(expected_node, actual_node, mandatory=mandatory)
             failed_checks += sum(
                 1 for issue in node_issues if issue["severity"] in {"error", "warning"}
             )
             total_checks += max(0, len(node_issues) - 1)
             issues.extend(node_issues)
 
-    score = 1.0 if total_checks == 0 else max(0.0, 1 - (failed_checks / total_checks))
+    issues.extend(_unexpected_screens(expected_screens, actual_screens))
+    return _comparison_report(issues, total_checks, failed_checks, threshold)
+
+
+def _comparison_report(
+    issues: list[dict[str, Any]], total_checks: int, failed_checks: int, threshold: float
+) -> dict[str, Any]:
+    score = 0.0 if total_checks == 0 else max(0.0, 1 - (failed_checks / total_checks))
     status = (
         "PASS"
         if score >= threshold and not any(i["severity"] == "error" for i in issues)
@@ -124,24 +140,44 @@ def compare_trees(
     }
 
 
-def compare_node(expected: dict[str, Any], actual: dict[str, Any]) -> list[dict[str, Any]]:
+def compare_node(
+    expected: dict[str, Any], actual: dict[str, Any], *, mandatory: bool = False
+) -> list[dict[str, Any]]:
+    """Compare one pair of normalized semantic nodes.
+
+    Args:
+        expected: Required node, including declared text, geometry, and visual properties.
+        actual: Measured counterpart with normalized parent and order metadata.
+        mandatory: Disable text masks and custom tolerances; the tree caller also
+            disables whole-node masks before reaching this function.
+
+    Returns:
+        Structured differences in role, required text, hierarchy, order, geometry, and style.
+    """
     issues: list[dict[str, Any]] = []
     semantic_id = expected.get("_semantic_key") or expected.get("semantic_id") or expected.get("id")
-    tolerance = DEFAULT_TOLERANCE | (expected.get("context", {}).get("tolerance", {}) or {})
+    tolerance = (
+        DEFAULT_TOLERANCE
+        if mandatory
+        else DEFAULT_TOLERANCE | (expected.get("context", {}).get("tolerance", {}) or {})
+    )
 
     for key in ("role",):
-        if expected.get(key) and actual.get(key) and expected.get(key) != actual.get(key):
+        if expected.get(key) and expected.get(key) != actual.get(key):
             issues.append(_issue("error", f"node.{key}", semantic_id, f"{key} differs"))
 
-    if not _text_masked(expected):
+    if mandatory or not _text_masked(expected):
         expected_text = expected.get("text")
         actual_text = actual.get("text")
-        if (
-            expected_text not in (None, "")
-            and actual_text not in (None, "")
-            and expected_text != actual_text
-        ):
-            issues.append(_issue("warning", "node.text", semantic_id, "text differs"))
+        if expected_text not in (None, "") and expected_text != actual_text:
+            issues.append(
+                _issue(
+                    "error" if actual_text is None else "warning",
+                    "node.text",
+                    semantic_id,
+                    "text differs or is unobserved",
+                )
+            )
 
     if (
         expected.get("_parent_key")
@@ -151,12 +187,18 @@ def compare_node(expected: dict[str, Any], actual: dict[str, Any]) -> list[dict[
         issues.append(_issue("warning", "node.hierarchy", semantic_id, "parent differs"))
 
     if abs(float(expected.get("_order", 0)) - float(actual.get("_order", 0))) > float(
-        tolerance.get("order", 0)
+        cast(float, tolerance.get("order", 0))
     ):
         issues.append(_issue("warning", "node.order", semantic_id, "order differs"))
 
     issues.extend(
-        _compare_bbox(semantic_id, expected.get("bbox", {}), actual.get("bbox", {}), tolerance)
+        _compare_bbox(
+            semantic_id,
+            expected.get("bbox", {}),
+            actual.get("bbox", {}),
+            tolerance,
+            mandatory=mandatory,
+        )
     )
     issues.extend(
         _compare_visual(
@@ -213,9 +255,11 @@ def _compare_bbox(
     expected: dict[str, Any],
     actual: dict[str, Any],
     tolerance: dict[str, Any],
+    *,
+    mandatory: bool = False,
 ) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
-    if not _bbox_is_measurable(expected):
+    if not mandatory and not _bbox_is_measurable(expected):
         return issues
     limit = float(tolerance.get("bbox_px", DEFAULT_TOLERANCE["bbox_px"]))
     for key in ("x", "y", "width", "height"):
@@ -239,10 +283,32 @@ def _compare_visual(
     actual: dict[str, Any],
     tolerance: dict[str, Any],
 ) -> list[dict[str, Any]]:
+    expected = _normalized_stroke(expected)
+    actual = _normalized_stroke(actual)
     issues: list[dict[str, Any]] = []
+    for key in expected.keys() - actual.keys():
+        issues.append(
+            _issue(
+                "error",
+                f"node.visual.{key}.missing",
+                semantic_id,
+                f"required {key} was not observed",
+            )
+        )
     # @spec FR-002: exact-match layout/alignItems comparison — .specs/features/048-compare-layout-spacing-properties/spec.md#fr-002
-    for key in ("fill", "stroke", "fontFamily", "fontWeight", "layout", "alignItems"):
-        if expected.get(key) and actual.get(key) and expected[key] != actual[key]:
+    for key in (
+        "fill",
+        "stroke",
+        "fontFamily",
+        "fontWeight",
+        "layout",
+        "alignItems",
+        "textAlign",
+        "strokeThickness",
+        "strokeWidth",
+        "strokeAlignment",
+    ):
+        if key in expected and key in actual and expected[key] != actual[key]:
             issues.append(_issue("warning", f"node.visual.{key}", semantic_id, f"{key} differs"))
     for key, limit_name in (("cornerRadius", "radius_px"), ("fontSize", "font_px")):
         if key in expected and key in actual:
@@ -325,3 +391,55 @@ def _is_number(value: Any) -> bool:
 
 def _issue(severity: str, code: str, semantic_id: str | None, message: str) -> dict[str, Any]:
     return {"severity": severity, "code": code, "semantic_id": semantic_id, "message": message}
+
+
+def _unexpected_screens(
+    expected_screens: dict[str, Any], actual_screens: dict[str, Any]
+) -> list[dict[str, Any]]:
+    issues: list[dict[str, Any]] = []
+    for screen_id in actual_screens.keys() - expected_screens.keys():
+        issues.append(_issue("error", "screen.unexpected", screen_id, "unexpected actual screen"))
+    return issues
+
+
+def _unexpected_controls(
+    expected_nodes: dict[str, Any], actual_nodes: dict[str, Any]
+) -> list[dict[str, Any]]:
+    issues: list[dict[str, Any]] = []
+    for semantic_id in actual_nodes.keys() - expected_nodes.keys():
+        if actual_nodes[semantic_id].get("role") in {
+            "button",
+            "link",
+            "input",
+            "select",
+            "toggle",
+            "form",
+            "component",
+        }:
+            issues.append(
+                _issue(
+                    "error",
+                    "node.unexpected_interactive",
+                    semantic_id,
+                    "unexpected interactive control",
+                )
+            )
+    return issues
+
+
+def _normalized_stroke(visual: dict[str, Any]) -> dict[str, Any]:
+    result = dict(visual)
+    stroke = visual.get("stroke")
+    if isinstance(stroke, dict):
+        result.update(stroke=stroke["fill"], strokeThickness=stroke["thickness"])
+    # C12 actual-ui-tree v1 accepts scalar and per-edge strokeWidth; native 2.14
+    # retains edges. Remove scalar expansion only when C12 drops scalar support
+    # and supported adapters have migrated to per-edge observations.
+    if "strokeWidth" in result:
+        width = result["strokeWidth"]
+        result["strokeWidth"] = (
+            [width.get(side, 0) for side in ("top", "right", "bottom", "left")]
+            if isinstance(width, dict)
+            else [width] * 4
+        )
+    return result

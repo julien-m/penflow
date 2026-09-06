@@ -38,6 +38,7 @@ ALLOWED_KEYS = {
 ROLE_ALIASES = {
     "frame": "container",
     "text": "text",
+    "icon": "icon",
     "icon_font": "icon",
     "rectangle": "shape",
     "ellipse": "shape",

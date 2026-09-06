@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -33,11 +34,11 @@ def lint_tokens(
     spacing_scale: tuple[float, ...] | list[float] | None = None,
     radius_scale: tuple[float, ...] | list[float] | None = None,
     fontsize_scale: tuple[float, ...] | list[float] | None = None,
+    pen_data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     # @spec FR-003: Deterministic token lint engine — .specs/features/046-lint-design-tokens/spec.md#fr-003
     # @spec FR-007: Round-trip guarantee with drafted pens — .specs/features/046-lint-design-tokens/spec.md#fr-007
     """Lint a `.pen` file's visual values against a theme and numeric scales.
-
     Args:
         pen_path: Path to the `.pen` file.
         theme: Loaded theme (`penflow.theme.load_theme` shape). `None` disables
@@ -49,11 +50,12 @@ def lint_tokens(
             `DEFAULT_RADIUS_SCALE` (resolved theme radius is always included).
         fontsize_scale: Allowed fontSize values; defaults to
             `DEFAULT_FONTSIZE_SCALE`.
-
+        pen_data: Optional preloaded Pencil document; takes precedence over
+            reading `pen_path`, which remains recorded in the report inputs.
     Returns:
         A strict token-lint report dictionary (`token-lint-report.schema.json`).
     """
-    raw = load_pen(pen_path)
+    raw = load_pen(pen_path) if pen_data is None else pen_data
     raw_variables = raw.get("variables")
     variables: dict[str, Any] = raw_variables if isinstance(raw_variables, dict) else {}
     nodes = all_nodes(parse_pen(raw))
@@ -84,6 +86,18 @@ def lint_tokens(
                 fontsize=fontsize,
             )
         )
+    return _token_report(violations, len(nodes), pen_path, theme_css, spacing, radius, fontsize)
+
+
+def _token_report(
+    violations: list[dict[str, Any]],
+    nodes_checked: int,
+    pen_path: str | Path,
+    theme_css: str | None,
+    spacing: tuple[float, ...],
+    radius: tuple[float, ...],
+    fontsize: tuple[float, ...],
+) -> dict[str, Any]:
     violations.sort(
         key=lambda item: (item["node_id"], item["property"], item["code"], str(item["value"]))
     )
@@ -93,7 +107,7 @@ def lint_tokens(
         "version": REPORT_VERSION,
         "kind": REPORT_KIND,
         "status": "PASS" if errors == 0 else "FAIL",
-        "summary": {"errors": errors, "warnings": warnings, "nodes_checked": len(nodes)},
+        "summary": {"errors": errors, "warnings": warnings, "nodes_checked": nodes_checked},
         "inputs": {
             "pen": str(pen_path),
             "theme_css": theme_css,
@@ -188,6 +202,26 @@ def _resolve_theme(
         if name.startswith(_RADIUS_VARIABLE_PREFIX) and isinstance(raw_value, (int, float)):
             theme_radius_values.append(float(raw_value))
 
+    theme_radius = _merge_theme_style(
+        theme, theme_variables, palette, theme_fonts, theme_fontsize_values
+    )
+    return (
+        palette,
+        theme_fonts,
+        theme_radius,
+        tuple(sorted(set(theme_fontsize_values))),
+        tuple(sorted(set(theme_radius_values))),
+    )
+
+
+def _merge_theme_style(
+    theme: dict[str, Any],
+    theme_variables: dict[str, Any],
+    palette: set[tuple[int, int, int, int]],
+    theme_fonts: set[str],
+    theme_fontsize_values: list[float],
+) -> float | None:
+    theme_radius = None
     style = theme.get("style")
     for token, value in style.items() if isinstance(style, dict) else []:
         # Theme style values are `$pf-*` refs when sourced from theme.css.
@@ -207,13 +241,7 @@ def _resolve_theme(
             parsed = parse_color(resolved)
             if parsed is not None:
                 palette.add(parsed)
-    return (
-        palette,
-        theme_fonts,
-        theme_radius,
-        tuple(sorted(set(theme_fontsize_values))),
-        tuple(sorted(set(theme_radius_values))),
-    )
+    return theme_radius
 
 
 def _node_violations(
@@ -257,6 +285,45 @@ def _node_violations(
             return resolved
         return value
 
+    _check_node_colors(node, resolve, add, check_palette, palette)
+    scales = (
+        ("gap", spacing, "spacing", "spacing"),
+        ("padding", spacing, "spacing", "spacing"),
+        ("cornerRadius", radius, "radius", "radius"),
+        ("fontSize", fontsize, "fontsize", "typography"),
+    )
+    for prop, scale, code, label in scales:
+        if prop in node.visual:
+            for value in _numeric_values(resolve(prop, node.visual[prop])):
+                if value not in scale:
+                    add(
+                        f"token.{code}.offscale",
+                        prop,
+                        value,
+                        f"{prop} value {value} is not in the {label} scale",
+                    )
+
+    if "fontFamily" in node.visual:
+        resolved = resolve("fontFamily", node.visual["fontFamily"])
+        if theme_fonts and isinstance(resolved, str) and resolved not in theme_fonts:
+            add(
+                "token.fontfamily.mismatch",
+                "fontFamily",
+                node.visual["fontFamily"],
+                f"fontFamily {resolved!r} is not declared by the theme fonts"
+                f" {sorted(theme_fonts)!r}",
+            )
+
+    return violations
+
+
+def _check_node_colors(
+    node: PenNode,
+    resolve: Callable[[str, Any], Any],
+    add: Callable[[str, str, Any, str], None],
+    check_palette: bool,
+    palette: set[tuple[int, int, int, int]],
+) -> None:
     for prop in _COLOR_PROPERTIES:
         if prop not in node.visual:
             continue
@@ -274,51 +341,6 @@ def _node_violations(
                 color_value,
                 f"color {resolved} is not in the resolved theme palette",
             )
-
-    for prop in _SPACING_PROPERTIES:
-        if prop not in node.visual:
-            continue
-        for value in _numeric_values(resolve(prop, node.visual[prop])):
-            if value not in spacing:
-                add(
-                    "token.spacing.offscale",
-                    prop,
-                    value,
-                    f"{prop} value {value} is not in the spacing scale",
-                )
-
-    if "cornerRadius" in node.visual:
-        for value in _numeric_values(resolve("cornerRadius", node.visual["cornerRadius"])):
-            if value not in radius:
-                add(
-                    "token.radius.offscale",
-                    "cornerRadius",
-                    value,
-                    f"cornerRadius value {value} is not in the radius scale",
-                )
-
-    if "fontSize" in node.visual:
-        for value in _numeric_values(resolve("fontSize", node.visual["fontSize"])):
-            if value not in fontsize:
-                add(
-                    "token.fontsize.offscale",
-                    "fontSize",
-                    value,
-                    f"fontSize value {value} is not in the typography scale",
-                )
-
-    if "fontFamily" in node.visual:
-        resolved = resolve("fontFamily", node.visual["fontFamily"])
-        if theme_fonts and isinstance(resolved, str) and resolved not in theme_fonts:
-            add(
-                "token.fontfamily.mismatch",
-                "fontFamily",
-                node.visual["fontFamily"],
-                f"fontFamily {resolved!r} is not declared by the theme fonts"
-                f" {sorted(theme_fonts)!r}",
-            )
-
-    return violations
 
 
 def _numeric_values(value: Any) -> list[float]:

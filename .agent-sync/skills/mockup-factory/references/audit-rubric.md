@@ -4,7 +4,12 @@
 
 # Prescriptive Audit Rubric — Gate Table
 
-PASS/FAIL comes **only** from the scripted gates below. Prose judgment never decides a verdict; it can only annotate. Each checklist item must include severity, blocking, evidence, and the best available anchor: `screen_id`, `semantic_id`, and `pencil_node_id`.
+## C51 closure
+
+**Read** [`../../../../docs/verification-workflow.md`](../../../../docs/verification-workflow.md) and apply its source review, applicability, native layout and profile protocol. These detailed standalone checks diagnose their own artifacts; final completion requires `penflow run --target <target> --profile design --project <consumer-project-root> --json` and `penflow validate-report <target>/run-report.json --schema --required-profile design --project <consumer-project-root> --json`, both PASS/exit 0. Required warnings and missing renderer evidence block. Pre-review preparation is non-certifying; `PASSED_WITH_WARNINGS` and historical reports never close C51. Reference/C48 applicability comes from reviewed procedure plus authenticated inheritance, never file absence.
+
+
+Detailed audit gate PASS/FAIL comes **only** from the scripted gates below; cumulative workflow completion requires the C51 production and revalidation above. Prose judgment never decides either verdict; it can only annotate. Each checklist item must include severity, blocking, evidence, and the best available anchor: `screen_id`, `semantic_id`, and `pencil_node_id`.
 
 ## Gate Table
 

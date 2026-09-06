@@ -22,6 +22,16 @@ description: >
 
 Guided pipeline that promotes reviewed behavior into canonical `flow-ui-contract/contract.json`. Flow/screen Markdown is generated through `export-flow-docs` or supplied only as explicit legacy migration input.
 
+## C51 workflow authority
+
+<!-- @spec(FR-015) -->
+**Read** [`../../../docs/verification-workflow.md`](../../../docs/verification-workflow.md) before accepting workflow completion. The existing workflow automatically prepares explicit test IDs before source review, binds actual upstream requirements and plan/workflow applicability, and selects `design` after review/native design or `implementation` after the external runner. Pre-review preparation is non-certifying; reuse unchanged design evidence instead of repeating Mockup Factory. Missing requirements, outcomes, native capabilities or review history block; no extra user-maintained ledger or manual verification step.
+
+- Final design: `penflow run --target <target> --profile design --project <consumer-project-root> --json`, then `penflow validate-report <target>/run-report.json --schema --required-profile design --project <consumer-project-root> --json`.
+- Final implementation: the same commands with `implementation` and the actual caller-supplied `--build-manifest <runner-path>` on both calls. Require exact-profile PASS, empty issues, report hash/scope/build concordance and exits 0.
+- Standalone commands, audit scores, `PASSED_WITH_WARNINGS`, masks, `--lenient`, missing-file heuristics and historical C47 never substitute for C51. The legacy sequences below remain preparation/diagnostics; C51 alone decides cumulative closure and normalizes native geometry.
+- Native lifecycle fields must survive actual Save/C46 before draft/archive variants are trusted. Pencil 2.14 accepting metadata without persisting it does not create a lifecycle revision; keep the valid active canvas and report the unsupported capability.
+
 ## Purpose
 
 Use this skill before Penflow needs a `semantic-ui-tree.json`. It turns product behavior into a strict JSON contract that Penflow can validate, convert into Pencil context, reverse/migrate from Pencil docs, and compare against runtime output later.
@@ -230,7 +240,7 @@ If any flow or screen declares surface `landing` or `showcase`, run the Design R
 
 ### Step 6 — Generation
 
-Author or update `<target>/flow-ui-contract/contract.json`, then generate its Markdown projections transactionally:
+Author or update `<target>/flow-ui-contract/contract.json`. Before its first source review, automatically call `penflow authority prepare <target>/flow-ui-contract/contract.json --project <consumer-project-root> --json`, require the closed PASS envelope, and write its `data` as the generated contract. Preserve explicit IDs; never repair an approved contract during validation. Run `penflow validate-flow-contract <target>/flow-ui-contract/contract.json --require-test-ids --project <consumer-project-root> --json` before review/Pencil. Bind source requirements, category-specific outcome predicates and the actual reviewed workflow policy as described in the C51 workflow, then generate Markdown projections transactionally:
 
 ```bash
 penflow export-flow-docs <target>/flow-ui-contract/contract.json --project <consumer-project-root> --out <target>/flow-ui-contract --json

@@ -4,66 +4,319 @@
   "title": "Penflow Actual UI Tree",
   "description": "After-code runtime UI tree (contract C12) emitted by external runtimes (SwiftUI, React, Rust/Dioxus, etc.) and validated by `penflow validate-actual`.",
   "type": "object",
-  "required": ["version", "screens"],
+  "required": [
+    "version",
+    "screens"
+  ],
   "additionalProperties": true,
   "properties": {
-    "version": {"type": "integer", "minimum": 1},
+    "version": {
+      "const": 1
+    },
     "screens": {
       "type": "array",
-      "items": {"$ref": "#/$defs/screen"}
+      "items": {
+        "$ref": "#/$defs/screen"
+      },
+      "minItems": 1
+    },
+    "observed_states": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "screen_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "state": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scenario_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            },
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "screen_id",
+          "state",
+          "scenario_id",
+          "session_id",
+          "evidence"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "$defs": {
     "screen": {
       "type": "object",
-      "required": ["screen_id", "root"],
+      "required": [
+        "screen_id",
+        "root"
+      ],
       "additionalProperties": true,
       "properties": {
-        "screen_id": {"type": "string"},
-        "viewport": {"$ref": "#/$defs/viewport"},
-        "root": {"$ref": "#/$defs/node"}
+        "screen_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "viewport": {
+          "$ref": "#/$defs/viewport"
+        },
+        "root": {
+          "$ref": "#/$defs/node"
+        }
       }
     },
     "viewport": {
       "type": "object",
-      "required": ["width", "height"],
+      "required": [
+        "width",
+        "height"
+      ],
       "additionalProperties": true,
       "properties": {
-        "x": {"type": "number"},
-        "y": {"type": "number"},
-        "width": {"type": "number"},
-        "height": {"type": "number"}
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number",
+          "minimum": 0
+        },
+        "height": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     },
     "node": {
       "type": "object",
-      "required": ["id", "role", "bbox"],
+      "required": [
+        "id",
+        "role",
+        "bbox"
+      ],
       "additionalProperties": true,
       "properties": {
-        "id": {"type": "string"},
-        "role": {"type": "string"},
-        "bbox": {"$ref": "#/$defs/bbox"},
-        "pencil_id": {"type": "string"},
-        "semantic_id": {"type": ["string", "null"]},
-        "name": {"type": ["string", "null"]},
-        "text": {"type": ["string", "null"]},
-        "visual": {"type": "object", "additionalProperties": true},
-        "context": {"type": "object", "additionalProperties": true},
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bbox": {
+          "$ref": "#/$defs/bbox"
+        },
+        "pencil_id": {
+          "type": "string"
+        },
+        "semantic_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "text": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "visual": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "fill": {
+              "type": "string",
+              "minLength": 1
+            },
+            "stroke": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "fill",
+                    "thickness"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "fill": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "thickness": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  }
+                }
+              ]
+            },
+            "fontFamily": {
+              "type": "string",
+              "minLength": 1
+            },
+            "layout": {
+              "type": "string",
+              "minLength": 1
+            },
+            "alignItems": {
+              "type": "string",
+              "minLength": 1
+            },
+            "cornerRadius": {
+              "type": "number"
+            },
+            "fontSize": {
+              "type": "number"
+            },
+            "gap": {
+              "type": "number"
+            },
+            "fontWeight": {
+              "type": [
+                "string",
+                "number"
+              ]
+            },
+            "padding": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 4,
+                  "items": {
+                    "type": "number"
+                  }
+                }
+              ]
+            },
+            "textAlign": {
+              "type": "string",
+              "minLength": 1
+            },
+            "strokeThickness": {
+              "type": "number",
+              "minimum": 0
+            },
+            "strokeWidth": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "minProperties": 1,
+                  "properties": {
+                    "top": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "right": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "bottom": {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    "left": {
+                      "type": "number",
+                      "minimum": 0
+                    }
+                  }
+                }
+              ]
+            },
+            "strokeAlignment": {
+              "enum": [
+                "inner",
+                "center",
+                "outer"
+              ]
+            }
+          }
+        },
+        "context": {
+          "type": "object",
+          "additionalProperties": true
+        },
         "children": {
           "type": "array",
-          "items": {"$ref": "#/$defs/node"}
+          "items": {
+            "$ref": "#/$defs/node"
+          }
         }
       }
     },
     "bbox": {
       "type": "object",
-      "required": ["x", "y", "width", "height"],
+      "required": [
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
       "additionalProperties": true,
       "properties": {
-        "x": {"type": "number"},
-        "y": {"type": "number"},
-        "width": {"type": "number"},
-        "height": {"type": "number"}
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number",
+          "minimum": 0
+        },
+        "height": {
+          "type": "number",
+          "minimum": 0
+        }
       }
     }
   }

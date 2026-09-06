@@ -48,56 +48,43 @@ def validate_strict_closure(
     run_dir.mkdir(parents=True, exist_ok=True)
     report_path = run_dir / REPORT_FILENAME
     before = _workspace_snapshot(workspace)
-    persistence_load_issues: list[dict[str, Any]] = []
-    actual_load_issues: list[dict[str, Any]] = []
-    visual_load_issues: list[dict[str, Any]] = []
+    gate_issues, run_id = _closure_gate_issues(
+        workspace,
+        references=references,
+        theme_css=theme_css,
+        actual_max_age_seconds=actual_max_age_seconds,
+        now=now,
+    )
+    report = _closure_report(workspace, report_path, before, gate_issues, run_id)
+    report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return report
 
-    persistence_path = run_dir / PERSISTENCE_FILENAME
+
+def _closure_gate_issues(
+    workspace: Path,
+    *,
+    references: str | Path | None,
+    theme_css: str | Path | None,
+    actual_max_age_seconds: float | None,
+    now: datetime | None,
+) -> tuple[dict[str, list[dict[str, Any]]], str | None]:
+    """Evaluate unchanged C47 validators in their historical order."""
+    records, loading = _closure_records(workspace)
+    persistence, actual_receipt = records["persistence"], records["actual"]
+    manifest, vision = records["manifest"], records["vision"]
+    persistence_load_issues = loading["persistence"]
+    actual_load_issues = loading["actual"]
+    visual_load_issues = [*loading["manifest"], *loading["vision"]]
     actual_path = workspace / "actual-ui-tree.json"
     expected_path = workspace / "expected-ui-tree.json"
     evidence_dir = workspace / ".mockup-validation" / "visual-evidence"
     references_dir = _resolve_optional_path(workspace, references)
     theme_path = _resolve_optional_path(workspace, theme_css)
 
-    persistence = _load_object(
-        persistence_path,
-        "strict.persistence",
-        persistence_load_issues,
-    )
-    actual_receipt = _load_object(
-        actual_provenance_path(actual_path),
-        "strict.actual_provenance",
-        actual_load_issues,
-    )
-    manifest = _load_object(
-        evidence_dir / "manifest.json",
-        "strict.visual_manifest",
-        visual_load_issues,
-    )
-    vision = _load_object(
-        evidence_dir / "vision-report.json",
-        "strict.vision_report",
-        visual_load_issues,
-    )
-
     persistence_issues = [*persistence_load_issues, *_persistence_issues(persistence)]
-    try:
-        actual_issues = [
-            *actual_load_issues,
-            *validate_actual_provenance(
-                actual_path,
-                expected_path=expected_path,
-                now=now or datetime.now(UTC),
-                max_age_seconds=(
-                    DEFAULT_ACTUAL_MAX_AGE_SECONDS
-                    if actual_max_age_seconds is None
-                    else actual_max_age_seconds
-                ),
-                require_fresh=True,
-            ),
-        ]
-    except ProvenanceError as error:
-        raise StrictClosureError(str(error)) from error
+    actual_issues = _actual_gate_issues(
+        actual_path, expected_path, now, actual_max_age_seconds, actual_load_issues
+    )
     visual_issues = [
         *visual_load_issues,
         *_visual_issues(
@@ -113,14 +100,46 @@ def validate_strict_closure(
         manifest=manifest,
     )
     run_issues, run_id = _same_run_issues(persistence, actual_receipt, manifest, vision)
-    issues = [
-        *persistence_issues,
-        *actual_issues,
-        *visual_issues,
-        *reference_issues,
-        *run_issues,
-    ]
+    return {
+        "persistence": persistence_issues,
+        "actual_provenance": actual_issues,
+        "visual_evidence": visual_issues,
+        "reference_fidelity": reference_issues,
+        "same_run": run_issues,
+    }, run_id
 
+
+def _closure_records(
+    workspace: Path,
+) -> tuple[dict[str, dict[str, Any] | None], dict[str, list[dict[str, Any]]]]:
+    """Read the four historical evidence objects while retaining each boundary finding."""
+    evidence = workspace / ".mockup-validation" / "visual-evidence"
+    paths = {
+        "persistence": (workspace / REPORT_DIR / PERSISTENCE_FILENAME, "strict.persistence"),
+        "actual": (
+            actual_provenance_path(workspace / "actual-ui-tree.json"),
+            "strict.actual_provenance",
+        ),
+        "manifest": (evidence / "manifest.json", "strict.visual_manifest"),
+        "vision": (evidence / "vision-report.json", "strict.vision_report"),
+    }
+    records, loading = {}, {}
+    for name, (path, code) in paths.items():
+        findings: list[dict[str, Any]] = []
+        records[name] = _load_object(path, code, findings)
+        loading[name] = findings
+    return records, loading
+
+
+def _closure_report(
+    workspace: Path,
+    report_path: Path,
+    before: dict[str, str],
+    gate_issues: dict[str, list[dict[str, Any]]],
+    run_id: str | None,
+) -> dict[str, Any]:
+    """Join gate findings with the unchanged-files invariant and stable report envelope."""
+    issues = [item for findings in gate_issues.values() for item in findings]
     after = _workspace_snapshot(workspace)
     unchanged = before == after
     if not unchanged:
@@ -132,13 +151,7 @@ def validate_strict_closure(
             )
         )
     issues.sort(key=_issue_sort_key)
-    gates = {
-        "persistence": _gate(persistence_issues),
-        "actual_provenance": _gate(actual_issues),
-        "visual_evidence": _gate(visual_issues),
-        "reference_fidelity": _gate(reference_issues),
-        "same_run": _gate(run_issues),
-    }
+    gates = {name: _gate(findings) for name, findings in gate_issues.items()}
     status = "PASS" if not issues else "FAIL"
     report: dict[str, Any] = {
         "kind": KIND,
@@ -157,7 +170,6 @@ def validate_strict_closure(
         "issues": issues,
     }
     report["integrity"] = {"sha256": _report_digest(report)}
-    report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return report
 
 
@@ -413,3 +425,30 @@ def _report_digest(report: dict[str, Any]) -> str:
     bound.pop("integrity", None)
     payload = json.dumps(bound, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
+
+
+def _actual_gate_issues(
+    actual_path: Path,
+    expected_path: Path,
+    now: datetime | None,
+    actual_max_age_seconds: float | None,
+    actual_load_issues: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    try:
+        actual_issues = [
+            *actual_load_issues,
+            *validate_actual_provenance(
+                actual_path,
+                expected_path=expected_path,
+                now=now or datetime.now(UTC),
+                max_age_seconds=(
+                    DEFAULT_ACTUAL_MAX_AGE_SECONDS
+                    if actual_max_age_seconds is None
+                    else actual_max_age_seconds
+                ),
+                require_fresh=True,
+            ),
+        ]
+    except ProvenanceError as error:
+        raise StrictClosureError(str(error)) from error
+    return actual_issues

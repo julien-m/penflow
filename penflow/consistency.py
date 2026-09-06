@@ -67,7 +67,12 @@ MAX_MESSAGE_EXAMPLES = 3
 
 
 def check_consistency(
-    tree_path: str | Path, *, group_by: str | None = None, lenient: bool = False
+    tree_path: str | Path,
+    *,
+    group_by: str | None = None,
+    lenient: bool = False,
+    tree_data: dict[str, Any] | None = None,
+    shared_identity_only: bool = False,
 ) -> dict[str, Any]:
     # @spec FR-001: Cross-screen consistency engine — .specs/features/047-cross-screen-consistency-check/spec.md#fr-001
     # @spec FR-005: Deterministic ordering and byte-identical reruns — .specs/features/047-cross-screen-consistency-check/spec.md#fr-005
@@ -82,6 +87,10 @@ def check_consistency(
             (role + context.intent + context.variant).
         lenient: Downgrade all non-always-error property divergences to warning
             in the emitted report.
+        tree_data: Optional preloaded tree; takes precedence over reading
+            ``tree_path``, which remains recorded as the report input.
+        shared_identity_only: Compare only components sharing explicit
+            intent, variant, or reuse identity; role alone does not form a group.
 
     Returns:
         A strict consistency report dictionary
@@ -94,12 +103,14 @@ def check_consistency(
     effective_group_by = group_by if group_by is not None else DEFAULT_GROUP_BY
     if effective_group_by not in GROUP_BY_CHOICES:
         raise ValueError(f"unknown group-by: {effective_group_by!r}")
-    tree = load_tree(tree_path)
+    tree = load_tree(tree_path) if tree_data is None else tree_data
     if not isinstance(tree, dict) or not isinstance(tree.get("screens"), list):
         raise ValueError(f"expected tree must be an object with a screens list: {tree_path}")
 
-    members = _collect_members(tree)
-    groups = _group_by_signature(members, effective_group_by)
+    members = _collect_members(tree, shared_identity_only=shared_identity_only)
+    groups = _group_by_signature(
+        members, effective_group_by, shared_identity_only=shared_identity_only
+    )
     issues: list[dict[str, Any]] = []
     groups_checked = 0
     for signature in sorted(groups):
@@ -139,7 +150,9 @@ def write_consistency_report(report: dict[str, Any], out_path: str | Path) -> No
     Path(out_path).write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
-def _collect_members(tree: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+def _collect_members(
+    tree: dict[str, Any], *, shared_identity_only: bool = False
+) -> list[tuple[str, dict[str, Any]]]:
     """Flatten every screen into `(screen_id, node)` pairs, skipping masked nodes.
 
     Mask semantics are shared with `compare.py` (`context.mask`, masked roles,
@@ -159,20 +172,27 @@ def _collect_members(tree: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
         if not isinstance(root, dict):
             raise ValueError(f"screens[{index}].root must be an object")
         for node in flatten_nodes(root):
-            if not node.get("role") or _is_masked(node):
+            if not node.get("role") or (not shared_identity_only and _is_masked(node)):
                 continue
             if _is_anonymous_container(node):
+                continue
+            if shared_identity_only and not any(
+                node.get("context", {}).get(key) for key in ("intent", "variant", "repeat")
+            ):
                 continue
             members.append((screen_id, node))
     return members
 
 
 def _group_by_signature(
-    members: list[tuple[str, dict[str, Any]]], group_by: str
+    members: list[tuple[str, dict[str, Any]]], group_by: str, *, shared_identity_only: bool = False
 ) -> dict[str, list[tuple[str, dict[str, Any]]]]:
     groups: dict[str, list[tuple[str, dict[str, Any]]]] = {}
     for screen_id, node in members:
-        groups.setdefault(_signature(node, group_by), []).append((screen_id, node))
+        signature = _signature(node, group_by)
+        if shared_identity_only:
+            signature += ";repeat=" + _signature_part(node.get("context", {}).get("repeat"))
+        groups.setdefault(signature, []).append((screen_id, node))
     return groups
 
 

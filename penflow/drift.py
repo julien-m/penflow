@@ -9,6 +9,7 @@ from typing import Any
 
 import yaml
 
+from .canonical_drift import canonical_source_issues
 from .context import Context
 from .semantic_enrichment import PenRecord, _pen_records
 from .semantic_mapping import pencil_context_map
@@ -17,7 +18,7 @@ from .semantic_validation import validate_semantic_tree
 CLARIFICATION = "[NEEDS CLARIFICATION]"
 REPORT_VERSION = 1
 PRESENTATIONAL_LEAF_TYPES = frozenset(
-    {"text", "icon_font", "line", "path", "rectangle", "ellipse", "polygon"}
+    {"text", "icon", "icon_font", "line", "path", "rectangle", "ellipse", "polygon"}
 )
 # @spec FR-008: blocking drift codes — .specs/features/049-strict-mode-default-blocking-drift/spec.md#fr-008
 # Codes whose presence forces status BLOCKED and a non-zero exit in both
@@ -29,6 +30,9 @@ BLOCKING_DRIFT_CODES = frozenset(
         "drift.pencil_context_obsolete",
         "drift.clarification_marker",
         "semantic.downgrade_suspect",
+        "drift.contract_invalid",
+        "drift.semantic_projection_changed",
+        "drift.contract_context_mismatch",
     }
 )
 
@@ -44,7 +48,8 @@ def detect_drift(
     """Write deterministic drift reports for specs, semantic tree, and Pencil.
 
     Args:
-        specs_dir: Directory containing `flows/*.md` and `screens/*.md`.
+        specs_dir: Canonical contract.json or its directory; legacy directories
+            without contract.json retain flows/screens Markdown validation.
         semantic_tree_path: Valid or partially valid `semantic-ui-tree.json`.
         pen_path: Pencil `.pen` mockup to compare against the semantic tree.
         out_path: Destination JSON report path.
@@ -56,7 +61,16 @@ def detect_drift(
     specs_root = Path(specs_dir)
     tree = json.loads(Path(semantic_tree_path).read_text(encoding="utf-8"))
     pen = json.loads(Path(pen_path).read_text(encoding="utf-8"))
-    issues = _drift_issues(specs_root, tree, pen)
+    contract_path = (
+        specs_root if specs_root.name == "contract.json" else specs_root / "contract.json"
+    )
+    if specs_root.name == "contract.json" or contract_path.exists() or contract_path.is_symlink():
+        issues = canonical_source_issues(contract_path, tree, pen, pen_path=str(pen_path))
+        if not issues:
+            issues = canonical_drift_issues(tree, pen)
+        issues.sort(key=_issue_sort_key)
+    else:
+        issues = _drift_issues(specs_root, tree, pen)
     report = {
         "version": REPORT_VERSION,
         "kind": "penflow-drift-report",
@@ -73,6 +87,29 @@ def detect_drift(
     if markdown_path is not None:
         Path(markdown_path).write_text(_markdown_report(report), encoding="utf-8")
     return report
+
+
+def canonical_drift_issues(tree: dict[str, Any], pen: dict[str, Any]) -> list[dict[str, Any]]:
+    """Evaluate canonical source-backed tree/context drift without legacy Markdown IO.
+
+    The caller must first recompute the exact tree from validated C20. Generated
+    human documents have their separate complete source/manifest freshness gate.
+
+    Args:
+        tree: Canonical semantic tree recomputed from the validated source contract.
+        pen: Authenticated Pencil document to compare against that semantic tree.
+
+    Returns:
+        Structured drift issues sorted deterministically by the canonical issue key.
+    """
+    issues = _semantic_validation_issues(tree)
+    if not _has_error(issues):
+        context_map = pencil_context_map(pen, tree)
+        issues.extend(_mapping_issues(context_map))
+        issues.extend(_obsolete_context_issues(pen, tree))
+        issues.extend(_uncovered_mockup_issues(pen, context_map, classified=True))
+    issues.extend(_clarification_tree_issues(tree))
+    return sorted(issues, key=_issue_sort_key)
 
 
 def _drift_issues(
@@ -223,7 +260,7 @@ def _obsolete_context_issues(pen: dict[str, Any], tree: dict[str, Any]) -> list[
 
 
 def _uncovered_mockup_issues(
-    pen: dict[str, Any], context_map: dict[str, Any]
+    pen: dict[str, Any], context_map: dict[str, Any], *, classified: bool = False
 ) -> list[dict[str, Any]]:
     matched_ids = {str(item["pencil_node_id"]) for item in context_map["matched"]}
     # Treat leaf-only visual descendants of mapped controls as covered while
@@ -236,7 +273,10 @@ def _uncovered_mockup_issues(
     issues = []
     for record in _pen_records(pen):
         node_id = str(record.node.get("id"))
-        has_semantic_context = Context.from_raw(record.node.get("context")).semantic_id is not None
+        context = Context.from_raw(record.node.get("context"))
+        if classified and context.classification in {"decorative", "inherited"}:
+            continue
+        has_semantic_context = context.semantic_id is not None
         is_covered_child = _is_covered_visual_child(record, covered_subtree_paths)
         if node_id not in matched_ids and not has_semantic_context and not is_covered_child:
             issues.append(

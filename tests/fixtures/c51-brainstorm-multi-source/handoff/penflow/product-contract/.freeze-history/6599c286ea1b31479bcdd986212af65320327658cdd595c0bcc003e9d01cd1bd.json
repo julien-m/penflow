@@ -1,0 +1,16 @@
+{
+  "change_request": {
+    "path": ".freeze-history/f9a85b9afe523b9755e2c3a56cab3dce2325319d436821b61a9faf1692203ca7.json",
+    "sha256": "f9a85b9afe523b9755e2c3a56cab3dce2325319d436821b61a9faf1692203ca7"
+  },
+  "freeze": {
+    "path": ".freeze-history/2541b09b5e527c1e29472ebf318c33bbbb6c24c5b670a2c05504f8cc1e17c949.json",
+    "sha256": "2541b09b5e527c1e29472ebf318c33bbbb6c24c5b670a2c05504f8cc1e17c949"
+  },
+  "kind": "product-contract-acceptance",
+  "previous": {
+    "path": ".freeze-history/12d506dce0393897d041cd50ed31f5ec63737e31f347ea3c230daf24fd6d6b91.json",
+    "sha256": "12d506dce0393897d041cd50ed31f5ec63737e31f347ea3c230daf24fd6d6b91"
+  },
+  "version": 1
+}

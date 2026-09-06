@@ -6,7 +6,15 @@ This guide explains how to emit an `actual-ui-tree.json` (contract C12) from a r
 
 Penflow ships **zero runtime code** for the React Native stack. Penflow does **not** start the Metro bundler, does **not** drive the iOS Simulator or Android Emulator, does **not** run Detox / Appium / Maestro, and does **not** execute the JS/TS snippet below. The snippet is **illustrative only** — copy it into your own RN test harness, your own bundler, your own CI. Penflow's responsibility starts after the JSON file lands on disk, with `penflow validate-actual <file> --schema`.
 
-The only thing Penflow guarantees for the React Native stack is the **shape of the JSON** your adapter must produce. That shape is defined by contract C12 ([`actual-ui-tree.schema.json`](../../penflow/schemas/actual-ui-tree.schema.json), feature 037).
+The C12 boundary validates the **shape of the JSON** your adapter must produce. That shape is defined by contract C12 ([`actual-ui-tree.schema.json`](../../penflow/schemas/actual-ui-tree.schema.json), feature 037).
+
+## C51 certification and coordinates
+
+C12 schema validation proves the shape of an observation. C51 additionally joins it to the independently selected build manifest, approved sources, runner/session/scenario identities and the exact evidence bytes. The runner records actual before/after facts and outcomes; it must not copy expected values or declare a successful assertion in place of observing it. **Read** [the verification workflow](../verification-workflow.md) and [the causal evidence guide](causal-transition-evidence.md) before producing certifying evidence.
+
+For C51, express every bbox in logical units relative to the observed screen origin, including nested nodes. Preserve the original native measurements in the runner evidence, then subtract the measured screen origin; do not consult the expected tree to normalize actual geometry. Missing measurements block capture instead of becoming zero boxes. Penflow independently normalizes its authenticated Pencil layout to the same screen coordinates. Older viewport/local-coordinate exports remain historical C13 examples; do not mix their coordinate conventions in a C51 comparison.
+
+Capture the rendered hierarchy, including additional controls without semantic annotations. Test identifiers join observations to the contract; they do not supply the observed role, text, visibility or value. Unknown or unmapped interactive elements must remain visible to validation. Hidden accessibility metadata alone does not prove an element is absent from the rendered screen. A required property unavailable through a platform adapter blocks that capability rather than being omitted.
 
 ## C13 mapping table — React Native
 
@@ -16,7 +24,7 @@ The columns follow the canonical C12 field ordering (`id` / `role` / `bbox` / `s
 |---|---|
 | `id` (required, unique within tree) | `props.testID`. MUST be unique within the tree; use dotted namespacing (e.g. `checkout.pay`) to make collisions unlikely. |
 | `role` (required, free-form string) | `props.accessibilityRole` (e.g. `"button"`, `"text"`, `"image"`) when set, falling back to the component's display name (e.g. `View`, `Text`, `Pressable`). |
-| `bbox.{x,y,width,height}` (required) | `onLayout` event's `nativeEvent.layout` — copy `x`, `y`, `width`, `height` as plain numbers. Store the last seen layout per node. |
+| `bbox.{x,y,width,height}` (required) | `onLayout.nativeEvent.layout` is parent-relative. Accumulate every measured ancestor offset for an untransformed/unscrolled hierarchy, or use actual native window measurements and subtract the measured screen origin. Observe scroll/transform offsets; never copy local `x/y` directly into C51. |
 | `semantic_id` (optional) | Same value as `testID` when no separate semantic id is needed. Used downstream by `compare-tree` to align actual ↔ expected. |
 | `name` (optional) | `props.accessibilityLabel`. |
 | `text` (optional) | `props.children` when it is a string (e.g. `<Text>{label}</Text>`), or the joined rendered text of nested `<Text>` children for leaf text nodes. Set to `null` for non-text components. |
@@ -27,6 +35,8 @@ The columns follow the canonical C12 field ordering (`id` / `role` / `bbox` / `s
 This table is normative for the React Native stack. The full cross-stack table in [`spec.md`](../../.specs/features/038-runtime-adapter-guides/spec.md#c13--adapter-conformance-contract-mapping-table) is the source of truth for C13.
 
 ## Reference snippet (JS / TS — illustrative, not executed by Penflow)
+
+The offset accumulation below assumes an unscrolled, untransformed hierarchy containing every measured host ancestor. A production adapter must use native measurements when those assumptions do not hold. The declared virtual tree and react-test-renderer alone are not evidence of a rendered native application.
 
 > **Illustrative only.** This snippet is documentation, not a file Penflow imports or bundles. Adapt it to your own RN test harness, your own bundler, your own CI. Penflow ships no runtime probe for the React Native stack.
 
@@ -57,8 +67,10 @@ type Node = {
   children: Node[];
 };
 
-function emitNode(node: Node) {
-  const bbox = layouts.get(node.id) ?? { x: 0, y: 0, width: 0, height: 0 };
+function emitNode(node: Node, parentX = 0, parentY = 0): unknown {
+  const local = layouts.get(node.id);
+  if (!local) throw new Error(`Missing measured layout: ${node.id}`);
+  const bbox = { ...local, x: parentX + local.x, y: parentY + local.y };
   return {
     id: node.id,
     role: node.role,
@@ -66,7 +78,7 @@ function emitNode(node: Node) {
     semantic_id: node.semantic_id ?? node.id,
     name: node.name ?? null,
     text: node.text ?? null,
-    children: node.children.map(emitNode),
+    children: node.children.map((child) => emitNode(child, bbox.x, bbox.y)),
   };
 }
 
@@ -78,7 +90,8 @@ function emitActualTree(screenId: string, root: Node) {
       {
         screen_id: screenId,
         viewport: { width, height },
-        root: emitNode(root),
+        root: emitNode(root, -(layouts.get(root.id)?.x ?? 0),
+                       -(layouts.get(root.id)?.y ?? 0)),
       },
     ],
   };
@@ -123,4 +136,4 @@ Expected output: exit 0, `"status": "PASS"`, `"issues": []`.
 - Does not add `react-native`, `node`, `npm`, or `metro` to `pyproject.toml`.
 - Does not turn snippet bugs into Penflow regressions — the snippet is documentation.
 
-If you want an end-to-end demo that drives a real running RN app, see feature 039 (out of scope for feature 038).
+The feature 039 demo uses a static actual-tree fixture. It does not execute a React Native application or certify this illustrative adapter.

@@ -4,139 +4,349 @@
   "$id": "https://penflow.dev/schemas/code-ir.schema.json",
   "title": "Penflow Code IR",
   "type": "object",
-  "required": ["version", "kind", "source", "flow", "screens"],
+  "required": [
+    "version",
+    "kind",
+    "source",
+    "flow",
+    "screens"
+  ],
   "additionalProperties": false,
   "properties": {
-    "version": {"type": "integer", "minimum": 1},
-    "kind": {"const": "penflow-code-ir"},
-    "source": {"const": "pencil-context"},
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "kind": {
+      "const": "penflow-code-ir"
+    },
+    "source": {
+      "const": "pencil-context"
+    },
     "flow": {
       "type": "object",
-      "required": ["id", "name"],
+      "required": [
+        "id",
+        "name"
+      ],
       "additionalProperties": true,
       "properties": {
-        "id": {"type": "string"},
-        "name": {"type": "string"}
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
       }
     },
     "screens": {
       "type": "array",
-      "items": {"$ref": "#/$defs/screen"}
+      "items": {
+        "$ref": "#/$defs/screen"
+      }
     },
     "bindings": {
       "type": "array",
-      "items": {"type": "string"}
+      "items": {
+        "type": "string"
+      }
     },
     "test_ids": {
       "type": "array",
-      "items": {"type": "string"}
+      "items": {
+        "type": "string"
+      }
     },
     "actions": {
       "type": "array",
-      "items": {"type": "object"}
+      "items": {
+        "type": "object"
+      }
     },
     "components": {
       "type": "array",
-      "items": {"type": "object"}
+      "items": {
+        "type": "object"
+      }
     },
     "inputs": {
       "type": "object",
-      "additionalProperties": {"type": "string"}
+      "additionalProperties": {
+        "type": "string"
+      }
     },
     "contract": {
       "type": "object",
-      "required": ["contract_id", "actors", "entities", "screens", "actions", "mutations", "guards", "permissions", "bindings", "states", "transitions"],
+      "required": [
+        "contract_id",
+        "actors",
+        "entities",
+        "screens",
+        "actions",
+        "mutations",
+        "guards",
+        "permissions",
+        "bindings",
+        "states",
+        "transitions"
+      ],
       "additionalProperties": false,
       "properties": {
-        "contract_id": {"type": "string"},
-        "actors": {"type": "array", "items": {"$ref": "#/$defs/contract_id_object"}},
-        "entities": {"type": "array", "items": {"$ref": "#/$defs/contract_id_object"}},
-        "screens": {"type": "array", "items": {"$ref": "#/$defs/contract_id_object"}},
-        "actions": {"type": "array", "items": {"$ref": "#/$defs/contract_id_object"}},
-        "mutations": {"type": "array", "items": {"$ref": "#/$defs/contract_id_object"}},
-        "guards": {"type": "array", "items": {"$ref": "#/$defs/contract_id_object"}},
-        "permissions": {"type": "array", "items": {"$ref": "#/$defs/contract_id_object"}},
-        "bindings": {"type": "array", "items": {"type": "string"}},
-        "states": {"type": "array", "items": {"type": "string"}},
-        "transitions": {"type": "array", "items": {"$ref": "#/$defs/contract_id_object"}}
+        "contract_id": {
+          "type": "string"
+        },
+        "actors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contract_id_object"
+          }
+        },
+        "entities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contract_id_object"
+          }
+        },
+        "screens": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contract_id_object"
+          }
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contract_id_object"
+          }
+        },
+        "mutations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contract_id_object"
+          }
+        },
+        "guards": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contract_id_object"
+          }
+        },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contract_id_object"
+          }
+        },
+        "bindings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "states": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "transitions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/contract_id_object"
+          }
+        },
+        "system_returns": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:penflow:c51:contracts:v1#/$defs/system-return"
+          }
+        },
+        "requirements": {
+          "$ref": "urn:penflow:c51:contracts:v1#/$defs/contract-requirements"
+        },
+        "outcome_expectations": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:penflow:c51:contracts:v1#/$defs/expected-outcome"
+          }
+        },
+        "verification_policy": {
+          "$ref": "urn:penflow:c51:contracts:v1#/$defs/verification-policy"
+        }
       }
     }
   },
   "$defs": {
     "contract_id_object": {
       "type": "object",
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "additionalProperties": true,
       "properties": {
-        "id": {"type": "string"}
+        "id": {
+          "type": "string"
+        }
       }
     },
     "screen": {
       "type": "object",
-      "required": ["id", "root", "source_map"],
+      "required": [
+        "id",
+        "root",
+        "source_map"
+      ],
       "additionalProperties": true,
       "properties": {
-        "id": {"type": "string"},
-        "name": {"type": "string"},
-        "flow_id": {"type": "string"},
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "flow_id": {
+          "type": "string"
+        },
         "viewport": {
           "type": "object",
           "additionalProperties": true
         },
-        "states": {"type": "array"},
-        "errors": {"type": "array"},
-        "test_id": {"type": ["string", "null"]},
-        "source_map": {"$ref": "#/$defs/source_map"},
-        "root": {"$ref": "#/$defs/node"}
+        "states": {
+          "type": "array"
+        },
+        "errors": {
+          "type": "array"
+        },
+        "test_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_map": {
+          "$ref": "#/$defs/source_map"
+        },
+        "root": {
+          "$ref": "#/$defs/node"
+        }
       }
     },
     "node": {
       "type": "object",
-      "required": ["id", "pencil_node_id", "path", "type", "source_map"],
+      "required": [
+        "id",
+        "pencil_node_id",
+        "path",
+        "type",
+        "source_map"
+      ],
       "additionalProperties": true,
       "properties": {
-        "id": {"type": "string"},
-        "pencil_node_id": {"type": "string"},
-        "path": {"type": "string"},
-        "type": {"type": "string"},
-        "semantic_id": {"type": "string"},
-        "name": {"type": "string"},
-        "text": {"type": "string"},
-        "role": {"type": "string"},
-        "intent": {"type": "string"},
-        "binding": {"type": "string"},
-        "entity": {"type": "string"},
-        "test_id": {"type": "string"},
+        "id": {
+          "type": "string"
+        },
+        "pencil_node_id": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "semantic_id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "intent": {
+          "type": "string"
+        },
+        "binding": {
+          "type": "string"
+        },
+        "entity": {
+          "type": "string"
+        },
+        "test_id": {
+          "type": "string"
+        },
         "actions": {
           "type": "array",
-          "items": {"type": "object"}
+          "items": {
+            "type": "object"
+          }
         },
-        "states": {"type": "array"},
-        "validations": {"type": "array"},
-        "side_effects": {"type": "array"},
-        "errors": {"type": "array"},
+        "states": {
+          "type": "array"
+        },
+        "validations": {
+          "type": "array"
+        },
+        "side_effects": {
+          "type": "array"
+        },
+        "errors": {
+          "type": "array"
+        },
         "state_kinds": {
           "type": "array",
-          "items": {"enum": ["empty", "error", "loading"]}
+          "items": {
+            "enum": [
+              "empty",
+              "error",
+              "loading"
+            ]
+          }
         },
-        "source_map": {"$ref": "#/$defs/source_map"},
+        "source_map": {
+          "$ref": "#/$defs/source_map"
+        },
         "children": {
           "type": "array",
-          "items": {"$ref": "#/$defs/node"}
+          "items": {
+            "$ref": "#/$defs/node"
+          }
+        },
+        "permission": {
+          "type": "string",
+          "minLength": 1
         }
       }
     },
     "source_map": {
       "type": "object",
-      "required": ["pencil_node_id", "pencil_path"],
+      "required": [
+        "pencil_node_id",
+        "pencil_path"
+      ],
       "additionalProperties": true,
       "properties": {
-        "pencil_node_id": {"type": "string"},
-        "pencil_path": {"type": "string"},
-        "semantic_id": {"type": "string"},
-        "context": {"type": "object"},
-        "flow_spec": {"type": "string"},
-        "screen_spec": {"type": "string"}
+        "pencil_node_id": {
+          "type": "string"
+        },
+        "pencil_path": {
+          "type": "string"
+        },
+        "semantic_id": {
+          "type": "string"
+        },
+        "context": {
+          "type": "object"
+        },
+        "flow_spec": {
+          "type": "string"
+        },
+        "screen_spec": {
+          "type": "string"
+        }
       }
     }
   }

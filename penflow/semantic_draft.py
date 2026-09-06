@@ -406,7 +406,7 @@ def _stroke(fill: str) -> dict[str, Any]:
 
 
 def _context_from_semantic_node(node: dict[str, Any]) -> str:
-    keys = ("semantic_id", "role", "intent", "binding", "repeat", "entity", "test_id")
+    keys = ("semantic_id", "role", "intent", "binding", "repeat", "entity", "test_id", "permission")
     return format_context_string({key: node[key] for key in keys if node.get(key)})
 
 

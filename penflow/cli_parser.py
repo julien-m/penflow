@@ -36,6 +36,7 @@ from .cli_commands_b import (
     cmd_validate_screen,
     cmd_validate_visual_evidence,
 )
+from .cli_authority import register_authority
 from .cli_reporting import _add_lenient
 from .token_lint import DEFAULT_FONTSIZE_SCALE, DEFAULT_RADIUS_SCALE, DEFAULT_SPACING_SCALE
 
@@ -277,6 +278,17 @@ def _register_codegen_reports(sub: Any) -> None:
     validate_report.add_argument("--json", action="store_true", help="print machine-readable JSON")
     validate_report.add_argument("--schema", action="store_true", help="run bundled JSON Schema")
     validate_report.add_argument("report")
+    validate_report.add_argument(
+        "--required-profile",
+        choices=("design", "implementation"),
+        default=None,
+        help="revalidate all C51 obligations for this workflow profile",
+    )
+    validate_report.add_argument(
+        "--build-manifest",
+        default=None,
+        help="independent caller-owned implementation runner manifest",
+    )
     _add_lenient(validate_report)
     validate_report.set_defaults(func=cmd_validate_report)
 
@@ -337,5 +349,6 @@ def build_parser() -> argparse.ArgumentParser:
     _register_ir_tools(sub)
     _register_codegen_reports(sub)
     _register_demo_projects(sub)
+    register_authority(sub)
     _register_project_health_arguments(sub)
     return parser
