@@ -40,12 +40,12 @@ semantic-ui-tree
 - Every screen root is a semantic node with `role: "screen"`; nested UI elements become semantic nodes with roles such as `container`, `text`, `button`, `input`, `list`, `modal`, or `alert`.
 - Visible labels become `text`; user-facing purpose becomes `intent`; data dependencies become `binding` and `entity`; repeated data regions set `repeat`; stable automation hooks become `test_id`.
 - Screen-level and node-level rules become `states[]`, `validations[]`, and `side_effects[]`. Unknown business logic must be written as `[NEEDS CLARIFICATION]`, not invented.
-- Each flow, screen, and node carries `source_map` so downstream agents can trace it back to a spec file, Pencil node, or reverse-engineered source.
+- Each flow, screen, and node carries `source_map` so downstream agents can trace it back to a spec file, pen.dev node, or reverse-engineered source.
 - Ordering is stable: files, flows, screens, steps, transitions, and child nodes must be emitted deterministically from source order plus stable sorting where the parser owns ordering.
 
-## Pencil Context Propagation
+## .pen Context Propagation
 
-`draft-pen-from-tree` and `enrich-pen` propagate semantic fields into Pencil `context`. Before strict downstream work, explicitly classify every authored node and run `map-pencil-context --strict-coverage --contract ... --coverage-out ...`; forward-only anchor matching is diagnostic, not exhaustive proof.
+`draft-pen-from-tree` and `enrich-pen` propagate semantic fields into pen.dev `.pen` `context`. Before strict downstream work, explicitly classify every authored node and run `map-pencil-context --strict-coverage --contract ... --coverage-out ...`; forward-only anchor matching is diagnostic, not exhaustive proof.
 
 ```text
 classification=semantic; semantic_id=checkout-form; test_id=checkout-form-screen; role=screen

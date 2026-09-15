@@ -39,7 +39,7 @@ def test_penflow_skill_documents_llm_workflow_modes() -> None:
         "## Purpose",
         "## Tree Contracts",
         "## Forward Mode",
-        "## Pencil Enrichment Mode",
+        "## pen.dev Enrichment Mode",
         "## Reverse Mode",
         "## Post-Implementation Compare Mode",
         "## Full Demo Mode",
@@ -67,7 +67,7 @@ def test_pencil_sync_gate_is_documented_for_stale_editor_state() -> None:
 
     for phrase in (
         "penflow pencil-sync",
-        "After every Pencil",
+        "After every pen.dev",
         "batch_design",
         "before any Penflow CLI command that reads",
         "BLOCKED",
@@ -195,7 +195,7 @@ def test_context_grammar_and_exhaustive_mapping_are_documented() -> None:
     combined = f"{penflow_skill}\n{flow_skill}\n{mockup_skill}\n{readme}"
 
     for phrase in (
-        "Pencil Context Grammar",
+        ".pen Context Grammar",
         "key=value",
         "classification=semantic",
         "classification=inherited",
@@ -401,7 +401,7 @@ def test_semantic_tree_reference_documents_formation_contract() -> None:
         "root` plus recursive `children`",
         "data dependencies become `binding` and `entity`",
         "`states[]`, `validations[]`, and `side_effects[]`",
-        "Pencil `context`",
+        "pen.dev `.pen` `context`",
         "`expected-ui-tree.json`",
         "`actual-ui-tree.json`",
     ):

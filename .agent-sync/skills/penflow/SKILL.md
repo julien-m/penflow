@@ -1,6 +1,6 @@
 ---
 name: penflow
-description: Use the Penflow CLI for Pencil .pen context validation, semantic/expected/actual UI-tree workflows, codegen handoff, reports, and deterministic visual-fix review.
+description: Use the Penflow CLI for pen.dev .pen context validation, semantic/expected/actual UI-tree workflows, codegen handoff, reports, and deterministic visual-fix review.
 ---
 <!-- LiveSpec traceability anchors -->
 <!-- @spec(FR-001) -->
@@ -14,7 +14,11 @@ description: Use the Penflow CLI for Pencil .pen context validation, semantic/ex
 
 # Penflow Skill
 
-Use this skill when a task mentions Penflow, Pencil `.pen`, flow specs, `semantic-ui-tree.json`, Pencil `context`, `expected-ui-tree.json`, `actual-ui-tree.json`, code IR, compare reports, or structural design/runtime validation.
+Use this skill when a task mentions Penflow, pen.dev `.pen`, flow specs, `semantic-ui-tree.json`, `.pen` `context`, `expected-ui-tree.json`, `actual-ui-tree.json`, code IR, compare reports, or structural design/runtime validation.
+
+## pen.dev naming
+
+Use `pen.dev` for the product, desktop app, editor, renderer, and MCP integration. On macOS, launch the installed app with `open -a Pen`; do not launch `Pencil`. Keep `pencil` only where it is the current MCP server id or part of an existing Penflow command, field, file, issue id, or receipt schema. The standalone CLI executable is `pen`.
 
 ## C51 workflow authority
 
@@ -24,11 +28,11 @@ Use this skill when a task mentions Penflow, Pencil `.pen`, flow specs, `semanti
 - Final design: `penflow run --target <target> --profile design --project <consumer-project-root> --json`, then `penflow validate-report <target>/run-report.json --schema --required-profile design --project <consumer-project-root> --json`.
 - Final implementation: the same commands with `implementation` and the actual caller-supplied `--build-manifest <runner-path>` on both calls. Require exact-profile PASS, empty issues, report hash/scope/build concordance and exits 0.
 - Standalone commands, audit scores, `PASSED_WITH_WARNINGS`, masks, `--lenient`, missing-file heuristics and historical C47 never substitute for C51. The legacy sequences below remain preparation/diagnostics; C51 alone decides cumulative closure and normalizes native geometry.
-- Native lifecycle fields must survive actual Save/C46 before draft/archive variants are trusted. Pencil 2.14 accepting metadata without persisting it does not create a lifecycle revision; keep the valid active canvas and report the unsupported capability.
+- Native lifecycle fields must survive actual Save/C46 before draft/archive variants are trusted. pen.dev 2.14 accepting metadata without persisting it does not create a lifecycle revision; keep the valid active canvas and report the unsupported capability.
 
 ## Purpose
 
-Penflow is a deterministic, runtime-agnostic CLI that connects product flow intent, Pencil design contracts, codegen handoff data, and post-implementation runtime verification.
+Penflow is a deterministic, runtime-agnostic CLI that connects product flow intent, pen.dev design contracts, codegen handoff data, and post-implementation runtime verification.
 
 Strict v2 uses `flow-ui-contract/contract.json` as the canonical machine contract. Markdown flow/screen docs are deterministic `export-flow-docs` projections or explicit legacy migration input, never competing sources.
 
@@ -63,7 +67,7 @@ At task start, run `penflow doctor --project <consumer-project-root> --check --j
 The LLM should not hand-write production trees, but it must understand their contracts before debugging or explaining results:
 
 - `semantic-ui-tree.json` is formed by `penflow export-semantic-tree` from `flow-ui-contract/contract.json`. Flow specs become `flows[]`; screen specs become `screens[]` in legacy docs; v2 contract objects become the same tree shape with recursive semantic nodes carrying `semantic_id`, `role`, `intent`, `binding`, `entity`, states, validations, side effects, source maps, and test ids.
-- `expected-ui-tree.json` is exported from a contextualized Pencil `.pen`; it is the design-derived baseline for structural comparison.
+- `expected-ui-tree.json` is exported from a contextualized pen.dev `.pen`; it is the design-derived baseline for structural comparison.
 - `actual-ui-tree.json` is emitted by an external runtime adapter; it is the post-implementation observation. Penflow validates it and compares it to the expected tree.
 
 For the semantic-tree formation rules, **Read** [`../flow-ui-contract/references/semantic-ui-tree.md`](../flow-ui-contract/references/semantic-ui-tree.md). For runtime adapter output rules, **Read** [`../../../docs/adapters/web-dom.md`](../../../docs/adapters/web-dom.md), **Read** [`../../../docs/adapters/swiftui-xctest.md`](../../../docs/adapters/swiftui-xctest.md), or **Read** [`../../../docs/adapters/react-native.md`](../../../docs/adapters/react-native.md) when targeting that stack.
@@ -77,12 +81,12 @@ For the semantic-tree formation rules, **Read** [`../flow-ui-contract/references
   ```
 - **Read** [`README.md`](../../../README.md) for project-level command examples when a user asks for the full workflow.
 - **Read** [`../../../docs/theme-contract.md`](../../../docs/theme-contract.md) before generating `theme.css` for `draft-pen-from-tree`, `lint-tokens`, or Brander-style handoff. It defines accepted `--pf-*` aliases, extended status/panel/font tokens, dynamic `palette-*` slots, dynamic `radius-*` slots, and the strict report inputs.
-- Before any UI flow, Pencil draft, mockup, or visual validation work, **Read** [`../../../.conventions/index.md`](../../../.conventions/index.md) and load all matching design domains. UI work must use the convention-defined view/component patterns, not only theme colors.
-- After every Pencil editor/MCP mutation (`batch_design`, manual edit, or equivalent), run `penflow pencil-sync <ui.pen> --expect-screens <N> --json` or add `--expect-min-nodes <N>`. This trigger always remains `persistence_status: UNVERIFIED` with `closes_persistence: false`; mtime, trigger text, and inspection counts never close persistence. The operator must preserve distinct pre/post snapshots, write the C46 observation, run `penflow verify-pencil-persistence ... --out persistence-receipt.json --json`, then run `penflow validate-report persistence-receipt.json --schema --json`; before any Penflow CLI command that reads the `.pen`, require receipt PASS, otherwise report `BLOCKED`.
+- Before any UI flow, pen.dev draft, mockup, or visual validation work, **Read** [`../../../.conventions/index.md`](../../../.conventions/index.md) and load all matching design domains. UI work must use the convention-defined view/component patterns, not only theme colors.
+- After every pen.dev editor/MCP mutation (`batch_design`, manual edit, or equivalent), run `penflow pencil-sync <ui.pen> --expect-screens <N> --json` or add `--expect-min-nodes <N>`. This trigger always remains `persistence_status: UNVERIFIED` with `closes_persistence: false`; mtime, trigger text, and inspection counts never close persistence. The operator must preserve distinct pre/post snapshots, write the C46 observation, run `penflow verify-pencil-persistence ... --out persistence-receipt.json --json`, then run `penflow validate-report persistence-receipt.json --schema --json`; before any Penflow CLI command that reads the `.pen`, require receipt PASS, otherwise report `BLOCKED`.
 
-## Pencil Context Grammar
+## .pen Context Grammar
 
-Pencil `context` is the shorthand string parsed by [`../../../penflow/context.py`](../../../penflow/context.py): `key=value` pairs separated by `;`. Allowed keys: `classification`, `decorative_owner`, `decorative_reason`, `inherits_from`, `instance_key`, `relation`, `semantic_id`, `role`, `intent`, `binding`, `repeat`, `entity`, `variant`, `test_id`, `action`, `permission`, `mask`, `mask_text`, `tolerance`. Every authored id-bearing node declares exactly one `classification=semantic|inherited|decorative`. Semantic nodes require `semantic_id`, `test_id`, and `role`; inherited nodes require `inherits_from` and `relation`; decorative nodes require `decorative_owner` and `decorative_reason`. Appearance never supplies classification.
+pen.dev `.pen` `context` is the shorthand string parsed by [`../../../penflow/context.py`](../../../penflow/context.py): `key=value` pairs separated by `;`. Allowed keys: `classification`, `decorative_owner`, `decorative_reason`, `inherits_from`, `instance_key`, `relation`, `semantic_id`, `role`, `intent`, `binding`, `repeat`, `entity`, `variant`, `test_id`, `action`, `permission`, `mask`, `mask_text`, `tolerance`. Every authored id-bearing node declares exactly one `classification=semantic|inherited|decorative`. Semantic nodes require `semantic_id`, `test_id`, and `role`; inherited nodes require `inherits_from` and `relation`; decorative nodes require `decorative_owner` and `decorative_reason`. Appearance never supplies classification.
 
 Examples:
 - Screen frame: `classification=semantic; semantic_id=cockpit-live; test_id=cockpit-live-screen; role=screen`
@@ -98,23 +102,23 @@ When creating frames/components via `batch_design`, attach classification contex
 |---|---|
 | "Integrate Penflow into my existing project" | Project integration mode |
 | "Generate `.pen` / code IR from flow specs" | Forward mode |
-| "Enrich an existing Pencil mockup with business context" | Pencil enrichment mode |
-| "Reconstruct flows from legacy Pencil" | Reverse mode |
+| "Enrich an existing pen.dev mockup with business context" | pen.dev enrichment mode |
+| "Reconstruct flows from a legacy pen.dev file" | Reverse mode |
 | "Compare implementation with design contract" | Post-implementation compare mode |
 | "Show me the whole chain" | Full demo mode |
-| "Generate, audit, or optimize Pencil mockups" | Mockup Factory mode |
+| "Generate, audit, or optimize pen.dev mockups" | Mockup Factory mode |
 
 ## Project Integration Mode
 
-Use when a user already has an application repository and asks how to adopt Penflow, where to store artifacts, how to migrate existing Pencil mockups, or how agents should consume Penflow outputs.
+Use when a user already has an application repository and asks how to adopt Penflow, where to store artifacts, how to migrate existing pen.dev mockups, or how agents should consume Penflow outputs.
 
-**Read** [`../../../docs/project-integration.md`](../../../docs/project-integration.md). It covers the recommended `penflow/` workspace, forward adoption, existing-Pencil enrichment, legacy reverse migration, code IR handoff, runtime `actual-ui-tree.json` verification, and CI gate.
+**Read** [`../../../docs/project-integration.md`](../../../docs/project-integration.md). It covers the recommended `penflow/` workspace, forward adoption, existing-pen.dev enrichment, legacy reverse migration, code IR handoff, runtime `actual-ui-tree.json` verification, and CI gate.
 
 ## Mockup Factory Mode
 
-Use when a user asks for mockup generation, audit, optimization, or `/mockup-factory` on Pencil `.pen` files.
+Use when a user asks for mockup generation, audit, optimization, or `/mockup-factory` on pen.dev `.pen` files.
 
-**Read** [`../mockup-factory/SKILL.md`](../mockup-factory/SKILL.md). It is the Penflow-local canonical workflow for guided UX/UI optimization. It requires `flow-ui-contract`, `semantic-ui-tree.json`, `theme.css`, `.pen`, `pencil-context-map.json`, `expected-ui-tree.json`, and `detect-drift` as deterministic anchors before any Pencil/Codex audit loop. **Read** [`../mockup-factory/references/visual-validation.md`](../mockup-factory/references/visual-validation.md) before applying the Visual Evidence Gate: layout snapshot dump, screenshot inspection over the five locked vision categories, PNG export, manifest, and `vision-report.json` when a renderer is available — gated by `penflow validate-visual-evidence` exit 0, not prose. UX/UI improvements must be tied to audited checklist items and `screen_id` / `semantic_id` / `pencil_node_id` when available. The audit rubric is prescriptive (feature 052): each category maps to a scripted gate (`lint-tokens`, `check-consistency`, `audit-visual`, `detect-drift`, `compare-tree`, `validate-visual-evidence`), fixes run in a bounded loop (`iteration <= 3`, full chain rerun, no PASS without a final clean run), and the verdict is the strict `audit-report.json` checked by `penflow validate-report audit-report.json --schema`.
+**Read** [`../mockup-factory/SKILL.md`](../mockup-factory/SKILL.md). It is the Penflow-local canonical workflow for guided UX/UI optimization. It requires `flow-ui-contract`, `semantic-ui-tree.json`, `theme.css`, `.pen`, `pencil-context-map.json`, `expected-ui-tree.json`, and `detect-drift` as deterministic anchors before any pen.dev/Codex audit loop. **Read** [`../mockup-factory/references/visual-validation.md`](../mockup-factory/references/visual-validation.md) before applying the Visual Evidence Gate: layout snapshot dump, screenshot inspection over the five locked vision categories, PNG export, manifest, and `vision-report.json` when a renderer is available — gated by `penflow validate-visual-evidence` exit 0, not prose. UX/UI improvements must be tied to audited checklist items and `screen_id` / `semantic_id` / `pencil_node_id` when available. The audit rubric is prescriptive (feature 052): each category maps to a scripted gate (`lint-tokens`, `check-consistency`, `audit-visual`, `detect-drift`, `compare-tree`, `validate-visual-evidence`), fixes run in a bounded loop (`iteration <= 3`, full chain rerun, no PASS without a final clean run), and the verdict is the strict `audit-report.json` checked by `penflow validate-report audit-report.json --schema`.
 
 ## Forward Mode
 
@@ -138,7 +142,7 @@ penflow code-ir --from-context ui.pen --semantic-tree semantic-ui-tree.json --co
 penflow validate-code-ir code-ir.json --json
 ```
 
-`draft-pen-from-tree` emits a structural Pencil draft only. When its JSON output is saved as `draft-report.json`, it includes `fidelity: "wireframe"`: draft = structure / wireframe, PAS un mockup final ; le hi-fi passe par mockup-factory.
+`draft-pen-from-tree` emits a structural pen.dev draft only. When its JSON output is saved as `draft-report.json`, it includes `fidelity: "wireframe"`: draft = structure / wireframe, PAS un mockup final ; le hi-fi passe par mockup-factory.
 
 Use `--group-by role+intent+variant+size-class` on dense screens: `check-consistency` skips anonymous containers with no stable intent, variant, or human name; height buckets keep 56px headers out of 820px panel groups; repeated divergences are aggregated. `--lenient` downgrades non-`fill`/`fontFamily` divergences to warnings in the report; `fill` and `fontFamily` stay errors.
 
@@ -157,13 +161,13 @@ APEX integration rule: `penflow run` is the unite naturelle qu'une tache APEX en
 
 `code-ir --from-context` expects the contextualized `.pen` file, not `expected-ui-tree.json`; wrong-tree inputs must fail before code IR generation with an explicit message.
 
-`export_nodes` batch limitation: Penflow core must not drive Pencil MCP/app exports. If Pencil `export_nodes` with multiple IDs fails as `wrong .pen file` while unitary exports pass, keep the deterministic Penflow gates intact and use exports unitaires at the skill/operator layer. The reproduced issue is tracked as [`PF-PENCIL-EXPORT-NODES-BATCH-20260701`](../../../docs/pencil-export-nodes-batch-issue.md); cite that ID in worker receipts instead of treating the fallback as untracked debt. Do not add browser, Pencil MCP, or renderer dependencies to Penflow Python core.
+`export_nodes` batch limitation: Penflow core must not drive pen.dev MCP/app exports. If pen.dev `export_nodes` with multiple IDs fails as `wrong .pen file` while unitary exports pass, keep the deterministic Penflow gates intact and use exports unitaires at the skill/operator layer. The reproduced issue is tracked as [`PF-PENCIL-EXPORT-NODES-BATCH-20260701`](../../../docs/pencil-export-nodes-batch-issue.md); cite that ID in worker receipts instead of treating the fallback as untracked debt. Do not add browser, pen.dev MCP, or renderer dependencies to Penflow Python core.
 
 Legacy route phrase for old docs/tests: `penflow export-semantic-tree examples/full/flow-ui-contract --out semantic-ui-tree.json --json`.
 
 Anti-gaming gates are strict: `validate-semantic-tree` emits `semantic.downgrade_suspect` for repeated list-like `container` children without `repeat`, and `validate-flow-contract --json` includes `interactive_coverage` while failing `contract.interactive_unbound` when a `button`/`link`/`input` has neither `action` nor transition binding. Static screens without interactive actions must declare `static: true` and a non-empty `static_reason`.
 
-`audit-visual` (feature 050/061) computes deterministic visual metrics from the expected tree, zero vision: WCAG AA contrast via parent-walk backgrounds (`visual.contrast.below_aa` error; 3:1 for fontSize ≥ 24 or ≥ 18 bold, else 4.5:1), touch targets on interactive roles (`visual.touch_target.too_small` — error < 24px, warning 24–43px; ≥ 44px passes; zero-sized drafts emit `visual.bbox.unmeasured` info), sibling overlap / parent overflow beyond 1px (`visual.bbox.overlap`, `visual.bbox.overflow`, errors), heuristic text overflow (`visual.text.likely_overflow` warning), and unparseable fills (`visual.color.unparsed` info). `$pf-*` fills resolve via `--theme-css`. When a renderer produced `layout-snapshot.json`, pass `--layout-snapshot` so overlap/overflow uses real Pencil bboxes; without it, flex-parent theoretical geometry is skipped while non-geometric checks still run on the tree.
+`audit-visual` (feature 050/061) computes deterministic visual metrics from the expected tree, zero vision: WCAG AA contrast via parent-walk backgrounds (`visual.contrast.below_aa` error; 3:1 for fontSize ≥ 24 or ≥ 18 bold, else 4.5:1), touch targets on interactive roles (`visual.touch_target.too_small` — error < 24px, warning 24–43px; ≥ 44px passes; zero-sized drafts emit `visual.bbox.unmeasured` info), sibling overlap / parent overflow beyond 1px (`visual.bbox.overlap`, `visual.bbox.overflow`, errors), heuristic text overflow (`visual.text.likely_overflow` warning), and unparseable fills (`visual.color.unparsed` info). `$pf-*` fills resolve via `--theme-css`. When a renderer produced `layout-snapshot.json`, pass `--layout-snapshot` so overlap/overflow uses real pen.dev bboxes; without it, flex-parent theoretical geometry is skipped while non-geometric checks still run on the tree.
 
 `validate-visual-evidence` (feature 051) deterministically gates the skill-layer visual evidence packet — Penflow never runs vision, it validates that vision happened:
 
@@ -176,13 +180,13 @@ Checks: `manifest.json` validates, every manifest screen PNG exists non-empty, `
 
 Feature 070/C45 makes every required criterion explicitly `blocking: true` and PASS-only. `manifest.json` and `vision-report.json` share one exact `runId`; each criterion carries structured `proof` for surface/screen/hierarchical region/state/assertion/measurement plus hashed actual/reference/contact-sheet artifacts and in-bounds crops. Warning/SKIP/non-pass status, narrative-only proof, run mismatch, invalid or stretched crops, expected/reference copied into actual, mismatched homology, or artifact reuse across non-homologous mappings blocks with exit 1.
 
-Feature 071/C46 separates the Pencil trigger from persistence proof. `pencil-sync` never closes the gate. An operator-layer `penflow-pencil-persistence-observation` binds the exact run, document, requested operation, trigger, and distinct pre/post snapshot digests; `penflow verify-pencil-persistence <observation> --document <ui.pen> --run-id <run> --operation <operation> --out <receipt> --json` independently re-reads all bytes and writes the structured receipt. Run `penflow validate-report <receipt> --schema --json` to reject stale/tampered receipt content. Only `status: PASS`, verifier `result: pass`, and `closes_persistence: true` close persistence; no-op, trigger-only, stale, replayed, tampered, missing, or mismatched evidence exits nonzero.
+Feature 071/C46 separates the pen.dev trigger from persistence proof. `pencil-sync` never closes the gate. An operator-layer `penflow-pencil-persistence-observation` binds the exact run, document, requested operation, trigger, and distinct pre/post snapshot digests; `penflow verify-pencil-persistence <observation> --document <ui.pen> --run-id <run> --operation <operation> --out <receipt> --json` independently re-reads all bytes and writes the structured receipt. Run `penflow validate-report <receipt> --schema --json` to reject stale/tampered receipt content. Only `status: PASS`, verifier `result: pass`, and `closes_persistence: true` close persistence; no-op, trigger-only, stale, replayed, tampered, missing, or mismatched evidence exits nonzero.
 
 When references exist, `manifest.json` declares `references_manifest` pointing to `references/references-manifest.json` (`[{screen_id, file, sha256, source}]`, files relative to `references/`). `vision-report.json` must include `reference_fidelity` for every referenced screen, with one side-by-side contact sheet and exactly `layout_match`, `palette_match`, `component_parity`, and `density_match`; every evidence sentence cites both reference and export files. Run `penflow validate-reference-fidelity .mockup-validation/visual-evidence --references references --json` after `validate-visual-evidence`; copied exports (`reference.evidence_is_reference_copy`) and deterministic-vs-LLM disagreement (`reference.llm_metric_disagreement`) block PASS.
 
-## Pencil Enrichment Mode
+## pen.dev Enrichment Mode
 
-Use when a visual Pencil file already exists and must keep its layout.
+Use when a visual pen.dev file already exists and must keep its layout.
 
 ```bash
 consumer=$(mktemp -d)

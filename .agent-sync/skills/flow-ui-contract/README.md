@@ -5,13 +5,13 @@
 
 # flow-ui-contract
 
-Penflow-local migration of the old specify-flows workflow. It captures behavior around visual mockups and Pencil `.pen` files, then promotes reviewed behavior into canonical `flow-ui-contract/contract.json` for semantic UI tree export and Pencil enrichment.
+Penflow-local migration of the old specify-flows workflow. It captures behavior around visual mockups and pen.dev `.pen` files, then promotes reviewed behavior into canonical `flow-ui-contract/contract.json` for semantic UI tree export and pen.dev enrichment.
 
 Invoke the installed skill as `flow-ui-contract`. Legacy wording signals such as `specify flows`, `flow specs`, and `spec flows` should route here; no separate `specify-flows` slash command is installed.
 
 ## Purpose
 
-Use this skill to author or recover the behavior layer before code. It produces canonical `flow-ui-contract/contract.json`; legacy `flow-ui-contract/flows/*.md` and `flow-ui-contract/screens/*.md` remain documentation or explicit migration inputs. Penflow then exports `semantic-ui-tree.json`, drafts or enriches Pencil, exports `expected-ui-tree.json`, generates `code-ir.json`, and compares external `actual-ui-tree.json`.
+Use this skill to author or recover the behavior layer before code. It produces canonical `flow-ui-contract/contract.json`; legacy `flow-ui-contract/flows/*.md` and `flow-ui-contract/screens/*.md` remain documentation or explicit migration inputs. Penflow then exports `semantic-ui-tree.json`, drafts or enriches pen.dev `.pen` files, exports `expected-ui-tree.json`, generates `code-ir.json`, and compares external `actual-ui-tree.json`.
 
 Runtime boundary: Penflow consumes actual trees from external adapters. It does not run browsers, Xcode, simulators, Playwright, React Native, Metro, or app builds.
 
@@ -109,6 +109,6 @@ The project-level suite also smoke-tests the migrated validator with `python3 -m
 ## Boundaries
 
 - This skill never writes to `.specs/`.
-- It prepares flow/screen contracts and documents Penflow commands; Penflow commands generate semantic trees, Pencil context, expected trees, code IR, and reports.
+- It prepares flow/screen contracts and documents Penflow commands; Penflow commands generate semantic trees, `.pen` context, expected trees, code IR, and reports.
 - It preserves `.pen` visual layout; enrichment adds context without blind overwrite.
 - It never runs a UI runtime; external adapters own `actual-ui-tree.json`.

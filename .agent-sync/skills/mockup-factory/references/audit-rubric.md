@@ -27,7 +27,7 @@ Run every gate from the target project root with the strict default exit policy 
 Gate notes:
 
 - `structural_fidelity` applies only once an `actual-ui-tree.json` exists (post-implementation). In a BEFORE-CODE mockup audit, record it as `not_run` with `exit_code: null`; it never blocks a design-time PASS.
-- `balance_readability` requires a Pencil renderer (Visual Evidence Gate, **Read** [`visual-validation.md`](visual-validation.md)). Without a renderer the gate is `not_run` and the audit status is `BLOCKED_VISUAL_NOT_RUN` — never PASS.
+- `balance_readability` requires a pen.dev renderer (Visual Evidence Gate, **Read** [`visual-validation.md`](visual-validation.md)). Without a renderer the gate is `not_run` and the audit status is `BLOCKED_VISUAL_NOT_RUN` — never PASS.
 - `accessibility_alignment` requires `--layout-snapshot` whenever the renderer is available; otherwise `audit-visual` skips flex-parent overlap/overflow from theoretical positions and still checks contrast, touch targets, and text fit on the tree.
 - Every other gate marked `not_run` blocks PASS: a gate either ran clean or the audit is not done.
 
@@ -69,7 +69,7 @@ The following guidance informs **what to fix and how**, but it cannot pass or fa
 
 ## Visual Evidence Criteria
 
-Final PASS must be backed by **Read** [`visual-validation.md`](visual-validation.md). The reviewer must inspect the actual Pencil-rendered screen and record:
+Final PASS must be backed by **Read** [`visual-validation.md`](visual-validation.md). The reviewer must inspect the actual pen.dev-rendered screen and record:
 
 - screenshot/PNG path for each screen;
 - layout snapshot dump (`layout-snapshot.json`) for the deterministic bbox cross-check;

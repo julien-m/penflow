@@ -3,7 +3,7 @@ name: flow-ui-contract
 description: >
   Penflow project-local skill for specifying flow/screen behavior before semantic UI tree
   generation. Recognizes legacy specify flows wording while positioning artifacts for
-  forward flow to semantic tree to Pencil draft/enrichment workflows, reverse Pencil to
+  forward flow to semantic tree to pen.dev draft/enrichment workflows, reverse pen.dev to
   flow workflows, and post-implementation runtime comparison.
   Triggers on: flow-ui-contract, flow ui contract, specify flows, génère les flow specs,
   flow specs, spec flows.
@@ -22,6 +22,10 @@ description: >
 
 Guided pipeline that promotes reviewed behavior into canonical `flow-ui-contract/contract.json`. Flow/screen Markdown is generated through `export-flow-docs` or supplied only as explicit legacy migration input.
 
+## pen.dev naming
+
+Use `pen.dev` for the product, desktop app, editor, renderer, and MCP integration. On macOS, launch the installed app with `open -a Pen`; do not launch `Pencil`. Keep `pencil` only where it is the current MCP server id or part of an existing Penflow command, field, file, issue id, or receipt schema. The standalone CLI executable is `pen`.
+
 ## C51 workflow authority
 
 <!-- @spec(FR-015) -->
@@ -30,11 +34,11 @@ Guided pipeline that promotes reviewed behavior into canonical `flow-ui-contract
 - Final design: `penflow run --target <target> --profile design --project <consumer-project-root> --json`, then `penflow validate-report <target>/run-report.json --schema --required-profile design --project <consumer-project-root> --json`.
 - Final implementation: the same commands with `implementation` and the actual caller-supplied `--build-manifest <runner-path>` on both calls. Require exact-profile PASS, empty issues, report hash/scope/build concordance and exits 0.
 - Standalone commands, audit scores, `PASSED_WITH_WARNINGS`, masks, `--lenient`, missing-file heuristics and historical C47 never substitute for C51. The legacy sequences below remain preparation/diagnostics; C51 alone decides cumulative closure and normalizes native geometry.
-- Native lifecycle fields must survive actual Save/C46 before draft/archive variants are trusted. Pencil 2.14 accepting metadata without persisting it does not create a lifecycle revision; keep the valid active canvas and report the unsupported capability.
+- Native lifecycle fields must survive actual Save/C46 before draft/archive variants are trusted. pen.dev 2.14 accepting metadata without persisting it does not create a lifecycle revision; keep the valid active canvas and report the unsupported capability.
 
 ## Purpose
 
-Use this skill before Penflow needs a `semantic-ui-tree.json`. It turns product behavior into a strict JSON contract that Penflow can validate, convert into Pencil context, reverse/migrate from Pencil docs, and compare against runtime output later.
+Use this skill before Penflow needs a `semantic-ui-tree.json`. It turns product behavior into a strict JSON contract that Penflow can validate, convert into `.pen` context, reverse/migrate from pen.dev docs, and compare against runtime output later.
 
 This skill prepares inputs. It does **not** run browser, Xcode, simulator, Playwright, React Native, Metro, app builds, or runtime adapters.
 
@@ -48,9 +52,9 @@ For a new project, continue from a failing start receipt only when every issue c
 - Route technical intermediates through producer-managed, ignored `.penflow-tmp/`, `.penflow-run/`, and `.mockup-validation/`; preflight/postflight reconcile cleanup-eligible runs after durable outputs finalize.
 - Doctor never chooses among multiple `.pen` files or rewrites Git index/history. Resolve `multiple_pen_files` by manually consolidating intended regions into `ui.pen` and deliberately migrating/removing extras. Manually review and unstage/untrack reported tracked/staged temporary leaks before rerunning Doctor.
 
-## Pencil Context Grammar
+## .pen Context Grammar
 
-When a contract is consumed by Pencil authoring, every id-bearing authored node receives exactly one explicit `semantic`, `inherited`, or `decorative` classification at insertion time. Allowed keys are `classification`, `decorative_owner`, `decorative_reason`, `inherits_from`, `instance_key`, `relation`, `semantic_id`, `role`, `intent`, `binding`, `repeat`, `entity`, `variant`, `test_id`, `action`, `permission`, `mask`, `mask_text`, and `tolerance`. Semantic nodes require `semantic_id`, `test_id`, and `role`; inherited/decorative nodes name an anchored owner and relation/reason. Never infer classification from visible appearance.
+When a contract is consumed by pen.dev authoring, every id-bearing authored node receives exactly one explicit `semantic`, `inherited`, or `decorative` classification at insertion time. Allowed keys are `classification`, `decorative_owner`, `decorative_reason`, `inherits_from`, `instance_key`, `relation`, `semantic_id`, `role`, `intent`, `binding`, `repeat`, `entity`, `variant`, `test_id`, `action`, `permission`, `mask`, `mask_text`, and `tolerance`. Semantic nodes require `semantic_id`, `test_id`, and `role`; inherited/decorative nodes name an anchored owner and relation/reason. Never infer classification from visible appearance.
 
 Examples:
 - Screen frame: `classification=semantic; semantic_id=cockpit-live; test_id=cockpit-live-screen; role=screen`
@@ -72,7 +76,7 @@ After authoring/enrichment, run `penflow map-pencil-context <target>/ui.pen <tar
 ## Positioning
 
 - **Forward mode:** write/review `contract.json`, generate/check Markdown projections, export `semantic-ui-tree.json`, draft or enrich `ui.pen`, require exhaustive semantic coverage, then generate downstream artifacts.
-- **Pencil enrichment:** use an existing visual `.pen`, inject Penflow context from the semantic tree, map semantic nodes to Pencil nodes, and validate the enriched file.
+- **pen.dev enrichment:** use an existing visual `.pen`, inject Penflow context from the semantic tree, map semantic nodes to pen.dev nodes, and validate the enriched file.
 - **Reverse mode:** run `reverse-pen` on legacy `ui.pen` to reconstruct flow/screen specs and `semantic-ui-tree.json`; unknown business logic becomes `[NEEDS CLARIFICATION]`.
 - **Runtime verification:** external adapters emit `actual-ui-tree.json`; Penflow validates, compares, and writes review/fix reports.
 
@@ -133,7 +137,7 @@ Input specs:
       validation: payment_method_present
 ```
 
-Matching Pencil contexts classify every id-bearing node explicitly:
+Matching `.pen` contexts classify every id-bearing node explicitly:
 
 ```text
 classification=semantic; semantic_id=checkout-form; test_id=checkout-form-screen; role=screen
@@ -186,7 +190,7 @@ Expected `semantic-ui-tree.json` excerpt:
 
 - Keep all outputs inside the target directory; never write into LiveSpec `.specs/`.
 - Keep exactly one `.pen` output named `ui.pen`; enrichment/reverse operations update that canonical document rather than producing peers.
-- Preserve Pencil visual properties during extraction and enrichment; metadata-only operations may atomically update canonical `ui.pen` in place but must not alter layout or create peer `.pen` files.
+- Preserve pen.dev visual properties during extraction and enrichment; metadata-only operations may atomically update canonical `ui.pen` in place but must not alter layout or create peer `.pen` files.
 - Never auto-invent canonical flows; ask the user to declare or confirm them.
 - Never skip validation; run [`validator.py`](validator.py) before accepting generated specs.
 - If `ui.pen` is missing, continue only when the failing start receipt contains exclusively the exact bootstrap allowlist, `doctor --fix` succeeds, and the following `doctor --check` passes; otherwise block.
@@ -195,7 +199,7 @@ Expected `semantic-ui-tree.json` excerpt:
 
 ```text
 <target>/
-├── ui.pen                         (optional Pencil source)
+├── ui.pen                         (optional pen.dev source)
 ├── mockups/
 │   └── manifest.json              (optional coverage/status source)
 └── flow-ui-contract/
@@ -213,7 +217,7 @@ Read from `<target>/`:
 - `mockups/manifest.json` if present; required only when mapping visual exports.
 - `design-read.json` if present, so reruns preserve or review the prior design direction.
 - `project-profile.md`, `01-exploration.md`, `02-market-research.md`, `theme.css` if present.
-- `ui.pen` if present for Pencil auto-fill.
+- `ui.pen` if present for pen.dev auto-fill.
 
 If no manifest exists, continue in manual mode and tell the user mockup status cannot be computed.
 
@@ -228,9 +232,9 @@ For each `mockups/manifest.json` export:
 2. Match it to declared flows by exact match, substring, or edit distance <= 2.
 3. Ask the user to validate the `Mockup | Proposed Flow | Confidence` table.
 
-### Step 4 — Pencil Auto-Fill
+### Step 4 — pen.dev Auto-Fill
 
-For each mapped screen, inspect `<target>/ui.pen` with Penflow/Pencil tooling when available and extract visible labels, CTA labels, and component hierarchy. If unavailable, proceed with empty auto-fill data.
+For each mapped screen, inspect `<target>/ui.pen` with Penflow/pen.dev tooling when available and extract visible labels, CTA labels, and component hierarchy. If unavailable, proceed with empty auto-fill data.
 
 ### Step 5 — Guided Conversation
 
@@ -240,7 +244,7 @@ If any flow or screen declares surface `landing` or `showcase`, run the Design R
 
 ### Step 6 — Generation
 
-Author or update `<target>/flow-ui-contract/contract.json`. Before its first source review, automatically call `penflow authority prepare <target>/flow-ui-contract/contract.json --project <consumer-project-root> --json`, require the closed PASS envelope, and write its `data` as the generated contract. Preserve explicit IDs; never repair an approved contract during validation. Run `penflow validate-flow-contract <target>/flow-ui-contract/contract.json --require-test-ids --project <consumer-project-root> --json` before review/Pencil. Bind source requirements, category-specific outcome predicates and the actual reviewed workflow policy as described in the C51 workflow, then generate Markdown projections transactionally:
+Author or update `<target>/flow-ui-contract/contract.json`. Before its first source review, automatically call `penflow authority prepare <target>/flow-ui-contract/contract.json --project <consumer-project-root> --json`, require the closed PASS envelope, and write its `data` as the generated contract. Preserve explicit IDs; never repair an approved contract during validation. Run `penflow validate-flow-contract <target>/flow-ui-contract/contract.json --require-test-ids --project <consumer-project-root> --json` before review/pen.dev. Bind source requirements, category-specific outcome predicates and the actual reviewed workflow policy as described in the C51 workflow, then generate Markdown projections transactionally:
 
 ```bash
 penflow export-flow-docs <target>/flow-ui-contract/contract.json --project <consumer-project-root> --out <target>/flow-ui-contract --json

@@ -82,7 +82,7 @@ def test_mockup_factory_visual_evidence_gate_is_documented() -> None:
         "ESCALATED",
         "layout snapshot",
         "screenshot inspection",
-        "Pencil renderer",
+        "pen.dev renderer",
         "screen_id",
         "semantic_id",
         "pencil_node_id",

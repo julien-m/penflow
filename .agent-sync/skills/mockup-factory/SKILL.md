@@ -1,9 +1,9 @@
 ---
 name: mockup-factory
 description: >
-  Penflow-local guided UX/UI optimizer for Pencil mockups. Uses flow-ui-contract,
+  Penflow-local guided UX/UI optimizer for pen.dev mockups. Uses flow-ui-contract,
   semantic-ui-tree, theme.css, .pen, pencil-context-map, expected-ui-tree, and
-  detect-drift reports as deterministic anchors before any Pencil/Codex audit loop.
+  detect-drift reports as deterministic anchors before any pen.dev/Codex audit loop.
 ---
 <!-- LiveSpec traceability anchors -->
 <!-- @spec(FR-004) -->
@@ -15,7 +15,11 @@ description: >
 
 # Mockup Factory — Penflow Guided Optimizer
 
-Use this skill when a user asks for `/mockup-factory`, mockup generation, mockup audit, or UX/UI optimization of Pencil `.pen` files inside a Penflow-backed project.
+Use this skill when a user asks for `/mockup-factory`, mockup generation, mockup audit, or UX/UI optimization of pen.dev `.pen` files inside a Penflow-backed project.
+
+## pen.dev naming
+
+Use `pen.dev` for the product, desktop app, editor, renderer, and MCP integration. On macOS, launch the installed app with `open -a Pen`; do not launch `Pencil`. Keep `pencil` only where it is the current MCP server id or part of an existing Penflow command, field, file, issue id, or receipt schema. The standalone CLI executable is `pen`.
 
 ## C51 workflow authority
 
@@ -25,11 +29,11 @@ Use this skill when a user asks for `/mockup-factory`, mockup generation, mockup
 - Final design: `penflow run --target <target> --profile design --project <consumer-project-root> --json`, then `penflow validate-report <target>/run-report.json --schema --required-profile design --project <consumer-project-root> --json`.
 - Final implementation: the same commands with `implementation` and the actual caller-supplied `--build-manifest <runner-path>` on both calls. Require exact-profile PASS, empty issues, report hash/scope/build concordance and exits 0.
 - Standalone commands, audit scores, `PASSED_WITH_WARNINGS`, masks, `--lenient`, missing-file heuristics and historical C47 never substitute for C51. The legacy sequences below remain preparation/diagnostics; C51 alone decides cumulative closure and normalizes native geometry.
-- Native lifecycle fields must survive actual Save/C46 before draft/archive variants are trusted. Pencil 2.14 accepting metadata without persisting it does not create a lifecycle revision; keep the valid active canvas and report the unsupported capability.
+- Native lifecycle fields must survive actual Save/C46 before draft/archive variants are trusted. pen.dev 2.14 accepting metadata without persisting it does not create a lifecycle revision; keep the valid active canvas and report the unsupported capability.
 
 ## Purpose
 
-Mockup Factory is a tree-aware, guided optimizer for Pencil mockups. It may orchestrate external design/audit tools from the skill layer, but Penflow Python remains runtime-agnostic and never imports Pencil MCP, cc-hub, browsers, simulators, Playwright, or UI runtimes.
+Mockup Factory is a tree-aware, guided optimizer for pen.dev mockups. It may orchestrate external design/audit tools from the skill layer, but Penflow Python remains runtime-agnostic and never imports pen.dev MCP, cc-hub, browsers, simulators, Playwright, or UI runtimes.
 
 ## Consumer Hygiene Gate
 
@@ -45,12 +49,12 @@ Treat these artifacts as first-class inputs, not optional notes:
 
 - `flow-ui-contract/contract.json` — canonical product behavior source.
 - `semantic-ui-tree.json` — before-code semantic anchor exported from flow specs.
-- `theme.css` — product theme input for canonical forward Pencil composition.
-- `ui.pen` — the only Pencil visual contract; lifecycle regions hold active, draft and archive revisions.
+- `theme.css` — product theme input for canonical forward pen.dev composition.
+- `ui.pen` — the only pen.dev visual contract; lifecycle regions hold active, draft and archive revisions.
 - `pencil-context-map.json` — `screen_id` / `semantic_id` / `pencil_node_id` linkage and ambiguity buckets.
 - `expected-ui-tree.json` — design-derived structural baseline.
 - `drift-report.json` from `penflow detect-drift` — deterministic contract drift report.
-- Screenshots and exported PNGs — visual evidence captured by Pencil MCP or an equivalent renderer when available; never a substitute for the tree anchors.
+- Screenshots and exported PNGs — visual evidence captured by pen.dev MCP or an equivalent renderer when available; never a substitute for the tree anchors.
 
 ## Preconditions
 
@@ -76,7 +80,7 @@ Treat `draft-pen-from-tree` output as the starting structure only. Its `draft-re
 
 All commands run with the strict default exit policy — no `--lenient` in the canonical chain. If any command fails, stop and report the failing artifact. Do not optimize a mockup whose semantic anchors are invalid. `validate-flow-contract --json` must show `interactive_coverage` with every screen either `covered` or `static`; `uncovered` means `contract.interactive_unbound` and blocks the audit. `validate-semantic-tree` must not emit `semantic.downgrade_suspect`; repeated list-like containers need `repeat`.
 
-After every Pencil MCP/editor mutation (`batch_design`, manual edit, or equivalent), preserve distinct pre/post snapshots and close actual C46 persistence before reading the updated source. As a trigger only, run `penflow pencil-sync <target>/ui.pen --expect-screens <expected-screen-count> --json` before any CLI command that reads the `.pen`. If `pencil-sync` sees fewer screens/nodes on disk than the editor state, return `BLOCKED`; MCP-only memory mutations are not proof that Penflow can inspect the updated file.
+After every pen.dev MCP/editor mutation (`batch_design`, manual edit, or equivalent), preserve distinct pre/post snapshots and close actual C46 persistence before reading the updated source. As a trigger only, run `penflow pencil-sync <target>/ui.pen --expect-screens <expected-screen-count> --json` before any CLI command that reads the `.pen`. If `pencil-sync` sees fewer screens/nodes on disk than the editor state, return `BLOCKED`; MCP-only memory mutations are not proof that Penflow can inspect the updated file.
 
 ## Design Convention Gate
 
@@ -108,11 +112,11 @@ A themed but structurally generic output is a failure. Reject screens that ignor
    - Preview boundary: `visual-preview` is for annotation and iteration only. Preview URLs are not canonical proof and must not be written into `manifest.json` or `vision-report.json`; the canonical proof remains `penflow validate-visual-evidence` exit 0. If `visual-preview` is unavailable, keep the Markdown image and record browser preview unavailable in operator notes/status.
    - Manifest stamps: write `.mockup-validation/visual-evidence/manifest.json` stamped with `runId` (ISO-8601 timestamp + short slug recommended), the `theme` block from `penflow theme-fingerprint <theme.css> --json`, per-screen PNG `sha256`, and `references_manifest` when references are present, plus `vision-report.json` with `generated_by` and `inputs[]` `{file, sha256}` for every evaluated file (legacy `visual-report.json` is deprecated).
    - Receipts: every evaluated PNG/contact sheet must resolve inside `.mockup-validation/visual-evidence/`; each `vision-report.screens[].png` must match the manifest PNG for the same `screen_id`; symlinks into `references/`, SHA mismatch, missing `generated_by`, missing `inputs`, and category evidence that omits the evaluated file are blocking failures. Receipts are mandatory and prose cannot replace them.
-   - Durable export operation (C48, when required by the reviewed policy or authenticated inheritance): Pencil MCP `export_nodes` runs only in this operator layer. After exporting, write a `penflow-export-operator-request` declaring the exact `run_id`, `source` `.pen` path + SHA-256, the C46 `persistence_receipt` path, the Pencil `document` id/name, the frozen product `contract` path + SHA-256, and per declared surface/screen/state the exact `node_id`, the native `export_nodes` PNG (`path`/`sha256`/`width`/`height`/`scale`/`format`), and two homologous references (`surface`/`role`/`state`/`region`/`design_intent`). Close it with `penflow verify-export-operation <request.json> --source-pen <ui.pen> --run-id <run> --out .mockup-validation/export-operation-receipt.json --json` (exit 0). Penflow only re-reads local bytes; a screenshot, renamed file, synthetic/non-PNG artifact, a non-`export_nodes` operation, missing/duplicate/mismatched coverage, a copied or non-homologous reference, or a stale/tampered receipt fails closed and is never a self-reported PASS.
+   - Durable export operation (C48, when required by the reviewed policy or authenticated inheritance): pen.dev MCP `export_nodes` runs only in this operator layer. After exporting, write a `penflow-export-operator-request` declaring the exact `run_id`, `source` `.pen` path + SHA-256, the C46 `persistence_receipt` path, the pen.dev `document` id/name, the frozen product `contract` path + SHA-256, and per declared surface/screen/state the exact `node_id`, the native `export_nodes` PNG (`path`/`sha256`/`width`/`height`/`scale`/`format`), and two homologous references (`surface`/`role`/`state`/`region`/`design_intent`). Close it with `penflow verify-export-operation <request.json> --source-pen <ui.pen> --run-id <run> --out .mockup-validation/export-operation-receipt.json --json` (exit 0). Penflow only re-reads local bytes; a screenshot, renamed file, synthetic/non-PNG artifact, a non-`export_nodes` operation, missing/duplicate/mismatched coverage, a copied or non-homologous reference, or a stale/tampered receipt fails closed and is never a self-reported PASS.
    - Gate: `penflow validate-visual-evidence .mockup-validation/visual-evidence --expected expected-ui-tree.json --theme-css <theme.css> --json` — the gate is the exit code, not prose.
    - Reference gate: `penflow validate-reference-fidelity .mockup-validation/visual-evidence --references <target>/references --json` — the gate is the exit code, not prose. It fails copied exports (`reference.evidence_is_reference_copy`) and deterministic-vs-LLM disagreement (`reference.llm_metric_disagreement`).
    - Stale theme: a modified theme.css deterministically invalidates stale packets (`evidence.theme.missing`/`evidence.theme.stale`) and forces a re-run of the bounded loop.
-   - Renderer coupling: when `layout-snapshot.json` is available from the renderer, rerun the `accessibility_alignment` gate with `--layout-snapshot` so overlap/overflow uses real Pencil bboxes, not theoretical flex positions.
+   - Renderer coupling: when `layout-snapshot.json` is available from the renderer, rerun the `accessibility_alignment` gate with `--layout-snapshot` so overlap/overflow uses real pen.dev bboxes, not theoretical flex positions.
 8. **Run Design Taste Advisory:** <!-- @spec(FR-004) --> <!-- @spec(FR-005) --> <!-- @spec(FR-006) --> after computing the scripted gates and before final proof, read `<target>/design-read.json` when present, then follow [`references/design-taste-advisory.md`](references/design-taste-advisory.md) to write `<target>/.mockup-validation/design-taste-advisory.md`. This report is advisory only: it never decides PASS/FAIL, never adds checklist items, and never changes gate status.
 9. **Decide final state and prove it:** write and schema-validate the detailed `audit-report.json` (`kind: penflow-mockup-audit`, `iterations`, `gates[]` with `{gate, command, exit_code, report_path, result}`, `residual_issues[]`). Validate the detailed audit with `penflow validate-report .mockup-validation/audit-report.json --schema --json`; every executed gate must cite an existing `report_path`, with `pass` => 0, `fail` => non-zero, and `not_run` => null/null. Then execute the C51 design production and revalidation above: this is the single CI-able final check for cumulative design closure. Require every applicable required gate and obligation PASS, with no required warnings; unavailable renderer is BLOCKED. Retain the final `penflow doctor --project <consumer-project-root> --check --json` receipt. Pre-review preparation cannot claim this final state.
 
@@ -122,13 +126,13 @@ A themed but structurally generic output is a failure. Reject screens that ignor
 Detailed audit findings come from the rubric gate table (**Read** [`references/audit-rubric.md`](references/audit-rubric.md)) — six scripted gates: `tokens` (`penflow lint-tokens` exit 0), `consistency` (`penflow check-consistency` exit 0), `accessibility_alignment` (`penflow audit-visual` zero errors, with `--layout-snapshot` when a renderer produced `layout-snapshot.json`), `contract` (`penflow detect-drift` `summary.blocking == 0`), `structural_fidelity` (`penflow compare-tree` threshold 0.98, when an actual tree exists), and `balance_readability` (Visual Evidence Gate: `penflow validate-visual-evidence` exit 0 plus `penflow validate-reference-fidelity` exit 0 when references exist, zero blocking vision/reference criteria — every audited screen has inspected screenshot evidence, exported PNG, manifest entry, and a locked `vision-report.json` anchored by `screen_id`, `semantic_id`, `pencil_node_id`, and reference/export pairs when available; proven by exit code, never by prose).
 
 Critical = any error-severity gate issue or any `blocking: true` item (drift or vision). C51 PASS requires a final clean cumulative run and public revalidation. PASSED_WITH_WARNINGS is a legacy audit status only and never certifies C51. ESCALATED is required when a critical issue remains after the bounded fix loop (max 3 iterations), with the residual issue list attached.
-`BLOCKED_VISUAL_NOT_RUN` is required when a Pencil renderer is expected but unavailable. Explicit user acceptance of structural-only validation may close only the legacy structural audit; it never produces a C51 design or implementation PASS, and missing required renderer evidence still blocks certification.
+`BLOCKED_VISUAL_NOT_RUN` is required when a pen.dev renderer is expected but unavailable. Explicit user acceptance of structural-only validation may close only the legacy structural audit; it never produces a C51 design or implementation PASS, and missing required renderer evidence still blocks certification.
 
 ## Runtime Boundary
 
-Allowed from this skill: Pencil MCP operations, screenshots, exported PNGs, `visual-preview url` browser annotation for exported PNGs/contact sheets, and independent `cc-hub codex` audit calls when available.
+Allowed from this skill: pen.dev MCP operations, screenshots, exported PNGs, `visual-preview url` browser annotation for exported PNGs/contact sheets, and independent `cc-hub codex` audit calls when available.
 
-Forbidden in Penflow Python core: importing or depending on Pencil MCP, cc-hub, `visual-preview`, browser automation, simulators, Playwright, React Native, Xcode, or a UI runtime.
+Forbidden in Penflow Python core: importing or depending on pen.dev MCP, cc-hub, `visual-preview`, browser automation, simulators, Playwright, React Native, Xcode, or a UI runtime.
 
 ## Output Layout
 

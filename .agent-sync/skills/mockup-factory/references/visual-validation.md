@@ -11,13 +11,13 @@
 **Read** [`../../../../docs/verification-workflow.md`](../../../../docs/verification-workflow.md) and apply its source review, applicability, native layout and profile protocol. These detailed standalone checks diagnose their own artifacts; final completion requires `penflow run --target <target> --profile design --project <consumer-project-root> --json` and `penflow validate-report <target>/run-report.json --schema --required-profile design --project <consumer-project-root> --json`, both PASS/exit 0. Required warnings and missing renderer evidence block. Pre-review preparation is non-certifying; `PASSED_WITH_WARNINGS` and historical reports never close C51. Reference/C48 applicability comes from reviewed procedure plus authenticated inheritance, never file absence.
 
 
-Run this gate after the deterministic Penflow anchors pass and before final PASS. It proves the mockup was rendered as a user-visible Pencil screen and that a vision pass answered the vision-only questions — Penflow never runs vision; it validates the evidence packet.
+Run this gate after the deterministic Penflow anchors pass and before final PASS. It proves the mockup was rendered as a user-visible pen.dev screen and that a vision pass answered the vision-only questions — Penflow never runs vision; it validates the evidence packet.
 
 **The gate is the `penflow validate-visual-evidence` exit code, not prose.** No narrative claim of visual quality may substitute for exit 0.
 
 ## Protocol
 
-Use Pencil MCP or an equivalent Pencil renderer. All artifacts go to `.mockup-validation/visual-evidence/`:
+Launch pen.dev first when the desktop renderer is required. On macOS, use `open -a Pen`; do not use `open -a Pencil`. Then use pen.dev MCP (server id `pencil`) or an equivalent pen.dev renderer. All artifacts go to `.mockup-validation/visual-evidence/`:
 
 1. **Export PNGs and expose previews** — `export_nodes` one PNG per audited screen (`<pencil_node_id>.png`). Every PNG must exist and be non-empty. Immediately after each export, expose the image in both human-review channels before writing `vision-report.json`; do not write `vision-report.json` before displaying each image:
    - Terminal: emit a Markdown image using the absolute path, e.g. `![checkoutScreen](/absolute/path/.mockup-validation/visual-evidence/checkoutScreen.png)`.
@@ -80,7 +80,7 @@ References live under `<workspace>/references/` with `references-manifest.json`:
 
 Files resolve relative to `references/`. The evidence manifest declares the manifest path with `references_manifest`, relative to `.mockup-validation/visual-evidence/`.
 
-For every referenced screen, export the matching Pencil screen PNG and create a side-by-side contact sheet showing `reference | export`. Write one `reference_fidelity` entry in `vision-report.json`:
+For every referenced screen, export the matching pen.dev screen PNG and create a side-by-side contact sheet showing `reference | export`. Write one `reference_fidelity` entry in `vision-report.json`:
 
 ```json
 {
@@ -180,4 +180,4 @@ PASS requires:
 - no `blocking: true` criterion with result `fail` remains;
 - non-critical `warning` results are listed under `PASSED_WITH_WARNINGS`; unresolved critical issues escalate to `ESCALATED`.
 
-If no Pencil renderer is available, do not mark PASS. Use `BLOCKED_VISUAL_NOT_RUN` (or `ESCALATED`) with the missing-tool reason — a layout snapshot and screenshot inspection cannot be faked from tree validation alone.
+If no pen.dev renderer is available, do not mark PASS. Use `BLOCKED_VISUAL_NOT_RUN` (or `ESCALATED`) with the missing-tool reason — a layout snapshot and screenshot inspection cannot be faked from tree validation alone.

@@ -68,4 +68,4 @@ Record the loop state machine in `.mockup-validation/<group>/state.json` (workin
 | PASSED_WITH_WARNINGS | Final run clean of critical issues; only non-critical, listed residual warnings remain. |
 | ESCALATED | A critical gate issue (error severity or `blocking: true`) survives iteration 3; residual issue list attached. |
 | BLOCKED | Required Penflow anchor command failed or input artifact is missing. |
-| BLOCKED_VISUAL_NOT_RUN | Pencil renderer/export was expected but no screenshot/PNG evidence could be captured. |
+| BLOCKED_VISUAL_NOT_RUN | pen.dev renderer/export was expected but no screenshot/PNG evidence could be captured. |
