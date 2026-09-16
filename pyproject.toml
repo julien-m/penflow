@@ -8,11 +8,21 @@ build-backend = "hatchling.build"
 [project]
 name = "penflow"
 version = "0.1.0"
-description = "Deterministic CLI for Pencil .pen contracts, UI-tree validation, and structural comparison."
+description = "Deterministic CLI for pen.dev .pen contracts, UI-tree validation, and structural comparison."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "Julien M" }]
+keywords = ["design-contracts", "pen-dev", "ui-testing", "validation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Quality Assurance",
+]
 dependencies = [
     "PyYAML>=6.0",
     "jsonschema>=4",
@@ -25,6 +35,33 @@ dev = ["pytest>=8.0", "ruff>=0.4", "mypy>=1.0"]
 
 [project.scripts]
 penflow = "penflow.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/julien-m/penflow"
+Documentation = "https://github.com/julien-m/penflow#readme"
+Issues = "https://github.com/julien-m/penflow/issues"
+Source = "https://github.com/julien-m/penflow"
+
+[tool.hatch.build.targets.wheel]
+packages = ["penflow"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/penflow",
+    "/tests",
+    "/docs",
+    "/examples",
+    "/README.md",
+    "/LICENSE",
+    "/CHANGELOG.md",
+    "/CONTRIBUTING.md",
+    "/PROVENANCE.md",
+    "/RELEASE.md",
+    "/SECURITY.md",
+    "/third-party-notices.md",
+    "/pyproject.toml",
+    "/uv.lock",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -11,7 +11,9 @@
 
 # Penflow
 
-Penflow is a deterministic Python CLI for Pencil `.pen` design contracts. It parses `.pen` JSON, validates `context`, exports expected UI trees, validates external actual UI trees, compares both trees structurally, writes JSON reports, and generates simple screen/code artifacts.
+Penflow is a deterministic Python CLI for pen.dev `.pen` design contracts. It parses `.pen` JSON, validates `context`, exports expected UI trees, validates external actual UI trees, compares both trees structurally, writes JSON reports, and generates simple screen/code artifacts. Penflow remains runtime-agnostic: browsers, simulators, application runtimes, and pen.dev itself stay outside the Python core.
+
+The project is licensed under the [MIT License](LICENSE). Before contributing or reporting a vulnerability, **read** [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md). Release status and provenance limits are recorded in [CHANGELOG.md](CHANGELOG.md), [RELEASE.md](RELEASE.md), and [PROVENANCE.md](PROVENANCE.md).
 
 ## Consumer Project Hygiene
 
@@ -30,6 +32,11 @@ Technical working data belongs only below ignored `.penflow-tmp/`, `.penflow-run
 Exit codes are `0` PASS, `1` project-health block, `2` usage error, `3` untrustworthy I/O/schema result, and `4` cleanup safety block.
 
 ## JSON-Only Contract v2
+
+Local form submits use `kind: state_change`, `event: submit`, a guard and a same-screen
+success transition. They require no invented network mutation or permission; mutation-bearing
+actions keep all request checks. C51 still requires the action, both guard outcomes and the
+transition to be observed. Read the [local submit contract](.specs/features/045-penflow-json-only-strict-contract-v2/spec.md#local-submit-clarification--2026-09-06).
 
 `flow-ui-contract/contract.json` is the canonical strict v2 business contract. Flow/screen Markdown is a deterministic, hash-bound projection produced by `export-flow-docs`; legacy Markdown is accepted only through explicit migration. Strict coverage is bidirectional: every contract node has one Pencil anchor and every authored Pencil node is explicitly semantic, inherited, or decorative.
 
@@ -65,9 +72,35 @@ Migration: append `--lenient` to any pipeline that tolerated warnings, or fix th
 
 ## Install
 
+Penflow requires Python 3.12 or newer. The repository is the current distribution source; no PyPI release is claimed.
+
+For a command available outside a checkout after the repository is public:
+
 ```bash
-python3 -m pip install -e ".[dev]"
+uv tool install "git+https://github.com/julien-m/penflow.git"
+penflow --help
 ```
+
+For development from a clone:
+
+```bash
+git clone https://github.com/julien-m/penflow.git
+cd penflow
+uv sync --extra dev --locked
+uv run penflow --help
+uv run python -m pytest
+```
+
+To build the same wheel and source archive checked by CI:
+
+```bash
+uv build
+python3 -m venv /tmp/penflow-release-check
+/tmp/penflow-release-check/bin/python -m pip install dist/penflow-0.1.0-py3-none-any.whl
+/tmp/penflow-release-check/bin/penflow --help
+```
+
+The release checklist in [RELEASE.md](RELEASE.md) defines the version/tag/build order. Do not publish an artifact whose version differs between `pyproject.toml`, `penflow.__version__`, and the tag.
 
 ## Core Commands
 

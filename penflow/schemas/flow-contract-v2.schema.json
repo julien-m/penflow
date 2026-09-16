@@ -814,11 +814,15 @@
             "if": {
               "properties": {
                 "kind": {
-                  "const": "navigation"
+                  "const": "state_change"
+                },
+                "event": {
+                  "const": "submit"
                 }
               },
               "required": [
-                "kind"
+                "kind",
+                "event"
               ],
               "not": {
                 "required": [
@@ -828,13 +832,22 @@
             },
             "then": {
               "required": [
-                "destination"
+                "guard",
+                "success_transition"
               ],
+              "properties": {
+                "trigger": {
+                  "enum": [
+                    "click",
+                    "submit"
+                  ]
+                }
+              },
               "not": {
                 "anyOf": [
                   {
                     "required": [
-                      "mutation"
+                      "permission"
                     ]
                   },
                   {
@@ -844,7 +857,12 @@
                   },
                   {
                     "required": [
-                      "success_transition"
+                      "destination"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "binding_ref"
                     ]
                   },
                   {
@@ -856,16 +874,62 @@
               }
             },
             "else": {
-              "required": [
-                "id",
-                "node",
-                "trigger",
-                "guard",
-                "permission",
-                "mutation",
-                "success_transition",
-                "error_transition"
-              ]
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "navigation"
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "not": {
+                  "required": [
+                    "mutation"
+                  ]
+                }
+              },
+              "then": {
+                "required": [
+                  "destination"
+                ],
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "mutation"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "side_effects"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "success_transition"
+                      ]
+                    },
+                    {
+                      "required": [
+                        "error_transition"
+                      ]
+                    }
+                  ]
+                }
+              },
+              "else": {
+                "required": [
+                  "id",
+                  "node",
+                  "trigger",
+                  "guard",
+                  "permission",
+                  "mutation",
+                  "success_transition",
+                  "error_transition"
+                ]
+              }
             }
           }
         }

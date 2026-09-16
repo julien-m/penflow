@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from .contract_actions import action_binding_issues
 import re
 from typing import Any
+
+from .contract_actions import action_binding_issues, local_submit_transition_issues
 from .contract_records import (
     record_items,
     screen_state_ids,
@@ -194,6 +195,9 @@ def _validate_actions(
                 append_missing_reference(registry_name[:-1], value, f"{path}.{field}", issues)
         if node is not None:
             issues.extend(action_binding_issues(action, node, registries["screens"], path))
+            issues.extend(
+                local_submit_transition_issues(action, node, registries["transitions"], path)
+            )
 
 
 def _validate_nodes(
