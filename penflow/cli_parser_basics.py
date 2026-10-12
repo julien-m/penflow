@@ -95,8 +95,15 @@ def _register_inspect_persistence(sub: Any) -> None:
     inspect_cmd.add_argument("pen")
     inspect_cmd.set_defaults(func=cmd_inspect)
 
-    pencil_sync = sub.add_parser("pencil-sync", help="save Pencil editor state and re-inspect disk")
+    pencil_sync = sub.add_parser(
+        "pencil-sync", help="save pen.dev editor state and re-inspect disk"
+    )
     pencil_sync.add_argument("pen")
+    pencil_sync.add_argument(
+        "--app",
+        default=None,
+        help="pen.dev bundle to target (default: PENFLOW_PEN_APP, then the single Pen.app installed)",
+    )
     pencil_sync.add_argument("--expect-min-nodes", type=int, default=None)
     pencil_sync.add_argument("--expect-screens", type=int, default=None)
     pencil_sync.add_argument("--json", action="store_true", help="print machine-readable JSON")

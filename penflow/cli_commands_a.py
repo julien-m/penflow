@@ -177,6 +177,7 @@ def cmd_pencil_sync(args: argparse.Namespace) -> int:
             args.pen,
             expect_min_nodes=args.expect_min_nodes,
             expect_screens=args.expect_screens,
+            app=args.app,
         )
     except PencilSyncError as error:
         raise PenflowError(str(error)) from error
