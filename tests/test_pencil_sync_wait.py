@@ -6,11 +6,13 @@ from __future__ import annotations
 
 import json
 import math
+import subprocess
 from pathlib import Path
 
 import pytest
 
 from penflow import cli
+from penflow.artifact_policy import MANAGED_IGNORE_BLOCK
 from penflow.pencil_sync import PencilSyncError, SaveOutcome, sync_pencil_to_disk
 
 SAVED = SaveOutcome(ok=True, method="fake", message="saved")
@@ -93,6 +95,34 @@ def test_partial_write_keeps_polling_until_the_bytes_parse(tmp_path: Path) -> No
     assert fake.now >= 1.0
 
 
+def test_changed_bytes_that_never_parse_end_in_the_inspection_error(tmp_path: Path) -> None:
+    pen = make_pen(tmp_path)
+    fake = FakeTime(pen, [(0.5, '{"version": "2.11", "child')])
+    with pytest.raises(json.JSONDecodeError):
+        run(pen, fake)
+    assert math.isclose(fake.now, 5.0)
+
+
+def test_polling_uses_the_fixed_interval(tmp_path: Path) -> None:
+    pen = make_pen(tmp_path)
+    fake = FakeTime(pen, [])
+    durations: list[float] = []
+
+    def recording_sleep(seconds: float) -> None:
+        durations.append(seconds)
+        fake.sleep(seconds)
+
+    sync_pencil_to_disk(
+        pen,
+        save_runner=lambda path: SAVED,
+        save_timeout=1.0,
+        clock=fake.clock,
+        sleep=recording_sleep,
+    )
+    assert all(math.isclose(d, 0.1) for d in durations[:9])
+    assert math.isclose(sum(durations), 1.0) and max(durations) <= 0.1 + 1e-9
+
+
 def test_zero_timeout_checks_once_without_sleeping(tmp_path: Path) -> None:
     pen = make_pen(tmp_path)
     fake = FakeTime(pen, [(0.1, pen_text(2))])
@@ -120,3 +150,18 @@ def test_invalid_timeout_is_a_cli_usage_error(tmp_path: Path, value: str) -> Non
     with pytest.raises(SystemExit) as raised:
         cli.main(["pencil-sync", str(make_pen(tmp_path)), "--save-timeout", value])
     assert raised.value.code == 2
+
+
+def test_cli_accepts_a_zero_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_sync(path: str, **kwargs: object) -> dict:
+        seen["save_timeout"] = kwargs["save_timeout"]
+        return {"kind": "penflow-pencil-sync", "status": "PASS"}
+
+    monkeypatch.setattr(cli, "sync_pencil_to_disk", fake_sync)
+    pen = make_pen(tmp_path)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True, timeout=10)
+    (tmp_path / ".gitignore").write_text(MANAGED_IGNORE_BLOCK, encoding="utf-8")
+    argv = ["pencil-sync", str(pen), "--save-timeout", "0", "--json", "--project", str(tmp_path)]
+    assert (cli.main(argv), seen) == (0, {"save_timeout": 0.0})

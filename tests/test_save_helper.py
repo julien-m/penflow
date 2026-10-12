@@ -225,3 +225,48 @@ def test_real_osacompile_install_into_a_temporary_directory(tmp_path: Path) -> N
     assert info(bundle)["CFBundleIdentifier"] == HELPER_BUNDLE_ID
     assert (bundle / "Contents" / "MacOS" / "applet").is_file()
     assert install_save_helper(tmp_path)["status"] == "unchanged"
+
+
+def test_default_install_directory_is_used_without_an_explicit_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(save_helper, "DEFAULT_HELPER_DIR", tmp_path / "Applications")
+    report = install_save_helper(runner=FakeTools())
+    assert report["path"] == str(tmp_path / "Applications" / HELPER_NAME)
+
+
+def test_default_helper_location_is_the_user_applications_folder() -> None:
+    assert save_helper.DEFAULT_HELPER_DIR == Path.home() / "Applications"
+    assert HELPER_NAME == "Penflow Save.app"
+
+
+def test_default_helper_is_found_without_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(save_helper, "DEFAULT_HELPER_DIR", tmp_path / "Applications")
+    installed = make_fake_helper(tmp_path / "Applications")
+    assert resolve_save_helper({}) == installed
+
+
+def test_changed_source_with_the_same_version_replaces_the_bundle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    install_save_helper(tmp_path, runner=FakeTools())
+    monkeypatch.setattr(save_helper, "HELPER_SOURCE", save_helper.HELPER_SOURCE + "-- changed\n")
+    report = install_save_helper(tmp_path, runner=FakeTools())
+    assert (report["status"], info(tmp_path / HELPER_NAME)["CFBundleShortVersionString"]) == (
+        "replaced",
+        HELPER_VERSION,
+    )
+
+
+def test_default_command_runner_bounds_the_helper_wait(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        seen.update(kwargs)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(save_helper.subprocess, "run", fake_run)
+    save_helper.run_command(["open", "-W"])
+    assert seen["timeout"] == save_helper.HELPER_TIMEOUT_SECONDS

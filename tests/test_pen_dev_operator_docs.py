@@ -149,6 +149,9 @@ MCP_SAVE_PHRASES = (
     "MCP cannot save",
     "`execute` with `filePath` requires",
     "no mutation reaches disk without a save",
+    "open in the editor",
+    "1.2.16",
+    "once",
 )
 
 

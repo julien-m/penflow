@@ -368,3 +368,26 @@ def test_shortcut_fallback_rechecks_that_pen_dev_is_frontmost() -> None:
     script = build_save_script(17575)
     check = "if unix id of (first application process whose frontmost is true) is not 17575"
     assert script.index(check) < script.index('keystroke "s" using command down')
+
+
+@pytest.mark.parametrize(
+    ("result", "ok", "method"),
+    [("OK shortcut", True, "helper:shortcut"), ("ERROR -1708 boom", False, "helper")],
+    ids=["shortcut", "error"],
+)
+def test_helper_shortcut_and_error_results_reach_the_save_outcome(
+    tmp_path: Path, result: str, ok: bool, method: str
+) -> None:
+    pen = make_bundle(tmp_path / "user")
+    make_helper(tmp_path / "apps")
+    outcome = run_pencil_save_via_osascript(
+        tmp_path / "ui.pen",
+        app=pen,
+        environ={},
+        process_lister=lambda: [(17575, executable_of(pen))],
+        executor=RecordingExecutor(),
+        system="Darwin",
+        helper_dir=tmp_path / "apps",
+        helper_runner=HelperOpen(result),
+    )
+    assert (outcome.ok, outcome.method) == (ok, method)
