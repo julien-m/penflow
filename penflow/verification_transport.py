@@ -77,15 +77,17 @@ def _decode(raw: str) -> Any:
 def _print_lines(text: str) -> list[str]:
     """Split one successful execute response into its non-empty Print lines.
 
-    The status must be the first line. Exactly one `## Print output` section is allowed; it
-    ends at the next `## ` heading. Each Print line ends with a Markdown hard break (two
-    spaces), which is trailing whitespace and therefore stripped.
+    The status must be the first line and `## Print output` the first section heading, so a
+    preceding error or warning section blocks. Exactly one Print section is allowed; it ends
+    at the next `## ` heading. Each Print line ends with a Markdown hard break (two spaces),
+    which is trailing whitespace and therefore stripped.
     """
     rows = text.split("\n")
     if rows[0].strip() != EXECUTE_OK:
         raise VerificationInputError("verification.geometry.transport_invalid")
     headers = [index for index, row in enumerate(rows) if row.strip() == PRINT_HEADER]
-    if len(headers) != 1:
+    sections = [index for index, row in enumerate(rows) if row.lstrip().startswith("## ")]
+    if len(headers) != 1 or sections[0] != headers[0]:
         raise VerificationInputError("verification.geometry.transport_invalid")
     lines = []
     for row in rows[headers[0] + 1 :]:
@@ -114,10 +116,12 @@ def _children_from_envelope(envelope: dict[str, Any]) -> list[Any]:
         raise VerificationInputError("verification.geometry.identity_or_parent_mismatch")
     for node_id, (parent, context, _) in document.items():
         measurement = measured[node_id]
-        if measurement["parent_id"] != parent or (
-            "context" in measurement and context is not None and measurement["context"] != context
-        ):
+        # Context is optional on both sides, but when either side declares it both must agree.
+        if measurement["parent_id"] != parent or measurement.get("context") != context:
             raise VerificationInputError("verification.geometry.identity_or_parent_mismatch")
+        # pen.dev reports clipping in `problems`; a clipped node is never silently certified.
+        if measurement.get("problems") is not None:
+            raise VerificationInputError("verification.geometry.native_problem")
     built = {
         node_id: {
             "id": node_id,

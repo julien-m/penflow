@@ -87,6 +87,7 @@ def test_trailing_sections_after_print_output_are_ignored() -> None:
         pytest.param(print_response("[NaN]"), id="non-finite"),
         pytest.param(print_response('{"a": 1, "a": 2}'), id="duplicate-member"),
         pytest.param(print_response("Exported /tmp/x.png"), id="not-json"),
+        pytest.param("OK\n\n## Errors\nboom\n## Print output\n[]\n", id="section-before-print"),
     ],
 )
 def test_ambiguous_or_failed_transport_is_rejected(text: str) -> None:
@@ -116,6 +117,10 @@ def _mutate(change: str) -> dict[str, Any]:
         envelope["coordinate_space"] = "absolute"
     elif change == "duplicate_node":
         envelope["roots"].append(deepcopy(envelope["roots"][0]))
+    elif change == "context_one_side":
+        del measurements[1]["context"]
+    elif change == "problems":
+        measurements[2]["problems"] = "partially clipped"
     return envelope
 
 
@@ -131,6 +136,8 @@ def _mutate(change: str) -> dict[str, Any]:
         ("kind", "native_envelope_invalid"),
         ("coordinate_space", "native_envelope_invalid"),
         ("duplicate_node", "node_invalid_or_duplicate"),
+        ("context_one_side", "identity_or_parent_mismatch"),
+        ("problems", "native_problem"),
     ],
 )
 def test_measurement_envelope_defects_block(change: str, code: str) -> None:
@@ -191,3 +198,21 @@ def test_load_native_geometry_rejects_children_differing_from_the_observation(
     with pytest.raises(VerificationInputError) as raised:
         load_native_geometry(snapshot, expected)
     assert str(raised.value) == "verification.geometry.observation_mismatch"
+
+
+def test_root_canvas_origin_is_removed_while_children_keep_parent_offsets(tmp_path: Path) -> None:
+    children: list[Any] = deepcopy(EXPECTED_CHILDREN)
+    children[0].update(x=500, y=700)
+    snapshot, expected = _workspace(tmp_path, children)
+    observation = tmp_path / "observed.json"
+    envelope = recorded_envelope()
+    envelope["measurements"][0]["bounds"].update(x=500, y=700)
+    text = "OK\n\n## Print output\n" + json.dumps(envelope) + "  \n"
+    observation.write_text(json.dumps({"content": [{"type": "text", "text": text}]}))
+    layout_path = tmp_path / ".mockup-validation/visual-evidence/layout-snapshot.json"
+    layout = json.loads(layout_path.read_text())
+    layout["observation"]["sha256"] = digest(observation.read_bytes())
+    layout_path.write_text(json.dumps(layout))
+    load_native_geometry(snapshot, expected)
+    screen_root = expected["screens"][0]["root"]
+    assert (screen_root["bbox"]["x"], screen_root["children"][0]["bbox"]["x"]) == (0.0, 32.0)
