@@ -57,7 +57,7 @@ Record the loop state machine in `.mockup-validation/<group>/state.json` (workin
 - Treat `ambiguous` or `unmapped` entries from `pencil-context-map.json` as review work before implementation.
 - Treat `drift-report.json` blocking issues as higher priority than visual polish.
 - Cross-screen styling divergence is decided by `check-consistency` (047), never by the coherence contact-sheet pass — coherence answers perception-only questions, and each loop iteration reruns the contact-sheet pass with the rest of the chain.
-- Flex layout geometry is decided by real `snapshot_layout` bboxes when available; without a renderer, `audit-visual` still checks contrast, touch targets, and text fit but does not turn theoretical flex overlap/overflow into gate errors.
+- Flex layout geometry is decided by real native layout bboxes printed by `execute` (legacy `snapshot_layout`) when available; without a renderer, `audit-visual` still checks contrast, touch targets, and text fit but does not turn theoretical flex overlap/overflow into gate errors.
 - Use screenshots as required visual evidence for final PASS when a renderer is available; tree and drift artifacts remain the deterministic source of truth.
 
 ## Terminal States
