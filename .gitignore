@@ -31,6 +31,7 @@ build/
 .specs/hooks/.commit-context.json
 .specs/.runs/
 .specs/.orchestration/
+.specs/.execution/
 .specs/.previews/
 .specs/conventions/runs/
 .specs/conventions/debt.json
