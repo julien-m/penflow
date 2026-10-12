@@ -35,6 +35,16 @@ The pen.dev MCP server (id `pencil`) exposes `get_app_state`, `execute`, `read_s
 6. Copy the saved document: `cp <workspace>/ui.pen <run-dir>/post.pen`. Preparation reads (`validate-pen`, `export-expected`, mapping, audits) may continue after a PASS trigger; they are explicitly noncertifying.
 7. **At design closure** (before a Mockup Factory PASS, C47 `--strict-closure` or the C51 design profile), write the `penflow-pencil-persistence-observation` binding the run, operation, trigger and the distinct `pre.pen`/`post.pen` digests, then run `penflow verify-pencil-persistence <observation> --document <workspace>/ui.pen --run-id <run> --operation <operation> --out <workspace>/.penflow-run/pencil-persistence-receipt.json --json` (the path C51 reads) and `penflow validate-report <workspace>/.penflow-run/pencil-persistence-receipt.json --schema --json`. C46 is not required before the first preparation read.
 
+### Save helper and Accessibility
+
+<!-- @spec FR-010: helper Accessibility grant and MCP save limitation — .specs/features/078-pen-dev-operator-compatibility/spec.md#fr-010 -->
+The pen.dev 1.2.16 MCP cannot save (it has no save function): `execute` exposes only Insert, Copy, Update, Replace, Move, Delete, SetVariables, GetVariables, Get, Print, TakeScreenshot, Export, Generate and FindEmptySpace; `execute` with `filePath` requires that file to be open in the editor; no mutation reaches disk without a save (disk SHA unchanged 15 s after a mutation). `penflow pencil-sync` is therefore the save step.
+
+- Install the dedicated helper once: `penflow doctor --install-save-helper --json` writes the versioned, background-only `~/Applications/Penflow Save.app` (idempotent: `installed`, `unchanged` or `replaced`; `--save-helper-dir <dir>` installs elsewhere and `PENFLOW_SAVE_HELPER=<bundle>` points `pencil-sync` at it).
+- Grant it once in System Settings > Privacy & Security > Accessibility (add `Penflow Save.app` with `+`), and allow its first Automation prompt for System Events. The grant belongs to this app, so it survives Claude, Codex or terminal updates; a reinstall after a version bump needs a new grant.
+- When the helper is present, `pencil-sync` runs `open -W -n -a "Penflow Save.app" --args <pid> <ui.pen> <result-file>`; the helper writes `OK menu|shortcut`, `DENIED` (grant Accessibility) or `NOT_FOUND` (open `ui.pen` in pen.dev). Without it, `pencil-sync` falls back to direct `osascript`, which needs Accessibility for the calling terminal or agent.
+- `pencil-sync` then polls the document until its digest changes and the bytes parse, up to `--save-timeout` seconds (default 5): pen.dev writes after the Save request returns, so an immediate re-read is not proof of failure.
+
 | Former MCP tool (pen.dev < 1.2, legacy) | pen.dev 1.2 `execute` equivalent |
 |---|---|
 | `batch_design` (legacy) | `Insert`, `Update`, `Replace`, `Copy`, `Move`, `Delete` in one snippet |

@@ -1,6 +1,7 @@
 # @spec AC-006: guidance names the pen.dev 1.2 MCP surface — .specs/features/078-pen-dev-operator-compatibility/spec.md#ac-006
 # @spec AC-007: ordered C46 file-copy protocol, no filesystem prohibition — .specs/features/078-pen-dev-operator-compatibility/spec.md#ac-007
 # @spec AC-008: C46 at design closure, preparation noncertifying — .specs/features/078-pen-dev-operator-compatibility/spec.md#ac-008
+# @spec AC-014: save helper Accessibility grant and MCP save limitation — .specs/features/078-pen-dev-operator-compatibility/spec.md#ac-014
 """Operator guidance matches the pen.dev 1.2 MCP surface and the C46 verifier."""
 
 from __future__ import annotations
@@ -135,3 +136,24 @@ def test_c46_protocol_order_holds_in_each_operator_guide(
     text = full[full.index(anchor) :]
     positions = [text.index(step) for step in steps]
     assert positions == sorted(positions)
+
+
+HELPER_PHRASES = (
+    "penflow doctor --install-save-helper",
+    "Penflow Save.app",
+    "Privacy & Security > Accessibility",
+    "Automation prompt",
+    "--save-timeout",
+)
+MCP_SAVE_PHRASES = (
+    "MCP cannot save",
+    "`execute` with `filePath` requires",
+    "no mutation reaches disk without a save",
+)
+
+
+@pytest.mark.parametrize("guide", [PENFLOW_SKILL, ROOT / "README.md"], ids=["skill", "readme"])
+def test_save_helper_grant_and_mcp_save_limit_are_documented(guide: Path) -> None:
+    text = guide.read_text(encoding="utf-8")
+    assert [phrase for phrase in HELPER_PHRASES if phrase not in text] == []
+    assert [phrase for phrase in MCP_SAVE_PHRASES if phrase.lower() not in text.lower()] == []
