@@ -13,15 +13,19 @@ from penflow import pen_schema
 from penflow.contracts import pencil_draft_from_screen
 from penflow.demo_data import visual_pen
 from penflow.doctor_files import EMPTY_PEN_BYTES
-from penflow.semantic_draft import PEN_VERSION
+from penflow.semantic_draft import PEN_VERSION, pen_draft_from_semantic_tree
 from penflow.verification_geometry import intrinsic_text_ids
 
 PENFLOW_DIR = Path(__file__).resolve().parents[1] / "penflow"
+EXAMPLE_TREE = json.loads(
+    (PENFLOW_DIR.parent / "examples/full/semantic-ui-tree.json").read_text(encoding="utf-8")
+)
 
 
 def test_doctor_draft_demo_and_contract_writers_share_the_write_version() -> None:
     assert json.loads(EMPTY_PEN_BYTES)["version"] == pen_schema.PEN_WRITE_VERSION
     assert PEN_VERSION == pen_schema.PEN_WRITE_VERSION
+    assert pen_draft_from_semantic_tree(EXAMPLE_TREE)["version"] == pen_schema.PEN_WRITE_VERSION
     assert visual_pen()["version"] == pen_schema.PEN_WRITE_VERSION
     assert pencil_draft_from_screen({"id": "root"})["version"] == pen_schema.PEN_WRITE_VERSION
 

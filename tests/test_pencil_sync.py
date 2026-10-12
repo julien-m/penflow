@@ -1,3 +1,5 @@
+# @spec AC-009: trigger contract keeps UNVERIFIED and digest comparison — .specs/features/078-pen-dev-operator-compatibility/spec.md#ac-009
+# @spec AC-003: pencil-sync --app CLI wiring — .specs/features/078-pen-dev-operator-compatibility/spec.md#ac-003
 from __future__ import annotations
 
 import json
@@ -153,6 +155,8 @@ def test_pencil_sync_cli_returns_exit_code_from_status(tmp_path: Path, monkeypat
                 "3",
                 "--expect-screens",
                 "1",
+                "--app",
+                "/Applications/Pen.app",
                 "--json",
                 "--project",
                 str(tmp_path),
@@ -164,5 +168,5 @@ def test_pencil_sync_cli_returns_exit_code_from_status(tmp_path: Path, monkeypat
         "path": str(pen_path),
         "expect_min_nodes": 3,
         "expect_screens": 1,
-        "app": None,
+        "app": "/Applications/Pen.app",
     }

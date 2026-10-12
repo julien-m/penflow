@@ -28,6 +28,12 @@ OPERATOR_GUIDES = (
     ROOT / "README.md",
 )
 OPERATOR_PHRASES = ("get_app_state", "`execute`", "ui.pen", "pen.dev")
+OPEN_DOCUMENT = re.compile(r"open `[^`]*ui\.pen` in pen\.dev", re.IGNORECASE)
+# A reworded prohibition still pairs a negation with reading/opening .pen bytes in one clause.
+READ_PROHIBITION = re.compile(
+    r"\b(never|do not|don't|must not|cannot)\b[^.\n]{0,40}\b(read|grep|access)\w*\b[^.\n]{0,40}\.pen\b",
+    re.IGNORECASE,
+)
 REMOVED_TOOLS = re.compile(
     r"\b(batch_design|batch_get|snapshot_layout|get_screenshot|get_editor_state|export_nodes)\b"
 )
@@ -54,6 +60,7 @@ def test_removed_mcp_tools_appear_only_in_labeled_lines(guide: Path) -> None:
 def test_no_guide_forbids_penflow_reading_the_pen_file(guide: Path) -> None:
     text = guide.read_text(encoding="utf-8")
     assert not [phrase for phrase in FILESYSTEM_PROHIBITIONS if phrase in text]
+    assert READ_PROHIBITION.findall(text) == []
 
 
 def test_current_mcp_surface_and_open_document_precondition_are_documented() -> None:
@@ -63,6 +70,7 @@ def test_current_mcp_surface_and_open_document_precondition_are_documented() -> 
     for guide in OPERATOR_GUIDES:
         text = guide.read_text(encoding="utf-8")
         assert [phrase for phrase in OPERATOR_PHRASES if phrase not in text] == []
+        assert OPEN_DOCUMENT.search(text) is not None
 
 
 def test_c46_file_copy_protocol_steps_are_ordered() -> None:
@@ -86,3 +94,44 @@ def test_mockup_factory_requires_c46_at_design_closure_not_before_first_read() -
     assert "C46 is required at design closure, before any PASS" in text
     assert "preparation reads after a PASS trigger are noncertifying" in text
     assert "close actual C46 persistence before reading" not in text
+
+
+@pytest.mark.parametrize(
+    ("guide", "anchor", "steps"),
+    [
+        (
+            ".agent-sync/skills/mockup-factory/SKILL.md",
+            "Before any pen.dev MCP call",
+            (
+                "copy `ui.pen` to a pre snapshot",
+                "mutate through `execute`",
+                "penflow pencil-sync",
+                "copy `ui.pen` to a post snapshot",
+                "penflow-pencil-persistence-observation",
+                "penflow verify-pencil-persistence",
+                "penflow validate-report",
+            ),
+        ),
+        (
+            "docs/verification-workflow.md",
+            "Open `ui.pen` in pen.dev and confirm it with `get_app_state`",
+            (
+                "copy `ui.pen` before the final mutation batch",
+                "mutate through `execute`",
+                "`pencil-sync` save trigger",
+                "copy `ui.pen` again",
+                "penflow-pencil-persistence-observation",
+                "verify-pencil-persistence",
+                "validate-report",
+            ),
+        ),
+    ],
+    ids=["mockup-factory", "verification-workflow"],
+)
+def test_c46_protocol_order_holds_in_each_operator_guide(
+    guide: str, anchor: str, steps: tuple[str, ...]
+) -> None:
+    full = (ROOT / guide).read_text(encoding="utf-8")
+    text = full[full.index(anchor) :]
+    positions = [text.index(step) for step in steps]
+    assert positions == sorted(positions)

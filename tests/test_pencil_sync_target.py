@@ -15,6 +15,7 @@ import pytest
 
 from penflow.pencil_sync import (
     PenTargetError,
+    SaveOutcome,
     build_save_script,
     find_pen_process,
     resolve_pen_app,
@@ -111,6 +112,7 @@ def test_zero_or_several_bundles_fail_without_running_a_script(
     assert executor.scripts == []
     assert "expected exactly one Pen.app" in outcome.message
     assert "--app" in outcome.message
+    assert str(dirs[0]) in outcome.message and str(dirs[1]) in outcome.message
     if installs == 2:
         assert str(dirs[0] / "Pen.app") in outcome.message
         assert str(dirs[1] / "Pen.app") in outcome.message
@@ -150,6 +152,10 @@ def test_explicit_app_wins_over_environment_and_defaults(tmp_path: Path) -> None
         == explicit
     )
     assert resolve_pen_app(None, environ={}, search_dirs=defaults) == tmp_path / "user" / "Pen.app"
+    assert (
+        resolve_pen_app(None, environ={"PENFLOW_PEN_APP": str(env_bundle)}, search_dirs=defaults)
+        == env_bundle
+    )
     assert (
         resolve_pen_app(None, environ={"PENFLOW_PEN_APP": str(env_bundle)}, search_dirs=())
         == env_bundle
@@ -214,3 +220,49 @@ def test_failed_target_resolution_keeps_trigger_contract_and_never_passes(tmp_pa
     assert result["save"]["target"] is None
     assert "pen.dev target" in result["message"]
     assert executor.scripts == []
+
+
+def test_shortcut_fallback_is_recorded_as_the_save_method(tmp_path: Path) -> None:
+    pen = make_bundle(tmp_path / "user")
+    outcome = run_pencil_save_via_osascript(
+        tmp_path / "ui.pen",
+        app=pen,
+        process_lister=lambda: [(17575, executable_of(pen))],
+        executor=RecordingExecutor(stdout="shortcut\n"),
+        system="Darwin",
+    )
+    assert (outcome.ok, outcome.method) == (True, "osascript:shortcut")
+
+
+def test_successful_save_through_the_resolved_process_records_its_target(tmp_path: Path) -> None:
+    pen = make_bundle(tmp_path / "user")
+    pen_path = tmp_path / "ui.pen"
+    pen_path.write_text(json.dumps({"version": "2.11", "children": []}), encoding="utf-8")
+
+    def saving_executor(script: str) -> subprocess.CompletedProcess[str]:
+        pen_path.write_text(json.dumps({"version": "2.17", "children": []}), encoding="utf-8")
+        return subprocess.CompletedProcess(["osascript"], 0, "menu\n", "")
+
+    result = sync_pencil_to_disk(
+        pen_path,
+        save_runner=lambda path: run_pencil_save_via_osascript(
+            path,
+            app=pen,
+            process_lister=lambda: [(17575, executable_of(pen))],
+            executor=saving_executor,
+            system="Darwin",
+        ),
+    )
+    assert (result["status"], result["save"]["target"]["pid"]) == ("PASS", 17575)
+
+
+def test_failed_save_never_passes_even_when_the_document_changed(tmp_path: Path) -> None:
+    pen_path = tmp_path / "ui.pen"
+    pen_path.write_text(json.dumps({"version": "2.11", "children": []}), encoding="utf-8")
+
+    def changed_but_failed(path: Path) -> SaveOutcome:
+        path.write_text(json.dumps({"version": "2.17", "children": []}), encoding="utf-8")
+        return SaveOutcome(ok=False, method="osascript", message="pen.dev target: ambiguous")
+
+    result = sync_pencil_to_disk(pen_path, save_runner=changed_but_failed)
+    assert (result["checks"]["content_changed"], result["status"]) == (True, "FAIL")
