@@ -270,3 +270,12 @@ def test_default_command_runner_bounds_the_helper_wait(monkeypatch: pytest.Monke
     monkeypatch.setattr(save_helper.subprocess, "run", fake_run)
     save_helper.run_command(["open", "-W"])
     assert seen["timeout"] == save_helper.HELPER_TIMEOUT_SECONDS
+
+
+def test_helper_save_uses_the_bounded_default_runner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    opener = FakeOpen("OK menu")
+    monkeypatch.setattr(save_helper, "run_command", opener)
+    result = run_helper_save(make_fake_helper(tmp_path), 7, tmp_path / "ui.pen")
+    assert (result.status, len(opener.commands)) == ("OK", 1)

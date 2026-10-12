@@ -165,3 +165,43 @@ def test_cli_accepts_a_zero_timeout(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     (tmp_path / ".gitignore").write_text(MANAGED_IGNORE_BLOCK, encoding="utf-8")
     argv = ["pencil-sync", str(pen), "--save-timeout", "0", "--json", "--project", str(tmp_path)]
     assert (cli.main(argv), seen) == (0, {"save_timeout": 0.0})
+
+
+def test_default_timeout_is_five_seconds(tmp_path: Path) -> None:
+    pen = make_pen(tmp_path)
+    fake = FakeTime(pen, [])
+    result = sync_pencil_to_disk(
+        pen, save_runner=lambda path: SAVED, clock=fake.clock, sleep=fake.sleep
+    )
+    assert (result["status"], math.isclose(fake.now, 5.0)) == ("FAIL", True)
+
+
+def test_cli_default_timeout_is_five_seconds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_sync(path: str, **kwargs: object) -> dict:
+        seen["save_timeout"] = kwargs["save_timeout"]
+        return {"kind": "penflow-pencil-sync", "status": "PASS"}
+
+    monkeypatch.setattr(cli, "sync_pencil_to_disk", fake_sync)
+    pen = make_pen(tmp_path)
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True, timeout=10)
+    (tmp_path / ".gitignore").write_text(MANAGED_IGNORE_BLOCK, encoding="utf-8")
+    argv = ["pencil-sync", str(pen), "--json", "--project", str(tmp_path)]
+    assert (cli.main(argv), seen) == (0, {"save_timeout": 5.0})
+
+
+def test_zero_timeout_passes_when_the_bytes_already_changed(tmp_path: Path) -> None:
+    pen = make_pen(tmp_path)
+
+    def saved_now(path: Path) -> SaveOutcome:
+        path.write_text(pen_text(2), encoding="utf-8")
+        return SAVED
+
+    fake = FakeTime(pen, [])
+    result = sync_pencil_to_disk(
+        pen, save_runner=saved_now, save_timeout=0, clock=fake.clock, sleep=fake.sleep
+    )
+    assert (result["status"], fake.sleeps) == ("PASS", 0)
