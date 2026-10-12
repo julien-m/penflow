@@ -21,8 +21,9 @@ from .doctor_authority import archived_authority_canvas
 from .doctor_git import _git_path_finding, _managed_git_paths
 from .doctor_models import DoctorFinding, _Inspection, _Repair
 from .pen import parse_pen, validate_pen_context
+from .pen_schema import PEN_WRITE_VERSION
 
-EMPTY_PEN_BYTES = b'{"children":[],"version":"1.0"}\n'
+EMPTY_PEN_BYTES = ('{"children":[],"version":"%s"}\n' % PEN_WRITE_VERSION).encode()
 _IGNORE_BEGIN = MANAGED_IGNORE_BLOCK_LINES[0]
 _IGNORE_END = MANAGED_IGNORE_BLOCK_LINES[-1]
 _TEMP_ROOTS = (MANAGED_TEMP_ROOT, *RECOGNIZED_LEGACY_ROOTS)

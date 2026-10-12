@@ -18,6 +18,7 @@ from .pen_lifecycle import (
     CanvasState,
     validate_canvas_lifecycle,
 )
+from .pen_schema import PEN_WRITE_VERSION
 from .semantic_validation import validate_semantic_tree
 
 # Re-exported for backward compatibility: theme parsing moved to penflow.theme
@@ -31,7 +32,7 @@ __all__ = [
     "write_pen_draft_from_semantic_tree",
 ]
 
-PEN_VERSION = "2.11"
+PEN_VERSION = PEN_WRITE_VERSION
 SCREEN_GAP = 16
 SCREEN_PADDING = 24
 NODE_GAP = 8

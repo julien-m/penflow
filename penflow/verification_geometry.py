@@ -3,18 +3,19 @@
 from typing import Any, cast
 import math
 
+from .pen_schema import supports_native_intrinsic_text
 from .verification_files import VerificationInputError
 from .verification_json import canonical_bytes, decode_json
 from .verification_snapshot import VerificationSnapshot
 
 
 def intrinsic_text_ids(pen: dict[str, Any]) -> frozenset[str]:
-    """Select native 2.14 text with an intrinsic dimension (auto width or wrapped height).
+    """Select native text (version >= 2.14) with an intrinsic dimension (auto width or wrapped height).
 
     Callers must separately authenticate complete native geometry before using this
     source property to replace a text-width estimate with its measured intrinsic width.
     """
-    if pen.get("version") != "2.14":
+    if not supports_native_intrinsic_text(pen.get("version")):
         return frozenset()
     result = set()
     pending = list(pen.get("children", []))
