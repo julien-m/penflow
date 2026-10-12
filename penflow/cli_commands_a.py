@@ -56,6 +56,7 @@ from .pencil_persistence import (
     verify_pencil_persistence,
 )
 from .pencil_sync import PencilSyncError
+from .save_helper import install_save_helper_report
 from .reverse import reverse_pen
 from .run_lifecycle import (
     LifecycleLock,
@@ -115,6 +116,10 @@ def _dependencies(args: argparse.Namespace) -> CommandDependencies:
 
 def cmd_doctor(args: argparse.Namespace) -> int:
     """Run the consumer-project Doctor and print its complete report."""
+    if getattr(args, "install_save_helper", False):
+        report, exit_code = install_save_helper_report(args.save_helper_dir)
+        _print(report, args.json)
+        return exit_code
     if args.fix and args.check:
         raise ProjectBoundaryError("doctor --check and --fix are mutually exclusive", exit_code=2)
     context = resolve_project_context(args.project)
@@ -178,6 +183,7 @@ def cmd_pencil_sync(args: argparse.Namespace) -> int:
             expect_min_nodes=args.expect_min_nodes,
             expect_screens=args.expect_screens,
             app=args.app,
+            save_timeout=args.save_timeout,
         )
     except PencilSyncError as error:
         raise PenflowError(str(error)) from error

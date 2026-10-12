@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 
+from penflow import save_helper
 from penflow.pencil_sync import (
     PenTargetError,
     SaveOutcome,
@@ -24,6 +25,13 @@ from penflow.pencil_sync import (
 )
 
 BUNDLE_ID = "dev.pencil.desktop"
+
+
+@pytest.fixture(autouse=True)
+def isolate_real_save_helper(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Never pick up a Penflow Save.app installed on the machine running the tests."""
+    monkeypatch.delenv("PENFLOW_SAVE_HELPER", raising=False)
+    monkeypatch.setattr(save_helper, "DEFAULT_HELPER_DIR", tmp_path / "no-helper")
 
 
 def make_bundle(root: Path, name: str = "Pen.app", executable: str = "Pen") -> Path:
@@ -266,3 +274,120 @@ def test_failed_save_never_passes_even_when_the_document_changed(tmp_path: Path)
 
     result = sync_pencil_to_disk(pen_path, save_runner=changed_but_failed)
     assert (result["checks"]["content_changed"], result["status"]) == (True, "FAIL")
+
+
+def make_helper(directory: Path) -> Path:
+    helper = directory / save_helper.HELPER_NAME
+    (helper / "Contents").mkdir(parents=True)
+    with (helper / "Contents" / "Info.plist").open("wb") as stream:
+        plistlib.dump({"CFBundleIdentifier": save_helper.HELPER_BUNDLE_ID}, stream)
+    return helper
+
+
+class HelperOpen:
+    def __init__(self, result: str) -> None:
+        self.result = result
+        self.commands: list[list[str]] = []
+
+    def __call__(self, command: list[str]) -> subprocess.CompletedProcess[str]:
+        self.commands.append(command)
+        Path(command[-1]).write_text(self.result, encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+
+def test_installed_helper_saves_instead_of_direct_osascript(tmp_path: Path) -> None:
+    pen = make_bundle(tmp_path / "user")
+    helper = make_helper(tmp_path / "apps")
+    opener, executor = HelperOpen("OK menu"), RecordingExecutor()
+    outcome = run_pencil_save_via_osascript(
+        tmp_path / "ui.pen",
+        app=pen,
+        environ={},
+        process_lister=lambda: [(17575, executable_of(pen))],
+        executor=executor,
+        system="Darwin",
+        helper_dir=tmp_path / "apps",
+        helper_runner=opener,
+    )
+    assert (outcome.ok, outcome.method, outcome.helper) == (True, "helper:menu", str(helper))
+    assert opener.commands[0][6:8] == ["17575", str(tmp_path / "ui.pen")]
+    assert executor.scripts == []
+
+
+@pytest.mark.parametrize(
+    ("result", "remedy"),
+    [
+        ("DENIED not allowed assistive access", "Privacy & Security > Accessibility"),
+        ("NOT_FOUND pid 17575", "open ui.pen in pen.dev"),
+    ],
+    ids=["denied", "not-found"],
+)
+def test_helper_refusals_fail_with_their_remedy(tmp_path: Path, result: str, remedy: str) -> None:
+    pen = make_bundle(tmp_path / "user")
+    make_helper(tmp_path / "apps")
+    outcome = run_pencil_save_via_osascript(
+        tmp_path / "ui.pen",
+        app=pen,
+        environ={},
+        process_lister=lambda: [(17575, executable_of(pen))],
+        executor=RecordingExecutor(),
+        system="Darwin",
+        helper_dir=tmp_path / "apps",
+        helper_runner=HelperOpen(result),
+    )
+    assert outcome.ok is False
+    assert remedy in outcome.message
+
+
+def test_explicit_helper_that_is_not_a_bundle_fails_without_fallback(tmp_path: Path) -> None:
+    pen = make_bundle(tmp_path / "user")
+    executor = RecordingExecutor()
+    outcome = run_pencil_save_via_osascript(
+        tmp_path / "ui.pen",
+        app=pen,
+        environ={"PENFLOW_SAVE_HELPER": str(tmp_path / "Missing.app")},
+        process_lister=lambda: [(17575, executable_of(pen))],
+        executor=executor,
+        system="Darwin",
+        helper_runner=HelperOpen("OK menu"),
+    )
+    assert (outcome.ok, executor.scripts) == (False, [])
+    assert "save helper not found" in outcome.message
+
+
+def test_symlinked_install_matches_the_running_executable(tmp_path: Path) -> None:
+    real = make_bundle(tmp_path / "real")
+    (tmp_path / "linked").mkdir()
+    linked = tmp_path / "linked" / "Pen.app"
+    linked.symlink_to(real, target_is_directory=True)
+    target = find_pen_process(linked, process_lister=lambda: [(17575, executable_of(real))])
+    assert target.pid == 17575
+
+
+def test_shortcut_fallback_rechecks_that_pen_dev_is_frontmost() -> None:
+    script = build_save_script(17575)
+    check = "if unix id of (first application process whose frontmost is true) is not 17575"
+    assert script.index(check) < script.index('keystroke "s" using command down')
+
+
+@pytest.mark.parametrize(
+    ("result", "ok", "method"),
+    [("OK shortcut", True, "helper:shortcut"), ("ERROR -1708 boom", False, "helper")],
+    ids=["shortcut", "error"],
+)
+def test_helper_shortcut_and_error_results_reach_the_save_outcome(
+    tmp_path: Path, result: str, ok: bool, method: str
+) -> None:
+    pen = make_bundle(tmp_path / "user")
+    make_helper(tmp_path / "apps")
+    outcome = run_pencil_save_via_osascript(
+        tmp_path / "ui.pen",
+        app=pen,
+        environ={},
+        process_lister=lambda: [(17575, executable_of(pen))],
+        executor=RecordingExecutor(),
+        system="Darwin",
+        helper_dir=tmp_path / "apps",
+        helper_runner=HelperOpen(result),
+    )
+    assert (outcome.ok, outcome.method) == (ok, method)

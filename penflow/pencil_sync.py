@@ -7,20 +7,26 @@ persistence. The runtime-agnostic verifier lives in `pencil_persistence.py`.
 # @spec FR-001: resolve exactly one pen.dev bundle — .specs/features/078-pen-dev-operator-compatibility/spec.md#fr-001
 # @spec FR-002: address the save to the exact process id — .specs/features/078-pen-dev-operator-compatibility/spec.md#fr-002
 # @spec FR-003: C33 trigger contract keeps UNVERIFIED and records the target — .specs/features/078-pen-dev-operator-compatibility/spec.md#fr-003
+# @spec FR-008: bounded wait for the saved bytes — .specs/features/078-pen-dev-operator-compatibility/spec.md#fr-008
+# @spec FR-009: save helper when installed, osascript otherwise — .specs/features/078-pen-dev-operator-compatibility/spec.md#fr-009
 
 from __future__ import annotations
 
 import hashlib
+import json
+import math
 import os
 import platform
 import plistlib
 import subprocess
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 from .pen import inspect_pen
+from .save_helper import CommandRunner, resolve_save_helper, run_helper_save
 
 PEN_APP_ENV = "PENFLOW_PEN_APP"
 PEN_APP_NAME = "Pen.app"
@@ -29,6 +35,14 @@ DEFAULT_PEN_APP_DIRS = (Path("/Applications"), Path.home() / "Applications")
 # AppleScript round-trips stay short; a hung System Events call must not block the operator.
 OSASCRIPT_TIMEOUT_SECONDS = 10
 PS_TIMEOUT_SECONDS = 5
+# pen.dev writes the file after the Save request returns (observed on 1.2.16); 5 s covers
+# that delay with margin while keeping a failed save quick to report.
+DEFAULT_SAVE_TIMEOUT_SECONDS = 5.0
+HELPER_REMEDIES = {
+    "DENIED": " - add Penflow Save.app in System Settings > Privacy & Security > Accessibility",
+    "NOT_FOUND": " - open ui.pen in pen.dev and keep one instance running",
+}
+SAVE_POLL_INTERVAL_SECONDS = 0.1
 
 
 @dataclass(frozen=True)
@@ -50,6 +64,7 @@ class SaveOutcome:
     stdout: str = ""
     stderr: str = ""
     target: dict[str, Any] | None = None
+    helper: str | None = None
 
 
 class PencilSyncError(RuntimeError):
@@ -72,35 +87,57 @@ def sync_pencil_to_disk(
     expect_screens: int | None = None,
     app: str | Path | None = None,
     save_runner: SaveRunner | None = None,
+    save_timeout: float = DEFAULT_SAVE_TIMEOUT_SECONDS,
+    clock: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> dict[str, Any]:
-    """Trigger save and report disk changes without closing persistence.
+    """Trigger save, wait for the bytes, and report disk changes without closing persistence.
 
     Args:
         pen: The `.pen` document expected to change on disk.
         expect_min_nodes: Optional minimum node count after the save.
         expect_screens: Optional minimum screen count after the save.
         app: Explicit pen.dev bundle for the default runner; ignored with ``save_runner``.
-        save_runner: Injectable trigger; defaults to the pen.dev osascript runner.
+        save_runner: Injectable trigger; defaults to the helper or osascript runner.
+        save_timeout: Seconds to wait for a changed, parseable document after a successful
+            save request; an unchanged digest is reported only after it.
+        clock: Monotonic clock, injected by tests.
+        sleep: Sleep function, injected by tests.
 
     Returns:
         The ``penflow-pencil-sync`` report; persistence always remains ``UNVERIFIED``.
 
     Raises:
-        PencilSyncError: If the document is missing or expectations are negative.
+        PencilSyncError: If the document is missing, expectations are negative or the
+            timeout is negative or not finite.
     """
     pen_path = _validated_request(Path(pen), expect_min_nodes, expect_screens)
+    if not math.isfinite(save_timeout) or save_timeout < 0:
+        raise PencilSyncError("--save-timeout must be a finite number >= 0")
     before_stat = pen_path.stat()
     before_sha256 = hashlib.sha256(pen_path.read_bytes()).hexdigest()
     before_inspect = inspect_pen(pen_path)
     runner = save_runner or (lambda path: run_pencil_save_via_osascript(path, app=app))
     save = runner(pen_path)
+    if save.ok:
+        _await_saved_bytes(pen_path, before_sha256, save_timeout, clock, sleep)
+    before = _inspection_summary(before_stat.st_mtime_ns, before_sha256, before_inspect)
+    return _sync_report(pen_path, save, before, expect_min_nodes, expect_screens)
+
+
+def _sync_report(
+    pen_path: Path,
+    save: SaveOutcome,
+    before: dict[str, Any],
+    expect_min_nodes: int | None,
+    expect_screens: int | None,
+) -> dict[str, Any]:
     after_stat = pen_path.stat()
     after_sha256 = hashlib.sha256(pen_path.read_bytes()).hexdigest()
     after_inspect = inspect_pen(pen_path)
-
     checks = {
-        "mtime_advanced": after_stat.st_mtime_ns > before_stat.st_mtime_ns,
-        "content_changed": after_sha256 != before_sha256,
+        "mtime_advanced": after_stat.st_mtime_ns > before["mtime_ns"],
+        "content_changed": after_sha256 != before["sha256"],
         "min_nodes": _expectation(
             actual=int(after_inspect["node_count"]), expected=expect_min_nodes
         ),
@@ -117,10 +154,41 @@ def sync_pencil_to_disk(
         "pen": str(pen_path),
         "message": _message(status, save, checks),
         "save": asdict(save),
-        "before": _inspection_summary(before_stat.st_mtime_ns, before_sha256, before_inspect),
+        "before": before,
         "after": _inspection_summary(after_stat.st_mtime_ns, after_sha256, after_inspect),
         "checks": checks,
     }
+
+
+def _await_saved_bytes(
+    pen_path: Path,
+    before_sha256: str,
+    timeout: float,
+    clock: Callable[[], float],
+    sleep: Callable[[float], None],
+) -> None:
+    """Poll until the document digest changed and its bytes parse, or the timeout elapses.
+
+    A partially written file (changed but not yet valid JSON) keeps the poll going; the
+    caller re-reads and inspects the final bytes either way.
+    """
+    deadline = clock() + timeout
+    while True:
+        raw = pen_path.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != before_sha256 and _parses(raw):
+            return
+        remaining = deadline - clock()
+        if remaining <= 0:
+            return  # Timeout: the caller reports the bytes it now reads.
+        sleep(min(SAVE_POLL_INTERVAL_SECONDS, remaining))
+
+
+def _parses(raw: bytes) -> bool:
+    try:
+        json.loads(raw)
+    except ValueError:
+        return False
+    return True
 
 
 def _validated_request(
@@ -243,7 +311,8 @@ def build_save_script(pid: int) -> str:
     """Build the AppleScript that saves the frontmost document of one exact process.
 
     Flow: bring the process with this unix id to the front, click File > Save, and fall back
-    to Cmd+S on the same process when the menu label is missing (localized menus). The script
+    to Cmd+S when the menu label is missing (localized menus), only after re-checking that this
+    process is still frontmost because a keystroke goes to the frontmost application. The script
     prints ``menu`` or ``shortcut`` so the caller records which path ran.
     """
     return f"""
@@ -256,6 +325,9 @@ tell application "System Events"
             click menu item "Save" of menu "File" of menu bar 1
             return "menu"
         on error
+            if unix id of (first application process whose frontmost is true) is not {pid} then
+                error "pen.dev is not frontmost; Save shortcut not sent" number 1
+            end if
             keystroke "s" using command down
             return "shortcut"
         end try
@@ -284,11 +356,14 @@ def run_pencil_save_via_osascript(
     process_lister: ProcessLister = list_processes,
     executor: ScriptExecutor = run_osascript,
     system: str | None = None,
+    helper_dir: Path | None = None,
+    helper_runner: CommandRunner | None = None,
 ) -> SaveOutcome:
     """Trigger File > Save in the single resolved pen.dev process.
 
-    ``pen_path`` is not used by AppleScript: pen.dev saves its frontmost document, and the
-    caller proves the effect by comparing the document digest before and after.
+    The save goes through `Penflow Save.app` when it is installed (``PENFLOW_SAVE_HELPER`` or
+    ``helper_dir``), otherwise through direct ``osascript``. pen.dev saves its frontmost
+    document; the caller proves the effect by comparing the document digest.
     """
     if (system or platform.system()) != "Darwin":
         return SaveOutcome(
@@ -303,6 +378,39 @@ def run_pencil_save_via_osascript(
         )
     except (PenTargetError, OSError, subprocess.SubprocessError) as error:
         return SaveOutcome(ok=False, method="osascript", message=f"pen.dev target: {error}")
+    helper = resolve_save_helper(environ, helper_dir)
+    if helper is not None:
+        return _save_with_helper(helper, target, pen_path, helper_runner)
+    return _save_with_osascript(target, executor)
+
+
+def _save_with_helper(
+    helper: Path, target: PenAppTarget, pen_path: Path, runner: CommandRunner | None
+) -> SaveOutcome:
+    try:
+        result = run_helper_save(helper, target.pid, pen_path, runner=runner)
+    except (OSError, subprocess.SubprocessError) as error:
+        return SaveOutcome(
+            ok=False,
+            method="helper",
+            message=f"save helper failed: {error}",
+            target=asdict(target),
+            helper=str(helper),
+        )
+    ok = result.status == "OK"
+    return SaveOutcome(
+        ok=ok,
+        method=f"helper:{result.detail}" if ok and result.detail else "helper",
+        message="pen.dev File > Save triggered by Penflow Save.app"
+        if ok
+        else f"save helper {result.status}: {result.detail}{HELPER_REMEDIES.get(result.status, '')}",
+        stdout=f"{result.status} {result.detail}".strip(),
+        target=asdict(target),
+        helper=str(helper),
+    )
+
+
+def _save_with_osascript(target: PenAppTarget, executor: ScriptExecutor) -> SaveOutcome:
     try:
         completed = executor(build_save_script(target.pid))
     except subprocess.TimeoutExpired as error:

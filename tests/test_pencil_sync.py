@@ -76,6 +76,7 @@ def test_pencil_sync_fails_when_save_is_same_digest_noop(tmp_path: Path) -> None
         pen_path,
         expect_screens=8,
         save_runner=lambda path: SaveOutcome(ok=True, method="fake", message="no-op"),
+        save_timeout=0,
     )
 
     assert result["status"] == "FAIL"
@@ -123,7 +124,12 @@ def test_pencil_sync_cli_returns_exit_code_from_status(tmp_path: Path, monkeypat
     observed: dict[str, Any] = {}
 
     def fake_sync(
-        path: str, *, expect_min_nodes: int | None, expect_screens: int | None, app: str | None
+        path: str,
+        *,
+        expect_min_nodes: int | None,
+        expect_screens: int | None,
+        app: str | None,
+        save_timeout: float,
     ):
         observed.update(
             {
@@ -131,6 +137,7 @@ def test_pencil_sync_cli_returns_exit_code_from_status(tmp_path: Path, monkeypat
                 "expect_min_nodes": expect_min_nodes,
                 "expect_screens": expect_screens,
                 "app": app,
+                "save_timeout": save_timeout,
             }
         )
         return {
@@ -145,28 +152,14 @@ def test_pencil_sync_cli_returns_exit_code_from_status(tmp_path: Path, monkeypat
         }
 
     monkeypatch.setattr(cli, "sync_pencil_to_disk", fake_sync)
+    flags = "--expect-min-nodes 3 --expect-screens 1 --app /Applications/Pen.app --save-timeout 2.5"
+    argv = ["pencil-sync", str(pen_path), *flags.split(), "--json", "--project", str(tmp_path)]
 
-    assert (
-        cli.main(
-            [
-                "pencil-sync",
-                str(pen_path),
-                "--expect-min-nodes",
-                "3",
-                "--expect-screens",
-                "1",
-                "--app",
-                "/Applications/Pen.app",
-                "--json",
-                "--project",
-                str(tmp_path),
-            ]
-        )
-        == 0
-    )
+    assert cli.main(argv) == 0
     assert observed == {
         "path": str(pen_path),
         "expect_min_nodes": 3,
         "expect_screens": 1,
         "app": "/Applications/Pen.app",
+        "save_timeout": 2.5,
     }
