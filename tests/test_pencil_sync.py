@@ -1,3 +1,5 @@
+# @spec AC-009: trigger contract keeps UNVERIFIED and digest comparison — .specs/features/078-pen-dev-operator-compatibility/spec.md#ac-009
+# @spec AC-003: pencil-sync --app CLI wiring — .specs/features/078-pen-dev-operator-compatibility/spec.md#ac-003
 from __future__ import annotations
 
 import json
@@ -120,12 +122,15 @@ def test_pencil_sync_cli_returns_exit_code_from_status(tmp_path: Path, monkeypat
     (tmp_path / ".gitignore").write_text(MANAGED_IGNORE_BLOCK, encoding="utf-8")
     observed: dict[str, Any] = {}
 
-    def fake_sync(path: str, *, expect_min_nodes: int | None, expect_screens: int | None):
+    def fake_sync(
+        path: str, *, expect_min_nodes: int | None, expect_screens: int | None, app: str | None
+    ):
         observed.update(
             {
                 "path": path,
                 "expect_min_nodes": expect_min_nodes,
                 "expect_screens": expect_screens,
+                "app": app,
             }
         )
         return {
@@ -150,6 +155,8 @@ def test_pencil_sync_cli_returns_exit_code_from_status(tmp_path: Path, monkeypat
                 "3",
                 "--expect-screens",
                 "1",
+                "--app",
+                "/Applications/Pen.app",
                 "--json",
                 "--project",
                 str(tmp_path),
@@ -161,4 +168,5 @@ def test_pencil_sync_cli_returns_exit_code_from_status(tmp_path: Path, monkeypat
         "path": str(pen_path),
         "expect_min_nodes": 3,
         "expect_screens": 1,
+        "app": "/Applications/Pen.app",
     }

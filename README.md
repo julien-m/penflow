@@ -168,7 +168,7 @@ For dense multi-screen mockups, prefer `penflow check-consistency expected-ui-tr
 
 ### Pencil Editor Sync
 
-Run `penflow pencil-sync <ui.pen> [--expect-min-nodes N] [--expect-screens N] --json` after any Pencil editor or MCP mutation. It is only an operator trigger: it reports pre/post SHA-256 plus inspection, always declares `persistence_status: UNVERIFIED` and `closes_persistence: false`, and never uses mtime, pane text, or trigger success to close persistence.
+Run `penflow pencil-sync <ui.pen> [--expect-min-nodes N] [--expect-screens N] [--app <Pen.app>] --json` after any pen.dev editor or MCP `execute` mutation, with `ui.pen` open in pen.dev (open `ui.pen` in pen.dev and confirm it with `get_app_state` before any MCP call). It resolves exactly one pen.dev bundle (`--app`, then `PENFLOW_PEN_APP`, then the single `Pen.app` in `/Applications` or `~/Applications`) and saves through the one running process of that executable, never a legacy `Pencil.app` sharing the bundle id `dev.pencil.desktop`; ambiguity fails before any script runs. It is only an operator trigger: it reports pre/post SHA-256 plus inspection, always declares `persistence_status: UNVERIFIED` and `closes_persistence: false`, and never uses mtime, pane text, or trigger success to close persistence.
 
 The operator must preserve distinct pre/post snapshot files and write a `penflow-pencil-persistence-observation` containing the exact `run_id`, document path, requested `operation`, trigger provider/status, snapshot paths, and claimed SHA-256 values. Then run `penflow verify-pencil-persistence observation.json --document ui.pen --run-id <exact-run> --operation <exact-operation> --out persistence-receipt.json --json` followed by `penflow validate-report persistence-receipt.json --schema --json`. The verifier independently re-reads observation, pre/post/current bytes; only a PASS receipt with `closes_persistence: true` closes the gate. No-op/same-digest, trigger-only, stale, replayed, tampered, missing, or mismatched evidence exits nonzero.
 
@@ -363,7 +363,7 @@ penflow compare-tree examples/full/expected-ui-tree.json examples/full/actual-ui
 
 - `.pen` stays JSON-first and runtime-agnostic.
 - `context` carries semantic design intent: `semantic_id`, `role`, `intent`, `binding`, `repeat`, `entity`, `variant`, `test_id`, `tolerance`.
-- Pencil `context` is written as `key=value` pairs separated by `;` (`semantic_id=cockpit-live.git; role=container`). Attach it during `batch_design` insertion for screen frames, sections, interactive components, and lists. Run `map-pencil-context --strict-anchors` before downstream `.pen` readers; use `--create-placeholders` only as explicit repair scaffolding because it reports `PARTIAL`.
+- Pencil `context` is written as `key=value` pairs separated by `;` (`semantic_id=cockpit-live.git; role=container`). Attach it during `execute` `Insert` (legacy `batch_design`) insertion for screen frames, sections, interactive components, and lists. Run `map-pencil-context --strict-anchors` before downstream `.pen` readers; use `--create-placeholders` only as explicit repair scaffolding because it reports `PARTIAL`.
 - Semantic anti-gaming is fail-closed: `validate-semantic-tree` rejects repeated list-like containers without `repeat`, and `validate-flow-contract --json` reports per-screen `interactive_coverage` while rejecting unbound interactive nodes.
 - Runtime frameworks provide actual UI trees; Penflow validates and compares those trees.
 - The primary validation is structural and semantic, not pixel-perfect.

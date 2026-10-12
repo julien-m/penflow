@@ -6,6 +6,8 @@ from __future__ import annotations
 from copy import deepcopy
 from typing import Any
 
+from .pen_schema import PEN_WRITE_VERSION
+
 FLOW_CONTRACT = {
     "version": 2,
     "kind": "penflow-flow-contract",
@@ -130,7 +132,7 @@ FLOW_CONTRACT = {
 }
 
 VISUAL_PEN = {
-    "version": "2.11",
+    "version": PEN_WRITE_VERSION,
     "children": [
         {
             "id": "checkoutScreen",
