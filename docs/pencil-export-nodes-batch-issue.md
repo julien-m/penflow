@@ -1,6 +1,6 @@
 # PF-PENCIL-EXPORT-NODES-BATCH-20260701
 
-Status: open upstream/operator-layer issue.
+Status: open upstream/operator-layer issue, historical for pen.dev < 1.2. The `export_nodes`, `get_editor_state` and `batch_get` MCP tools cited below no longer exist in pen.dev 1.2; exports now run through `execute` `Export([...])` and the open document is checked with `get_app_state`. Keep one node per `Export` call if multi-node exports misbehave.
 
 ## Evidence
 

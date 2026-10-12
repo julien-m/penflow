@@ -3,18 +3,20 @@
 from typing import Any, cast
 import math
 
+from .pen_schema import supports_native_intrinsic_text
 from .verification_files import VerificationInputError
-from .verification_json import canonical_bytes, decode_json
+from .verification_json import canonical_bytes
 from .verification_snapshot import VerificationSnapshot
+from .verification_transport import decode_native_observation_text, native_layout_children
 
 
 def intrinsic_text_ids(pen: dict[str, Any]) -> frozenset[str]:
-    """Select native 2.14 text with an intrinsic dimension (auto width or wrapped height).
+    """Select native text (version >= 2.14) with an intrinsic dimension (auto width or wrapped height).
 
     Callers must separately authenticate complete native geometry before using this
     source property to replace a text-width estimate with its measured intrinsic width.
     """
-    if pen.get("version") != "2.14":
+    if not supports_native_intrinsic_text(pen.get("version")):
         return frozenset()
     result = set()
     pending = list(pen.get("children", []))
@@ -51,11 +53,10 @@ def load_native_geometry(
         for item in observation.get("content", [])
         if isinstance(item, dict) and item.get("type") == "text"
     ]
-    if (
-        len(texts) != 1
-        or not isinstance(texts[0], str)
-        or canonical_bytes(decode_json(texts[0])) != canonical_bytes(layout["children"])
-    ):
+    if len(texts) != 1 or not isinstance(texts[0], str):
+        raise VerificationInputError("verification.geometry.observation_mismatch")
+    observed = native_layout_children(decode_native_observation_text(texts[0]))
+    if canonical_bytes(observed) != canonical_bytes(layout["children"]):
         raise VerificationInputError("verification.geometry.observation_mismatch")
     normalize_native_geometry(expected, layout["children"])
     if "screens" in layout:

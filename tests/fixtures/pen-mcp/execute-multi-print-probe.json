@@ -1,0 +1,8 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "OK\n\n## Print output\n{\"type\":\"frame\",\"id\":\"o5QKT\",\"x\":0,\"y\":0,\"name\":\"Microphone settings\",\"context\":\"classification=semantic;semantic_id=microphone-settings;test_id=microphone-settings;role=screen\",\"width\":900,\"height\":680,\"fill\":\"#FAFAF9\",\"layout\":\"vertical\",\"gap\":24,\"padding\":32,\"children\":[{\"type\":\"frame\",\"id\":\"iTRjC\",\"name\":\"Microphone header\",\"context\":\"classification=semantic;semantic_id=microphone-header;test_id=microphone-header;role=container\",\"width\":\"fill_container\",\"layout\":\"vertical\",\"gap\":8,\"children\":[{\"type\":\"text\",\"id\":\"vrFnK\",\"name\":\"Microphone priority title\",\"context\":\"classification=semantic;semantic_id=microphone-title;test_id=microphone-title;role=text\",\"fill\":\"#1A1A1A\",\"content\":\"Microphone priority\",\"fontFamily\":\"Inter\",\"fontSize\":28,\"fontWeight\":\"600\"}]}]}  \n[{\"id\":\"o5QKT\",\"parent_id\":null,\"bounds\":{\"x\":0,\"y\":0,\"width\":900,\"height\":680},\"context\":\"classification=semantic;semantic_id=microphone-settings;test_id=microphone-settings;role=screen\",\"problems\":null},{\"id\":\"iTRjC\",\"parent_id\":\"o5QKT\",\"bounds\":{\"x\":32,\"y\":32,\"width\":836,\"height\":34},\"context\":\"classification=semantic;semantic_id=microphone-header;test_id=microphone-header;role=container\",\"problems\":null},{\"id\":\"vrFnK\",\"parent_id\":\"iTRjC\",\"bounds\":{\"x\":0,\"y\":0,\"width\":269,\"height\":34},\"context\":\"classification=semantic;semantic_id=microphone-title;test_id=microphone-title;role=text\",\"problems\":null}]  \nExported /workspace/handy/.specs/features/001-microphone-priority/screens/capability-probe/o5QKT.png\n"
+    }
+  ]
+}

@@ -1,20 +1,58 @@
-"""Operator-layer Pencil save trigger and disk observation.
+"""Operator-layer pen.dev save trigger and disk observation.
 
-This module can trigger Pencil on macOS, but its report never closes
+This module can trigger pen.dev on macOS, but its report never closes
 persistence. The runtime-agnostic verifier lives in `pencil_persistence.py`.
 """
+
+# @spec FR-001: resolve exactly one pen.dev bundle — .specs/features/078-pen-dev-operator-compatibility/spec.md#fr-001
+# @spec FR-002: address the save to the exact process id — .specs/features/078-pen-dev-operator-compatibility/spec.md#fr-002
+# @spec FR-003: C33 trigger contract keeps UNVERIFIED and records the target — .specs/features/078-pen-dev-operator-compatibility/spec.md#fr-003
+# @spec FR-008: bounded wait for the saved bytes — .specs/features/078-pen-dev-operator-compatibility/spec.md#fr-008
+# @spec FR-009: save helper when installed, osascript otherwise — .specs/features/078-pen-dev-operator-compatibility/spec.md#fr-009
 
 from __future__ import annotations
 
 import hashlib
+import json
+import math
+import os
 import platform
+import plistlib
 import subprocess
-from collections.abc import Callable
+import time
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 from .pen import inspect_pen
+from .save_helper import CommandRunner, resolve_save_helper, run_helper_save
+
+PEN_APP_ENV = "PENFLOW_PEN_APP"
+PEN_APP_NAME = "Pen.app"
+# pen.dev installs per machine or per user; both locations are searched, never the whole disk.
+DEFAULT_PEN_APP_DIRS = (Path("/Applications"), Path.home() / "Applications")
+# AppleScript round-trips stay short; a hung System Events call must not block the operator.
+OSASCRIPT_TIMEOUT_SECONDS = 10
+PS_TIMEOUT_SECONDS = 5
+# pen.dev writes the file after the Save request returns (observed on 1.2.16); 5 s covers
+# that delay with margin while keeping a failed save quick to report.
+DEFAULT_SAVE_TIMEOUT_SECONDS = 5.0
+HELPER_REMEDIES = {
+    "DENIED": " - add Penflow Save.app in System Settings > Privacy & Security > Accessibility",
+    "NOT_FOUND": " - open ui.pen in pen.dev and keep one instance running",
+}
+SAVE_POLL_INTERVAL_SECONDS = 0.1
+
+
+@dataclass(frozen=True)
+class PenAppTarget:
+    """The single pen.dev bundle and running process a save trigger may address."""
+
+    app_path: str
+    bundle_id: str | None
+    executable: str
+    pid: int
 
 
 @dataclass(frozen=True)
@@ -25,13 +63,21 @@ class SaveOutcome:
     returncode: int | None = None
     stdout: str = ""
     stderr: str = ""
+    target: dict[str, Any] | None = None
+    helper: str | None = None
 
 
 class PencilSyncError(RuntimeError):
     """Raised when pencil-sync cannot inspect its target file."""
 
 
+class PenTargetError(RuntimeError):
+    """Raised when no single pen.dev application process can be addressed."""
+
+
 SaveRunner = Callable[[Path], SaveOutcome]
+ProcessLister = Callable[[], Sequence[tuple[int, str]]]
+ScriptExecutor = Callable[[str], subprocess.CompletedProcess[str]]
 
 
 def sync_pencil_to_disk(
@@ -39,37 +85,63 @@ def sync_pencil_to_disk(
     *,
     expect_min_nodes: int | None = None,
     expect_screens: int | None = None,
+    app: str | Path | None = None,
     save_runner: SaveRunner | None = None,
+    save_timeout: float = DEFAULT_SAVE_TIMEOUT_SECONDS,
+    clock: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> dict[str, Any]:
-    """Trigger save and report disk changes without closing persistence."""
-    pen_path = Path(pen)
-    if not pen_path.exists():
-        raise PencilSyncError(f".pen file not found: {pen_path}")
-    if expect_min_nodes is not None and expect_min_nodes < 0:
-        raise PencilSyncError("--expect-min-nodes must be >= 0")
-    if expect_screens is not None and expect_screens < 0:
-        raise PencilSyncError("--expect-screens must be >= 0")
+    """Trigger save, wait for the bytes, and report disk changes without closing persistence.
 
+    Args:
+        pen: The `.pen` document expected to change on disk.
+        expect_min_nodes: Optional minimum node count after the save.
+        expect_screens: Optional minimum screen count after the save.
+        app: Explicit pen.dev bundle for the default runner; ignored with ``save_runner``.
+        save_runner: Injectable trigger; defaults to the helper or osascript runner.
+        save_timeout: Seconds to wait for a changed, parseable document after a successful
+            save request; an unchanged digest is reported only after it.
+        clock: Monotonic clock, injected by tests.
+        sleep: Sleep function, injected by tests.
+
+    Returns:
+        The ``penflow-pencil-sync`` report; persistence always remains ``UNVERIFIED``.
+
+    Raises:
+        PencilSyncError: If the document is missing, expectations are negative or the
+            timeout is negative or not finite.
+    """
+    pen_path = _validated_request(Path(pen), expect_min_nodes, expect_screens)
+    if not math.isfinite(save_timeout) or save_timeout < 0:
+        raise PencilSyncError("--save-timeout must be a finite number >= 0")
     before_stat = pen_path.stat()
     before_sha256 = hashlib.sha256(pen_path.read_bytes()).hexdigest()
     before_inspect = inspect_pen(pen_path)
-    runner = save_runner or run_pencil_save_via_osascript
+    runner = save_runner or (lambda path: run_pencil_save_via_osascript(path, app=app))
     save = runner(pen_path)
+    if save.ok:
+        _await_saved_bytes(pen_path, before_sha256, save_timeout, clock, sleep)
+    before = _inspection_summary(before_stat.st_mtime_ns, before_sha256, before_inspect)
+    return _sync_report(pen_path, save, before, expect_min_nodes, expect_screens)
+
+
+def _sync_report(
+    pen_path: Path,
+    save: SaveOutcome,
+    before: dict[str, Any],
+    expect_min_nodes: int | None,
+    expect_screens: int | None,
+) -> dict[str, Any]:
     after_stat = pen_path.stat()
     after_sha256 = hashlib.sha256(pen_path.read_bytes()).hexdigest()
     after_inspect = inspect_pen(pen_path)
-
     checks = {
-        "mtime_advanced": after_stat.st_mtime_ns > before_stat.st_mtime_ns,
-        "content_changed": after_sha256 != before_sha256,
+        "mtime_advanced": after_stat.st_mtime_ns > before["mtime_ns"],
+        "content_changed": after_sha256 != before["sha256"],
         "min_nodes": _expectation(
-            actual=int(after_inspect["node_count"]),
-            expected=expect_min_nodes,
+            actual=int(after_inspect["node_count"]), expected=expect_min_nodes
         ),
-        "screens": _expectation(
-            actual=len(after_inspect["screens"]),
-            expected=expect_screens,
-        ),
+        "screens": _expectation(actual=len(after_inspect["screens"]), expected=expect_screens),
     }
     status = (
         "PASS" if save.ok and checks["content_changed"] and _expectations_pass(checks) else "FAIL"
@@ -82,59 +154,284 @@ def sync_pencil_to_disk(
         "pen": str(pen_path),
         "message": _message(status, save, checks),
         "save": asdict(save),
-        "before": _inspection_summary(before_stat.st_mtime_ns, before_sha256, before_inspect),
+        "before": before,
         "after": _inspection_summary(after_stat.st_mtime_ns, after_sha256, after_inspect),
         "checks": checks,
     }
 
 
-def run_pencil_save_via_osascript(pen_path: Path) -> SaveOutcome:
-    """Trigger Pencil's File > Save menu with AppleScript."""
-    if platform.system() != "Darwin":
+def _await_saved_bytes(
+    pen_path: Path,
+    before_sha256: str,
+    timeout: float,
+    clock: Callable[[], float],
+    sleep: Callable[[float], None],
+) -> None:
+    """Poll until the document digest changed and its bytes parse, or the timeout elapses.
+
+    A partially written file (changed but not yet valid JSON) keeps the poll going; the
+    caller re-reads and inspects the final bytes either way.
+    """
+    deadline = clock() + timeout
+    while True:
+        raw = pen_path.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != before_sha256 and _parses(raw):
+            return
+        remaining = deadline - clock()
+        if remaining <= 0:
+            return  # Timeout: the caller reports the bytes it now reads.
+        sleep(min(SAVE_POLL_INTERVAL_SECONDS, remaining))
+
+
+def _parses(raw: bytes) -> bool:
+    try:
+        json.loads(raw)
+    except ValueError:
+        return False
+    return True
+
+
+def _validated_request(
+    pen_path: Path, expect_min_nodes: int | None, expect_screens: int | None
+) -> Path:
+    if not pen_path.exists():
+        raise PencilSyncError(f".pen file not found: {pen_path}")
+    if expect_min_nodes is not None and expect_min_nodes < 0:
+        raise PencilSyncError("--expect-min-nodes must be >= 0")
+    if expect_screens is not None and expect_screens < 0:
+        raise PencilSyncError("--expect-screens must be >= 0")
+    return pen_path
+
+
+def resolve_pen_app(
+    app: str | Path | None = None,
+    *,
+    environ: Mapping[str, str] | None = None,
+    search_dirs: Sequence[Path] = DEFAULT_PEN_APP_DIRS,
+) -> Path:
+    """Select exactly one pen.dev bundle: explicit ``app``, then ``PENFLOW_PEN_APP``, then defaults.
+
+    Args:
+        app: Explicit bundle path; when given, it is the only candidate.
+        environ: Environment used for the ``PENFLOW_PEN_APP`` fallback.
+        search_dirs: Directories searched for ``Pen.app`` when nothing explicit is given.
+
+    Returns:
+        The resolved bundle path.
+
+    Raises:
+        PenTargetError: If the explicit path is not a bundle or the default search finds
+            zero or several bundles.
+    """
+    env = os.environ if environ is None else environ
+    explicit = app if app is not None else env.get(PEN_APP_ENV) or None
+    if explicit is not None:
+        bundle = Path(explicit).expanduser()
+        if bundle.suffix != ".app" or not (bundle / "Contents" / "Info.plist").is_file():
+            raise PenTargetError(f"not a pen.dev application bundle: {bundle}")
+        return bundle
+    candidates = [
+        directory / PEN_APP_NAME
+        for directory in search_dirs
+        if (directory / PEN_APP_NAME / "Contents" / "Info.plist").is_file()
+    ]
+    if len(candidates) != 1:
+        found = ", ".join(str(path) for path in candidates) or "none"
+        raise PenTargetError(
+            f"expected exactly one {PEN_APP_NAME} in "
+            f"{', '.join(str(d) for d in search_dirs)} (found: {found}); "
+            f"pass --app or set {PEN_APP_ENV}"
+        )
+    return candidates[0]
+
+
+def bundle_identity(bundle: Path) -> tuple[str | None, str]:
+    """Read the bundle id and absolute executable path from a bundle's ``Info.plist``.
+
+    Raises:
+        PenTargetError: If the plist is unreadable or declares no executable.
+    """
+    try:
+        with (bundle / "Contents" / "Info.plist").open("rb") as stream:
+            info = plistlib.load(stream)
+    except (OSError, plistlib.InvalidFileException) as error:
+        raise PenTargetError(f"unreadable Info.plist in {bundle}: {error}") from error
+    executable = info.get("CFBundleExecutable")
+    if not isinstance(executable, str) or not executable:
+        raise PenTargetError(f"no CFBundleExecutable in {bundle}")
+    bundle_id = info.get("CFBundleIdentifier")
+    return (
+        bundle_id if isinstance(bundle_id, str) else None,
+        str(bundle / "Contents" / "MacOS" / executable),
+    )
+
+
+def list_processes() -> list[tuple[int, str]]:
+    """List ``(pid, executable path)`` pairs via ``ps``.
+
+    `ps -axww -o pid=,comm=` prints one process per line with the full executable path on
+    macOS (no truncation with ``ww``); unparseable lines are skipped because they cannot match
+    an absolute bundle executable anyway.
+    """
+    completed = subprocess.run(
+        ["ps", "-axww", "-o", "pid=,comm="],
+        capture_output=True,
+        check=True,
+        text=True,
+        timeout=PS_TIMEOUT_SECONDS,
+    )
+    processes = []
+    for line in completed.stdout.splitlines():
+        pid, _, command = line.strip().partition(" ")
+        if pid.isdigit() and command:
+            processes.append((int(pid), command.strip()))
+    return processes
+
+
+def find_pen_process(
+    bundle: Path, *, process_lister: ProcessLister = list_processes
+) -> PenAppTarget:
+    """Match the single running process whose executable is exactly the bundle's executable.
+
+    Raises:
+        PenTargetError: If zero or several processes run that executable.
+    """
+    bundle_id, executable = bundle_identity(bundle)
+    wanted = os.path.realpath(executable)
+    pids = [pid for pid, command in process_lister() if os.path.realpath(command) == wanted]
+    if len(pids) != 1:
+        state = "is not running" if not pids else f"runs {len(pids)} times (pids {pids})"
+        raise PenTargetError(
+            f"{executable} {state}; open ui.pen in pen.dev and keep one instance running"
+        )
+    return PenAppTarget(str(bundle), bundle_id, executable, pids[0])
+
+
+def build_save_script(pid: int) -> str:
+    """Build the AppleScript that saves the frontmost document of one exact process.
+
+    Flow: bring the process with this unix id to the front, click File > Save, and fall back
+    to Cmd+S when the menu label is missing (localized menus), only after re-checking that this
+    process is still frontmost because a keystroke goes to the frontmost application. The script
+    prints ``menu`` or ``shortcut`` so the caller records which path ran.
+    """
+    return f"""
+tell application "System Events"
+    set penProcess to first application process whose unix id is {pid}
+    set frontmost of penProcess to true
+    delay 0.3
+    tell penProcess
+        try
+            click menu item "Save" of menu "File" of menu bar 1
+            return "menu"
+        on error
+            if unix id of (first application process whose frontmost is true) is not {pid} then
+                error "pen.dev is not frontmost; Save shortcut not sent" number 1
+            end if
+            keystroke "s" using command down
+            return "shortcut"
+        end try
+    end tell
+end tell
+"""
+
+
+def run_osascript(script: str) -> subprocess.CompletedProcess[str]:
+    """Run one AppleScript; exit 0 means System Events accepted the save request."""
+    return subprocess.run(
+        ["osascript", "-e", script],
+        capture_output=True,
+        check=False,
+        text=True,
+        timeout=OSASCRIPT_TIMEOUT_SECONDS,
+    )
+
+
+def run_pencil_save_via_osascript(
+    pen_path: Path,
+    *,
+    app: str | Path | None = None,
+    environ: Mapping[str, str] | None = None,
+    search_dirs: Sequence[Path] = DEFAULT_PEN_APP_DIRS,
+    process_lister: ProcessLister = list_processes,
+    executor: ScriptExecutor = run_osascript,
+    system: str | None = None,
+    helper_dir: Path | None = None,
+    helper_runner: CommandRunner | None = None,
+) -> SaveOutcome:
+    """Trigger File > Save in the single resolved pen.dev process.
+
+    The save goes through `Penflow Save.app` when it is installed (``PENFLOW_SAVE_HELPER`` or
+    ``helper_dir``), otherwise through direct ``osascript``. pen.dev saves its frontmost
+    document; the caller proves the effect by comparing the document digest.
+    """
+    if (system or platform.system()) != "Darwin":
         return SaveOutcome(
             ok=False,
             method="osascript",
-            message="pencil-sync requires macOS osascript to trigger Pencil File > Save",
+            message="pencil-sync requires macOS osascript to trigger pen.dev File > Save",
         )
-
-    script = f"""
-tell application "Pencil"
-    activate
-end tell
-delay 0.5
-tell application "System Events"
-    tell process "Pencil"
-        set frontmost to true
-        delay 0.3
-        click menu item "Save" of menu "File" of menu bar 1
-    end tell
-end tell
--- target: {pen_path}
-"""
     try:
-        completed = subprocess.run(
-            ["osascript", "-e", script],
-            capture_output=True,
-            check=False,
-            text=True,
-            timeout=10,
+        target = find_pen_process(
+            resolve_pen_app(app, environ=environ, search_dirs=search_dirs),
+            process_lister=process_lister,
         )
+    except (PenTargetError, OSError, subprocess.SubprocessError) as error:
+        return SaveOutcome(ok=False, method="osascript", message=f"pen.dev target: {error}")
+    helper = resolve_save_helper(environ, helper_dir)
+    if helper is not None:
+        return _save_with_helper(helper, target, pen_path, helper_runner)
+    return _save_with_osascript(target, executor)
+
+
+def _save_with_helper(
+    helper: Path, target: PenAppTarget, pen_path: Path, runner: CommandRunner | None
+) -> SaveOutcome:
+    try:
+        result = run_helper_save(helper, target.pid, pen_path, runner=runner)
+    except (OSError, subprocess.SubprocessError) as error:
+        return SaveOutcome(
+            ok=False,
+            method="helper",
+            message=f"save helper failed: {error}",
+            target=asdict(target),
+            helper=str(helper),
+        )
+    ok = result.status == "OK"
+    return SaveOutcome(
+        ok=ok,
+        method=f"helper:{result.detail}" if ok and result.detail else "helper",
+        message="pen.dev File > Save triggered by Penflow Save.app"
+        if ok
+        else f"save helper {result.status}: {result.detail}{HELPER_REMEDIES.get(result.status, '')}",
+        stdout=f"{result.status} {result.detail}".strip(),
+        target=asdict(target),
+        helper=str(helper),
+    )
+
+
+def _save_with_osascript(target: PenAppTarget, executor: ScriptExecutor) -> SaveOutcome:
+    try:
+        completed = executor(build_save_script(target.pid))
     except subprocess.TimeoutExpired as error:
         return SaveOutcome(
             ok=False,
             method="osascript",
-            message="Pencil File > Save timed out",
-            stdout=(error.stdout or "").strip() if isinstance(error.stdout, str) else "",
-            stderr=(error.stderr or "").strip() if isinstance(error.stderr, str) else "",
+            message="pen.dev File > Save timed out",
+            stdout=error.stdout.strip() if isinstance(error.stdout, str) else "",
+            stderr=error.stderr.strip() if isinstance(error.stderr, str) else "",
+            target=asdict(target),
         )
     ok = completed.returncode == 0
+    path_taken = completed.stdout.strip()
     return SaveOutcome(
         ok=ok,
-        method="osascript",
-        message="Pencil File > Save triggered" if ok else "Pencil File > Save failed",
+        method=f"osascript:{path_taken}" if ok and path_taken else "osascript",
+        message="pen.dev File > Save triggered" if ok else "pen.dev File > Save failed",
         returncode=completed.returncode,
-        stdout=completed.stdout.strip(),
+        stdout=path_taken,
         stderr=completed.stderr.strip(),
+        target=asdict(target),
     )
 
 
@@ -167,7 +464,7 @@ def _expectations_pass(checks: dict[str, Any]) -> bool:
 def _message(status: str, save: SaveOutcome, checks: dict[str, Any]) -> str:
     if status == "PASS":
         return (
-            "Pencil save trigger changed disk bytes and inspection met expectations; "
+            "pen.dev save trigger changed disk bytes and inspection met expectations; "
             "persistence remains UNVERIFIED until a persistence receipt passes."
         )
     if not save.ok:
@@ -179,11 +476,12 @@ def _message(status: str, save: SaveOutcome, checks: dict[str, Any]) -> str:
         for name in ("min_nodes", "screens")
         if isinstance(checks.get(name), dict) and not checks[name]["passed"]
     ]
-    return "Pencil saved, but disk inspection did not meet expectations: " + ", ".join(failed)
+    return "pen.dev saved, but disk inspection did not meet expectations: " + ", ".join(failed)
 
 
 def _not_persisted_message(reason: str) -> str:
     return (
-        "Pencil editor did not persist the file - "
-        f"is the file open, is the app running, and is Accessibility permission granted? ({reason})"
+        "pen.dev editor did not persist the file - "
+        "is ui.pen open in pen.dev, is the app running, and is Accessibility permission "
+        f"granted? ({reason})"
     )

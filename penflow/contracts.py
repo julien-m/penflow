@@ -24,6 +24,7 @@ from .code_ir import (
 from .schema_cache import validator_for as validator_for
 from .models import PenNode
 from .pen import parse_pen, update_pen_by_semantic_id
+from .pen_schema import PEN_WRITE_VERSION
 
 # Prefer the design-token spacing scale's base (16 px) when it is observed.
 DEFAULT_BASE_SPACING = 16
@@ -90,7 +91,7 @@ def pencil_draft_from_screen(screen: dict[str, Any]) -> dict[str, Any]:
     }
     for index, component in enumerate(screen.get("components", []) or []):
         root["children"].append(_component_to_pen(component, index))
-    return {"version": "2.11", "children": [root]}
+    return {"version": PEN_WRITE_VERSION, "children": [root]}
 
 
 def write_pencil_draft(screen_path: str | Path, out_path: str | Path) -> dict[str, Any]:

@@ -7,8 +7,11 @@
 # @spec(FR-008)
 # @spec(FR-009)
 
+import argparse
+import math
 from typing import Any
 
+from .pencil_sync import DEFAULT_SAVE_TIMEOUT_SECONDS
 from .cli_commands_a import (
     cmd_checklist_from_drift,
     cmd_detect_drift,
@@ -39,6 +42,17 @@ from .cli_context_parser import (
 from .cli_reporting import _add_lenient
 
 
+def _save_timeout(raw: str) -> float:
+    """Parse ``--save-timeout`` as a finite, non-negative number of seconds."""
+    try:
+        value = float(raw)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(f"invalid seconds: {raw!r}") from error
+    if not math.isfinite(value) or value < 0:
+        raise argparse.ArgumentTypeError("--save-timeout must be a finite number >= 0")
+    return value
+
+
 def _register_doctor_run(sub: Any) -> None:
     doctor = sub.add_parser("doctor", help="check or safely repair a consumer Git project")
     doctor.add_argument("--project", default=None, help="consumer project path (default: CWD)")
@@ -52,6 +66,16 @@ def _register_doctor_run(sub: Any) -> None:
         "--dry-run",
         action="store_true",
         help="plan repairs without modifying project bytes",
+    )
+    doctor.add_argument(
+        "--install-save-helper",
+        action="store_true",
+        help="install or refresh ~/Applications/Penflow Save.app (pen.dev save helper)",
+    )
+    doctor.add_argument(
+        "--save-helper-dir",
+        default=None,
+        help="install the save helper into this directory instead of ~/Applications",
     )
     doctor.add_argument("--json", action="store_true", help="print machine-readable JSON")
     doctor.set_defaults(func=cmd_doctor)
@@ -95,8 +119,21 @@ def _register_inspect_persistence(sub: Any) -> None:
     inspect_cmd.add_argument("pen")
     inspect_cmd.set_defaults(func=cmd_inspect)
 
-    pencil_sync = sub.add_parser("pencil-sync", help="save Pencil editor state and re-inspect disk")
+    pencil_sync = sub.add_parser(
+        "pencil-sync", help="save pen.dev editor state and re-inspect disk"
+    )
     pencil_sync.add_argument("pen")
+    pencil_sync.add_argument(
+        "--app",
+        default=None,
+        help="pen.dev bundle to target (default: PENFLOW_PEN_APP, then the single Pen.app installed)",
+    )
+    pencil_sync.add_argument(
+        "--save-timeout",
+        type=_save_timeout,
+        default=DEFAULT_SAVE_TIMEOUT_SECONDS,
+        help="seconds to wait for pen.dev to write the saved file (default: 5)",
+    )
     pencil_sync.add_argument("--expect-min-nodes", type=int, default=None)
     pencil_sync.add_argument("--expect-screens", type=int, default=None)
     pencil_sync.add_argument("--json", action="store_true", help="print machine-readable JSON")

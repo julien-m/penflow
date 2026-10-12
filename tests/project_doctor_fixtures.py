@@ -14,9 +14,10 @@ from penflow.project_doctor import (
     DoctorResult,
 )
 from penflow.doctor_context import GitCommandResult, SubprocessGitGateway
+from penflow.doctor_files import EMPTY_PEN_BYTES as DOCTOR_EMPTY_PEN_BYTES
 
 
-EMPTY_PEN_BYTES = b'{"children":[],"version":"1.0"}\n'
+EMPTY_PEN_BYTES = DOCTOR_EMPTY_PEN_BYTES
 MANAGED_IGNORE_BLOCK = (
     "# >>> Penflow managed temporary artifacts v1 >>>\n"
     ".penflow-tmp/\n"

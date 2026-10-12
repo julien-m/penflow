@@ -20,6 +20,48 @@ Use this skill when a task mentions Penflow, pen.dev `.pen`, flow specs, `semant
 
 Use `pen.dev` for the product, desktop app, editor, renderer, and MCP integration. On macOS, launch the installed app with `open -a Pen`; do not launch `Pencil`. Keep `pencil` only where it is the current MCP server id or part of an existing Penflow command, field, file, issue id, or receipt schema. The standalone CLI executable is `pen`.
 
+## pen.dev 1.2 operator protocol
+
+<!-- @spec FR-005: current pen.dev MCP surface — .specs/features/078-pen-dev-operator-compatibility/spec.md#fr-005 -->
+<!-- @spec FR-006: C46 file-copy protocol — .specs/features/078-pen-dev-operator-compatibility/spec.md#fr-006 -->
+<!-- @spec FR-007: C46 at design closure — .specs/features/078-pen-dev-operator-compatibility/spec.md#fr-007 -->
+The pen.dev MCP server (id `pencil`) exposes `get_app_state`, `execute`, `read_skill`, `get_style` and `browser`. MCP and app control stay in the operator layer; Penflow core only reads local files.
+
+1. **Open `ui.pen` in pen.dev before any MCP call.** Ask the user to open it (or run `open -a ~/Applications/Pen.app <project>/penflow/ui.pen`), then call `get_app_state` and confirm the open document is that exact `ui.pen` and is not reported empty. A Dashboard or another document blocks; MCP errors such as "A file needs to be open in the editor" mean this step was skipped.
+2. Call `read_skill` with `path: "execute.md"` once per session for the current `execute` API.
+3. Copy the document before mutating: `cp <workspace>/ui.pen <run-dir>/pre.pen`.
+4. Mutate and read through `execute` (always pass `filePath`). Penflow reads `ui.pen` from disk by design; no rule forbids Penflow commands from reading it.
+5. Save with `penflow pencil-sync <workspace>/ui.pen --expect-screens <N> --json` (add `--app <Pen.app>` when several installs exist). It resolves the single pen.dev bundle and its running process by executable path; it never targets a legacy `Pencil.app` sharing the bundle id `dev.pencil.desktop`. It stays a trigger: `persistence_status: UNVERIFIED`.
+6. Copy the saved document: `cp <workspace>/ui.pen <run-dir>/post.pen`. Preparation reads (`validate-pen`, `export-expected`, mapping, audits) may continue after a PASS trigger; they are explicitly noncertifying.
+7. **At design closure** (before a Mockup Factory PASS, C47 `--strict-closure` or the C51 design profile), write the `penflow-pencil-persistence-observation` binding the run, operation, trigger and the distinct `pre.pen`/`post.pen` digests, then run `penflow verify-pencil-persistence <observation> --document <workspace>/ui.pen --run-id <run> --operation <operation> --out <workspace>/.penflow-run/pencil-persistence-receipt.json --json` (the path C51 reads) and `penflow validate-report <workspace>/.penflow-run/pencil-persistence-receipt.json --schema --json`. C46 is not required before the first preparation read.
+
+### Save helper and Accessibility
+
+<!-- @spec FR-010: helper Accessibility grant and MCP save limitation — .specs/features/078-pen-dev-operator-compatibility/spec.md#fr-010 -->
+The pen.dev 1.2.16 MCP cannot save (it has no save function): `execute` exposes only Insert, Copy, Update, Replace, Move, Delete, SetVariables, GetVariables, Get, Print, TakeScreenshot, Export, Generate and FindEmptySpace; `execute` with `filePath` requires that file to be open in the editor; no mutation reaches disk without a save (disk SHA unchanged 15 s after a mutation). `penflow pencil-sync` is therefore the save step.
+
+- Install the dedicated helper once: `penflow doctor --install-save-helper --json` writes the versioned, background-only `~/Applications/Penflow Save.app` (idempotent: `installed`, `unchanged` or `replaced`; `--save-helper-dir <dir>` installs elsewhere and `PENFLOW_SAVE_HELPER=<bundle>` points `pencil-sync` at it).
+- Grant it once in System Settings > Privacy & Security > Accessibility (add `Penflow Save.app` with `+`), and allow its first Automation prompt for System Events. The grant belongs to this app, so it survives Claude, Codex or terminal updates; a reinstall after a version bump needs a new grant.
+- When the helper is present, `pencil-sync` runs `open -W -n -a "Penflow Save.app" --args <pid> <ui.pen> <result-file>`; the helper writes `OK menu|shortcut`, `DENIED` (grant Accessibility) or `NOT_FOUND` (open `ui.pen` in pen.dev). Without it, `pencil-sync` falls back to direct `osascript`, which needs Accessibility for the calling terminal or agent.
+- `pencil-sync` then polls the document until its digest changes and the bytes parse, up to `--save-timeout` seconds (default 5): pen.dev writes after the Save request returns, so an immediate re-read is not proof of failure.
+
+| Former MCP tool (pen.dev < 1.2, legacy) | pen.dev 1.2 `execute` equivalent |
+|---|---|
+| `batch_design` (legacy) | `Insert`, `Update`, `Replace`, `Copy`, `Move`, `Delete` in one snippet |
+| `batch_get` (legacy) | `Print(Get(id, {depth: 2}))` |
+| `snapshot_layout` (legacy) | `Get(screenId, visitor)` printing `ctx.bounds` (native layout below) |
+| `get_screenshot` (legacy) | `TakeScreenshot([nodeId])` |
+| `export_nodes` (legacy tool; still the C48 receipt operation id) | `Export([nodeId], "png", dir)`, one node per call when multi-node exports misbehave |
+| `get_editor_state` (legacy) | `get_app_state` |
+
+Native layout for C51 geometry: run one `execute` call that prints only the parent-relative layout and save its raw MCP response as the observation file:
+
+```js
+const idx={},roots=[];Get(screenId,(n,c)=>{const e={id:n.id,x:c.bounds.x,y:c.bounds.y,width:c.bounds.width,height:c.bounds.height,children:[]};idx[n.id]=e;(c.parentCtx?idx[c.parentCtx.node.id].children:roots).push(e)});Print(roots)
+```
+
+The response text is `OK`, a blank line, `## Print output` and that single JSON line. Save the whole MCP response (`{"content": [{"type": "text", "text": ...}]}`) as the observation and set the `penflow-native-layout` envelope `children` to the printed list. A single printed `penflow-native-get-layout` object (`roots` plus per-node `measurements` with `parent_id` and `bounds`) is also accepted; `children` is then the tree rebuilt by `penflow.verification_transport.native_layout_children`. C51 decodes the Print transport, still accepts a bare JSON legacy observation, and rejects failed calls, several Print lines, duplicate sections, non-finite JSON, any node, parent or context mismatch, and measurements carrying pen.dev `problems` (clipping).
+
 ## C51 workflow authority
 
 <!-- @spec(FR-015) -->
@@ -82,7 +124,7 @@ For the semantic-tree formation rules, **Read** [`../flow-ui-contract/references
 - **Read** [`README.md`](../../../README.md) for project-level command examples when a user asks for the full workflow.
 - **Read** [`../../../docs/theme-contract.md`](../../../docs/theme-contract.md) before generating `theme.css` for `draft-pen-from-tree`, `lint-tokens`, or Brander-style handoff. It defines accepted `--pf-*` aliases, extended status/panel/font tokens, dynamic `palette-*` slots, dynamic `radius-*` slots, and the strict report inputs.
 - Before any UI flow, pen.dev draft, mockup, or visual validation work, **Read** [`../../../.conventions/index.md`](../../../.conventions/index.md) and load all matching design domains. UI work must use the convention-defined view/component patterns, not only theme colors.
-- After every pen.dev editor/MCP mutation (`batch_design`, manual edit, or equivalent), run `penflow pencil-sync <ui.pen> --expect-screens <N> --json` or add `--expect-min-nodes <N>`. This trigger always remains `persistence_status: UNVERIFIED` with `closes_persistence: false`; mtime, trigger text, and inspection counts never close persistence. The operator must preserve distinct pre/post snapshots, write the C46 observation, run `penflow verify-pencil-persistence ... --out persistence-receipt.json --json`, then run `penflow validate-report persistence-receipt.json --schema --json`; before any Penflow CLI command that reads the `.pen`, require receipt PASS, otherwise report `BLOCKED`.
+- After every pen.dev editor/MCP mutation (`execute` snippets, manual edit, or equivalent; the legacy `batch_design` tool no longer exists), run `penflow pencil-sync <ui.pen> --expect-screens <N> --json` or add `--expect-min-nodes <N>`. This trigger always remains `persistence_status: UNVERIFIED` with `closes_persistence: false`; mtime, trigger text, and inspection counts never close persistence; before any Penflow CLI command that reads the `.pen` after a mutation, require a PASS trigger, otherwise report `BLOCKED`; such preparation reads stay noncertifying. At design closure the operator preserves distinct pre/post snapshots, writes the C46 observation, runs `penflow verify-pencil-persistence ... --out <workspace>/.penflow-run/pencil-persistence-receipt.json --json`, then `penflow validate-report` on that receipt with `--schema --json` (see the pen.dev 1.2 operator protocol above).
 
 ## .pen Context Grammar
 
@@ -94,7 +136,7 @@ Examples:
 - Internal label: `classification=inherited; inherits_from=cockpit-live.stop-worker; relation=content`
 - Icon: `classification=decorative; decorative_owner=cockpit-live.stop-worker; decorative_reason=duplicates-label`
 
-When creating frames/components via `batch_design`, attach classification context at insertion time; adding it later is repair work. Run `penflow map-pencil-context <ui.pen> <semantic-ui-tree.json> --out pencil-context-map.json --strict-coverage --contract flow-ui-contract/contract.json --coverage-out semantic-context-coverage.json --json`; only coverage `PASS` authorizes downstream strict gates. `--strict-anchors` remains labeled forward-only diagnostic evidence and cannot prove reverse coverage. `--create-placeholders` is opt-in repair scaffolding only: its report remains `PARTIAL`, never `PASS`, and never closes exhaustive coverage.
+When creating frames/components through `execute` `Insert` (formerly the legacy `batch_design` tool), attach classification context at insertion time; adding it later is repair work. Run `penflow map-pencil-context <ui.pen> <semantic-ui-tree.json> --out pencil-context-map.json --strict-coverage --contract flow-ui-contract/contract.json --coverage-out semantic-context-coverage.json --json`; only coverage `PASS` authorizes downstream strict gates. `--strict-anchors` remains labeled forward-only diagnostic evidence and cannot prove reverse coverage. `--create-placeholders` is opt-in repair scaffolding only: its report remains `PARTIAL`, never `PASS`, and never closes exhaustive coverage.
 
 ## Mode Selection
 
@@ -161,7 +203,7 @@ APEX integration rule: `penflow run` is the unite naturelle qu'une tache APEX en
 
 `code-ir --from-context` expects the contextualized `.pen` file, not `expected-ui-tree.json`; wrong-tree inputs must fail before code IR generation with an explicit message.
 
-`export_nodes` batch limitation: Penflow core must not drive pen.dev MCP/app exports. If pen.dev `export_nodes` with multiple IDs fails as `wrong .pen file` while unitary exports pass, keep the deterministic Penflow gates intact and use exports unitaires at the skill/operator layer. The reproduced issue is tracked as [`PF-PENCIL-EXPORT-NODES-BATCH-20260701`](../../../docs/pencil-export-nodes-batch-issue.md); cite that ID in worker receipts instead of treating the fallback as untracked debt. Do not add browser, pen.dev MCP, or renderer dependencies to Penflow Python core.
+Legacy `export_nodes` batch limitation (historical, pen.dev < 1.2): Penflow core must not drive pen.dev MCP/app exports. With pen.dev 1.2 export through `execute` `Export([nodeId], "png", dir)`. If a multi-node legacy `export_nodes` (or `Export`) call fails as `wrong .pen file` while unitary exports pass, keep the deterministic Penflow gates intact and use exports unitaires at the skill/operator layer. The reproduced issue is tracked as [`PF-PENCIL-EXPORT-NODES-BATCH-20260701`](../../../docs/pencil-export-nodes-batch-issue.md); cite that ID in worker receipts instead of treating the fallback as untracked debt. Do not add browser, pen.dev MCP, or renderer dependencies to Penflow Python core.
 
 Legacy route phrase for old docs/tests: `penflow export-semantic-tree examples/full/flow-ui-contract --out semantic-ui-tree.json --json`.
 

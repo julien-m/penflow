@@ -10,10 +10,10 @@ from pathlib import Path
 
 import pytest
 
+from penflow.doctor_files import EMPTY_PEN_BYTES
 from penflow.project_doctor import run_project_doctor
 from tests.monorepo_project_boundary_proof import run_proof
 
-EMPTY_PEN_BYTES = b'{"children":[],"version":"1.0"}\n'
 MANAGED_IGNORE_BLOCK = (
     "# >>> Penflow managed temporary artifacts v1 >>>\n"
     ".penflow-tmp/\n"
