@@ -36,6 +36,7 @@ build/
 .specs/conventions/debt.json
 .specs/conventions/debt-report.md
 .specs/features/*/checks/transcripts/
+.specs/features/*/.reviews/
 .specs/features/*/run/
 .specs/preflight-report.md
 .specs/features/*/preflight-report.md
