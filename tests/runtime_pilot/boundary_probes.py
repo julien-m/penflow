@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import shutil
@@ -11,10 +12,10 @@ import tempfile
 import time
 from pathlib import Path
 
-from run_pilot import BROWSER, NODE, PLAYWRIGHT, SOURCES, stop
+from run_pilot import BROWSER, NODE, PLAYWRIGHT, SOURCES, resolve_tools, stop
 
 
-def browser_probe(root: Path, mode: str) -> dict:
+def browser_probe(root: Path, mode: str, settings: argparse.Namespace) -> dict:
     """Serve changed HTML and observe rejection or its actual DOM role."""
     project = root / mode
     project.mkdir()
@@ -47,13 +48,13 @@ def browser_probe(root: Path, mode: str) -> dict:
         app_pid = int(ready["process_instance"].split(":")[0])
         output = project / "observed.json"
         command = [
-            NODE,
+            settings.node,
             str(project / "capture.mjs"),
             f"http://127.0.0.1:{ready['port']}/",
             "inspect",
             str(output),
-            PLAYWRIGHT,
-            BROWSER,
+            settings.playwright,
+            settings.browser,
         ]
         result = subprocess.run(command, capture_output=True, text=True, timeout=60, check=False)
         (project / "browser.stdout.log").write_text(result.stdout)
@@ -123,10 +124,12 @@ def mutation_probe(root: Path) -> dict:
 
 def main() -> None:
     """Retain every negative probe and print its exact result path."""
+    settings = argparse.Namespace(node=NODE, playwright=PLAYWRIGHT, browser=BROWSER)
+    resolve_tools(settings)
     root = Path(tempfile.mkdtemp(prefix="penflow-real-boundaries-")).resolve()
     results = [
-        browser_probe(root, "unmapped-control"),
-        browser_probe(root, "false-role"),
+        browser_probe(root, "unmapped-control", settings),
+        browser_probe(root, "false-role", settings),
         mutation_probe(root),
     ]
     output = root / "results.json"

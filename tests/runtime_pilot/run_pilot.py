@@ -22,8 +22,8 @@ from typing import Any
 from publish_capture import publish, source_references
 
 NODE = os.environ.get("PENFLOW_PILOT_NODE") or shutil.which("node") or "node"
-PLAYWRIGHT = os.environ.get("PENFLOW_PILOT_PLAYWRIGHT", "playwright/index.js")
-BROWSER = os.environ.get("PENFLOW_PILOT_BROWSER", "chromium")
+PLAYWRIGHT = os.environ.get("PENFLOW_PILOT_PLAYWRIGHT") or "playwright"
+BROWSER = os.environ.get("PENFLOW_PILOT_BROWSER")
 SCENARIOS = (
     "edit",
     "invalid",
@@ -54,6 +54,53 @@ SOURCES = (
     "font-sources.json",
 )
 BUILD_ASSETS = {"app.py", "index.html", "inter-regular.woff2", "inter-semibold.woff2"}
+
+
+def resolve_tools(settings: argparse.Namespace) -> None:
+    """Resolve external tools in the caller's environment before snapshot execution."""
+    node = shutil.which(os.path.expanduser(settings.node))
+    if node is None:
+        raise RuntimeError("Node.js unavailable; install Node.js or supply --node /path/to/node")
+    settings.node = str(Path(node).absolute())
+    requested = os.path.expanduser(settings.playwright)
+    if requested.startswith(".") or Path(requested).is_absolute() or Path(requested).exists():
+        requested = str(Path(requested).resolve())
+    # Normal Node resolution (including NODE_PATH), plus modules beside the selected
+    # Node installation. Resolve in the caller's cwd, never the retained snapshot.
+    script = """
+const path = require('node:path');
+const [requested, node] = process.argv.slice(1);
+const root = path.dirname(path.dirname(node));
+const entry = require.resolve(requested, {paths: [process.cwd(), root, path.join(root, 'lib')]});
+const {chromium} = require(entry);
+console.log(JSON.stringify({entry, browser: chromium.executablePath()}));
+"""
+    try:
+        result = subprocess.run(
+            [settings.node, "-e", script, requested, settings.node],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=True,
+        )
+        tools = json.loads(result.stdout)
+        package = Path(tools["entry"]).with_name("package.json")
+        json.loads(package.read_text())["version"]
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError) as exc:
+        raise RuntimeError(
+            "Playwright unavailable; install the external playwright package in the caller's "
+            "Node environment or supply --playwright /path/to/playwright/index.js"
+        ) from exc
+    settings.playwright = str(Path(tools["entry"]).resolve())
+    browser = os.path.expanduser(settings.browser) if settings.browser else tools["browser"]
+    executable = shutil.which(browser)
+    if executable is None:
+        raise RuntimeError(
+            "Chromium unavailable; install this Playwright version's browser with "
+            "playwright install chromium or supply --browser /path/to/browser"
+        )
+    # Do not dereference executable symlinks: launchers can depend on their own path.
+    settings.browser = str(Path(executable).absolute())
 
 
 def write_json(path: Path, value: Any) -> None:
@@ -370,6 +417,10 @@ def main() -> None:
     parser.add_argument("--execute", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--invocation", default=str(uuid.uuid4()), help=argparse.SUPPRESS)
     settings = parser.parse_args()
+    try:
+        resolve_tools(settings)
+    except RuntimeError as exc:
+        parser.error(str(exc))
     if settings.execute:
         print(json.dumps({"build_manifest": str(execute(settings))}))
         return
