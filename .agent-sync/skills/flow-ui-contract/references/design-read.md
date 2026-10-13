@@ -9,7 +9,7 @@ Scope: applies to `landing` and `showcase` surfaces. Other surfaces record `stat
 
 ## Source
 
-Before capture, **Read** [`../../../../.conventions/index.md`](../../../../.conventions/index.md), load `design-views`, then **Read** the routed design-read protocol from [`../../../../.conventions/index.md`](../../../../.conventions/index.md). The protocol is the source of truth for the one-liner and dial inference; do not copy its table into this file.
+Before capture, **Read** the project's `.conventions/index.md` (when present), load `design-views`, then **Read** the routed design-read protocol from that index. The protocol is the source of truth for the one-liner and dial inference; do not copy its table into this file.
 
 ## Write Timing
 

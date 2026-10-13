@@ -18,7 +18,7 @@ Capture the rendered hierarchy, including additional controls without semantic a
 
 ## C13 mapping table — SwiftUI + XCTest
 
-The columns follow the canonical C12 field ordering (`id` / `role` / `bbox` / `semantic_id` / `name` / `text` / `children` / `viewport` / `screen_id`). See the spec table in [`spec.md`](../../.specs/features/038-runtime-adapter-guides/spec.md#c13--adapter-conformance-contract-mapping-table) for the cross-stack view.
+The columns follow the canonical C12 field ordering (`id` / `role` / `bbox` / `semantic_id` / `name` / `text` / `children` / `viewport` / `screen_id`). See the cross-stack overview in [README.md](README.md).
 
 | C12 field (target) | SwiftUI + XCTest source |
 |---|---|
@@ -32,7 +32,7 @@ The columns follow the canonical C12 field ordering (`id` / `role` / `bbox` / `s
 | `viewport.{width,height}` | `XCUIApplication().windows.firstMatch.frame.size` (or the device's logical screen size from `UIScreen.main.bounds`). |
 | `screen_id` | XCTest test method name, the SwiftUI view name (e.g. `"checkout"`), or a developer-chosen identifier. |
 
-This table is normative for the SwiftUI stack. The full cross-stack table in [`spec.md`](../../.specs/features/038-runtime-adapter-guides/spec.md#c13--adapter-conformance-contract-mapping-table) is the source of truth for C13.
+This table is normative for the SwiftUI stack. The cross-stack overview in [README.md](README.md) lists the other stacks.
 
 ## Reference snippet (Swift / XCTest — illustrative, not executed by Penflow)
 
@@ -137,7 +137,7 @@ Expected output: exit 0, `"status": "PASS"`, `"issues": []`.
 - **C12** — [`actual-ui-tree.schema.json`](../../penflow/schemas/actual-ui-tree.schema.json) (feature 037). Defines the JSON shape your adapter must produce.
 - **C13** — adapter conformance mapping (feature 038, this guide).
 - **Three Trees** — see the [project README](../../README.md#three-trees) for the role of `actual-ui-tree.json` in the broader Penflow flow.
-- **Spec** — [`spec.md`](../../.specs/features/038-runtime-adapter-guides/spec.md) and [`plan.md`](../../.specs/features/038-runtime-adapter-guides/plan.md) own the normative boundary for feature 038.
+- **Spec** — the internal feature 038 specification (not published) owns the normative boundary; the [adapter guide overview](README.md) summarizes it.
 
 ## What this guide does NOT do
 

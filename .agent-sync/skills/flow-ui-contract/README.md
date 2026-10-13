@@ -19,7 +19,7 @@ Before and after the workflow, run `penflow doctor --project <consumer-project-r
 
 ## Design Conventions
 
-Before authoring UI flows or screens, **Read** [`../../../.conventions/index.md`](../../../.conventions/index.md) and load the matching design domains. UI specs must use the convention-defined patterns for app shells, dashboards, payments, forms, lists/tables, states, responsiveness, and accessibility; a screen that only lists labels and buttons is incomplete when a richer pattern applies.
+Before authoring UI flows or screens, **Read** the project's `.conventions/index.md` (when present) and load the matching design domains. UI specs must use the convention-defined patterns for app shells, dashboards, payments, forms, lists/tables, states, responsiveness, and accessibility; a screen that only lists labels and buttons is incomplete when a richer pattern applies.
 
 ## Semantic Tree Formation
 

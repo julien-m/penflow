@@ -21,9 +21,9 @@ from typing import Any
 
 from publish_capture import publish, source_references
 
-NODE = "/opt/homebrew/bin/node"
-PLAYWRIGHT = "~/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.js"
-BROWSER = "/Applications/Comet.app/Contents/MacOS/Comet"
+NODE = os.environ.get("PENFLOW_PILOT_NODE") or shutil.which("node") or "node"
+PLAYWRIGHT = os.environ.get("PENFLOW_PILOT_PLAYWRIGHT", "playwright/index.js")
+BROWSER = os.environ.get("PENFLOW_PILOT_BROWSER", "chromium")
 SCENARIOS = (
     "edit",
     "invalid",

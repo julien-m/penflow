@@ -16,4 +16,4 @@ For ordinary bugs without security impact, use the public issue tracker after re
 
 Penflow validates local contract and evidence files. It does not run browsers, simulators, application runtimes, or pen.dev. Treat every imported JSON, Markdown, `.pen`, report, and path as untrusted input.
 
-CI includes a SHA-pinned Gitleaks action, but a successful CI run is not proof that Git history, generated evidence, or third-party provenance is globally clear. The current publication limits are documented in [PROVENANCE.md](PROVENANCE.md).
+CI runs a SHA-pinned Gitleaks action on every push and pull request. Publication boundaries and the history cleanup performed before the repository became public are documented in [PROVENANCE.md](PROVENANCE.md).

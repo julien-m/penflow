@@ -13,9 +13,9 @@ uv run penflow --help
 
 ## Before changing code
 
-- **Read** [AGENTS.md](AGENTS.md) and [.specs/spec-system.md](.specs/spec-system.md); shipped LiveSpec features keep `spec.md`, `plan.md`, `implementation.md`, `progress.md`, and `changelog.md` synchronized.
+- Maintainers specify features with [LiveSpec](https://github.com/julien-m/livespec); the `.specs/` working tree stays local and is not published. Describe the intended contract in the pull request instead.
 - Preserve the runtime-agnostic boundary. External adapters produce runtime observations; Penflow validates local artifacts.
-- Never commit credentials, personal data, machine-specific run archives, or consumer evidence. `.specs/features/*/run/` is intentionally ignored.
+- Never commit credentials, personal data, machine-specific paths, run archives, or consumer evidence. Local agent and spec tooling (`.specs/`, `.agent-sync.local/`, `.claude/`, `.codex/`, `.conventions/`, `AGENTS.md`) is intentionally ignored.
 - Add deterministic tests for behavior changes and update README commands when the public workflow changes.
 
 ## Checks
@@ -33,4 +33,4 @@ git diff --check
 
 ## Pull requests
 
-Keep changes scoped, explain the contract or user-visible effect, identify the LiveSpec feature when applicable, and state the exact checks run. Do not bundle generated run evidence or unrelated cleanup. By contributing, you agree that your contribution is provided under the repository's [MIT License](LICENSE); only submit material you have the right to contribute.
+Keep changes scoped, explain the contract or user-visible effect, and state the exact checks run. Do not bundle generated run evidence or unrelated cleanup. By contributing, you agree that your contribution is provided under the repository's [MIT License](LICENSE); only submit material you have the right to contribute.

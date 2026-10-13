@@ -86,7 +86,7 @@ Before generating or validating files, **Read** [`references/grammar.md`](refere
 
 ## Design Convention Gate
 
-Before writing or editing `flow-ui-contract/` for any UI surface, **Read** [`../../../.conventions/index.md`](../../../.conventions/index.md), then load the matching design domains from that index. This is mandatory input, not optional polish.
+Before writing or editing `flow-ui-contract/` for any UI surface, **Read** the project's `.conventions/index.md` (when present), then load the matching design domains from that index. This is mandatory input, not optional polish.
 
 - Always load `design-tokens`, `design-components`, `design-views`, and `design-quality` for UI flows.
 - Also load `design-dataviz` for dashboard, metrics, KPI, chart, analytics, or usage screens.

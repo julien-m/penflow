@@ -21,7 +21,7 @@ Each guide repeats the C13 mapping table for its stack with the canonical C12 fi
 - **C12** — [`actual-ui-tree.schema.json`](../../penflow/schemas/actual-ui-tree.schema.json) (feature 037). The JSON shape your adapter must produce.
 - **C13** — adapter conformance mapping (feature 038, this directory). Per-stack mapping onto C12 — no new schema, no new node fields.
 - **Three Trees** — see the [project README](../../README.md#three-trees) for the role of `actual-ui-tree.json` in the broader Penflow flow.
-- **Spec** — [`spec.md`](../../.specs/features/038-runtime-adapter-guides/spec.md) and [`plan.md`](../../.specs/features/038-runtime-adapter-guides/plan.md) own the normative boundary for feature 038.
+- **Spec** — the internal feature 038 specification (not published) owns the normative boundary; this guide summarizes it.
 
 ## Out of scope
 

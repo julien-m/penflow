@@ -9,7 +9,7 @@ Advisory only. This pass never decides PASS/FAIL, never adds checklist items, ne
 
 ## Source
 
-Before running this advisory pass, **Read** [`../../../../.conventions/index.md`](../../../../.conventions/index.md), load `design-quality`, then **Read** the routed design taste source from [`../../../../.conventions/index.md`](../../../../.conventions/index.md). Also **Read** [`../../flow-ui-contract/references/design-read.md`](../../flow-ui-contract/references/design-read.md) when `<target>/design-read.json` exists.
+Before running this advisory pass, **Read** the project's `.conventions/index.md` (when present), load `design-quality`, then **Read** the routed design taste source from that index. Also **Read** [`../../flow-ui-contract/references/design-read.md`](../../flow-ui-contract/references/design-read.md) when `<target>/design-read.json` exists.
 
 ## Inputs
 

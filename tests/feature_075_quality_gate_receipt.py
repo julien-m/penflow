@@ -151,9 +151,11 @@ def _qg4_specs(python: str) -> tuple[CommandSpec, ...]:
                 python,
                 "tests/monorepo_project_boundary_proof.py",
                 "--live-project",
-                "~/projects/project-brainstorm/projects/routempo",
+                os.environ.get(
+                    "PENFLOW_QG4_LIVE_PROJECT", "../project-brainstorm/projects/routempo"
+                ),
                 "--sibling",
-                "~/projects/project-brainstorm/projects/ylune",
+                os.environ.get("PENFLOW_QG4_SIBLING", "../project-brainstorm/projects/ylune"),
                 "--out",
                 PROJECT_BRAINSTORM_PROOF.as_posix(),
             ),
@@ -214,7 +216,7 @@ def _qg6_specs(python: str, pytest: tuple[str, ...]) -> tuple[CommandSpec, ...]:
                 python,
                 "tests/consumer_project_hygiene_probe.py",
                 "--search-root",
-                "~/projects",
+                os.environ.get("PENFLOW_CONSUMER_SEARCH_ROOT", ".."),
                 "--expected-inventory-receipt",
                 authoritative.as_posix(),
                 "--out",

@@ -4,9 +4,9 @@ Status: open upstream/operator-layer issue, historical for pen.dev < 1.2. The `e
 
 ## Evidence
 
-Read [`session-refondre-timeline.txt`](local-session-transcript.txt) before changing this issue.
+The evidence comes from a local operator session transcript that is not published with this repository; the line numbers below refer to that transcript.
 
-- Lines 663-668 reproduce the failure: `export_nodes` with eight node IDs on `projects/claude-pilot/handoff/penflow/ui.pen` fails with Pencil error `wrong .pen file`.
+- Lines 663-668 reproduce the failure: `export_nodes` with eight node IDs on a consumer `ui.pen` fails with Pencil error `wrong .pen file`.
 - Lines 670-675 qualify the file/ID state: `get_editor_state` confirms the opened document is the expected `.pen` and the eight top-level IDs are present.
 - Lines 677-682 prove the single-node fallback: unit export of `kd7bd` succeeds.
 - Lines 684-695 isolate batch size/state: a three-node batch succeeds, a four-node batch fails again with the same batch path.

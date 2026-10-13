@@ -9,49 +9,37 @@ dist/
 build/
 *.egg-info/
 .venv/
+.idea/
+.vscode/
 
-# Materialized conventions
-.conventions/*
-!.conventions/
-!.conventions/index.md
-!.conventions/manifest.yaml
+# Local agent and spec tooling (never published)
+.specs/
+.agent-sync.local/
+.agents/
+.claude/
+.codex/
+.conventions/
+AGENTS.md
+CLAUDE.md
 
-.agent-sync.local/skills/spec-*
-.agent-sync.local/skills/source-command-cli
-.agents/skills/spec-*
-.agents/skills/source-command-cli
-.claude/agents/livespec-*.md
-.claude/rules/*.md
-.claude/rules/livespec/
-.claude/skills/spec-*
-.claude/skills/source-command-cli
-.codex/agents/livespec-*.toml
-.specs/.livespec-path
-.specs/.LOCK
-.specs/hooks/.commit-context.json
-.specs/.runs/
-.specs/.orchestration/
-.specs/.execution/
-.specs/.previews/
-.specs/conventions/runs/
-.specs/conventions/debt.json
-.specs/conventions/debt-report.md
-.specs/features/*/checks/transcripts/
-.specs/features/*/.reviews/
-.specs/features/*/run/
-.specs/preflight-report.md
-.specs/features/*/preflight-report.md
+# Penflow working data in this checkout
+/.penflow-tmp/
+/.penflow-run/
+/.mockup-validation/
+/tools/
+
+# Generated reports and trees
 test-results/
 playwright-report/
 reports/
 actual-ui-tree.json
 expected-ui-tree.json
+compare-report.json
+compare-report.md
 !tests/fixtures/claude-pilot/expected-ui-tree.json
 !examples/adapters/web-dom/actual-ui-tree.json
 !examples/adapters/swiftui-xctest/actual-ui-tree.json
 !examples/adapters/react-native/actual-ui-tree.json
-compare-report.json
-compare-report.md
 !examples/demo/actual-ui-tree.json
 !examples/demo/expected-ui-tree.json
 !examples/demo/compare-report.json
@@ -59,4 +47,3 @@ compare-report.md
 !examples/full/actual-ui-tree.json
 !examples/full/expected-ui-tree.json
 !examples/full/.mockup-validation/compare-report.json
-.idea

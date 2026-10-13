@@ -197,14 +197,17 @@ def test_c16_guidance_cleans_its_temporary_consumer() -> None:
 
 
 def test_feature_074_registry_ci_and_example_hygiene_are_static_contracts() -> None:
-    registry = (ROOT / ".specs" / "README.md").read_text(encoding="utf-8")
-    canonical_row = (
-        "| [074-penflow-doctor-consumer-project-hygiene]"
-        "(features/074-penflow-doctor-consumer-project-hygiene/) | Implemented | P1 |"
-    )
-    assert registry.count(canonical_row) == 1
-    assert re.search(r"^\| 074 \|", registry, re.MULTILINE) is None
-    assert (ROOT / ".specs" / "changelog.md").read_bytes().endswith(b"\n")
+    # The LiveSpec registry is a local maintainer workspace and is not published.
+    registry_path = ROOT / ".specs" / "README.md"
+    if registry_path.exists():
+        registry = registry_path.read_text(encoding="utf-8")
+        canonical_row = (
+            "| [074-penflow-doctor-consumer-project-hygiene]"
+            "(features/074-penflow-doctor-consumer-project-hygiene/) | Implemented | P1 |"
+        )
+        assert registry.count(canonical_row) == 1
+        assert re.search(r"^\| 074 \|", registry, re.MULTILINE) is None
+        assert (ROOT / ".specs" / "changelog.md").read_bytes().endswith(b"\n")
 
     workflow_lines = (
         (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8").splitlines()

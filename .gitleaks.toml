@@ -2,29 +2,3 @@ title = "Penflow Gitleaks policy"
 
 [extend]
 useDefault = true
-
-[[rules]]
-id = "generic-api-key"
-
-[[rules.allowlists]]
-description = "Historical LiveSpec prose containing a non-secret workflow phrase"
-condition = "AND"
-# This immutable commit is the sole historical revision containing the false-positive prose.
-commits = ["a5c64c5460df983c8ecb0adf6800267148013110"]
-# Anchor the exception to the exact Feature 076 progress file, never a directory-wide scope.
-paths = ['''^\.specs/features/076-exhaustive-bidirectional-semantic-context/progress\.md$''']
-regexTarget = "line"
-# Match only the documented non-secret phrase that triggered generic-api-key on that line.
-regexes = ['''complete context-key list, placeholders/PARTIAL contract, detailed run lineage/failure guarantees''']
-
-[[rules.allowlists]]
-description = "Feature 077 immutable evidence file SHA-256 values; exact artifact keys and known digests only"
-condition = "AND"
-paths = ['''^\.specs/features/077-complete-verification-workflow/checks/(?:[^/]+/)?[^/]+\.json$''']
-regexTarget = "line"
-regexes = [
-  '''^\s*"penflow/\.mockup\-validation/native\-design/lint\-tokens\-approved\.json": "(?:8b5c0c0dc4701ac99ed98a252d06a38946c0a9298f69f44ea2dba5878275fc47)",?\s*$''',
-  '''^\s*"penflow/token\-lint\-report\.json": "(?:21dea820f1a748b6fd31876b6e56ccfcdbfff0a40056db18b0eb8d19a323f7e5)",?\s*$''',
-  '''^\s*"penflow/token_lint\.py": "(?:4351c1d19652f0e7d93db95488cac891a2179055dc7a1619a55490a672ee7355|73a23328c19d76fa747325489fd7081a51e48c0651af508df041b2dbbbc255ec|c9c9b887d7eacf055f3197434a264affda50823a83a778f7d71de861f09a0d3a|f27ba68e9e9d3660c68b696a8c657348de89b920989b5881c00a0c9b753e47eb)",?\s*$''',
-  '''^\s*"tests/test_lint_tokens\.py": "(?:c0341f8565de0acfa07dd847cd62da76a2f96ecfcbe33e44c92514d88f9c1b5c)",?\s*$''',
-]

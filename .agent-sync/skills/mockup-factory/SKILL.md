@@ -85,7 +85,7 @@ Before any pen.dev MCP call, open `<target>/ui.pen` in pen.dev and confirm it wi
 
 ## Design Convention Gate
 
-Before auditing, generating, or fixing any `.pen`, **Read** [`../../../.conventions/index.md`](../../../.conventions/index.md), then load every matching design domain. Treat the loaded convention files as acceptance criteria for visual validity.
+Before auditing, generating, or fixing any `.pen`, **Read** the project's `.conventions/index.md` (when present), then load every matching design domain. Treat the loaded convention files as acceptance criteria for visual validity.
 
 - Always load `design-tokens`, `design-components`, `design-views`, and `design-quality`.
 - Load `design-dataviz` for dashboard, metrics, KPI, chart, analytics, and usage screens.
