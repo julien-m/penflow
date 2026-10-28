@@ -10,7 +10,9 @@ from uuid import uuid4
 import pytest
 
 from penflow.requirement_projection import project_requirements
-from penflow.verification_files import InputReader
+from penflow.requirement_sources import _current_sources
+from penflow.requirement_markdown import semantic_text_sha256
+from penflow.verification_files import InputReader, VerificationInputError
 from penflow.verification_json import digest
 
 
@@ -26,6 +28,8 @@ def test_authenticated_projection_preserves_actual_old_parser_pointers(tmp_path:
 | --- | --- |
 | {name} | {uuid4().hex} |
 
+**configuration_key:** {name}
+
 ## Functional Requirements
 
 - **FR-001:** Preserve {name} (AC-001).
@@ -39,10 +43,12 @@ def test_authenticated_projection_preserves_actual_old_parser_pointers(tmp_path:
     # dependency, independently of the compatibility adapter under test.
     code = (
         "import json,sys,mistune; from dataclasses import asdict; "
-        "from penflow.requirement_markdown import extract_requirement_definitions_text; "
+        "from penflow.requirement_markdown import extract_requirement_definitions_text,semantic_text_sha256; "
         "assert mistune.__version__ == '3.2.0'; "
-        "print(json.dumps([asdict(x) for x in "
-        "extract_requirement_definitions_text(sys.stdin.read(),'001-compatibility')]))"
+        "source=sys.stdin.read(); "
+        "print(json.dumps({'definitions':[asdict(x) for x in "
+        "extract_requirement_definitions_text(source,'001-compatibility')],"
+        "'semantic_sha256':semantic_text_sha256(source)}))"
     )
     result = subprocess.run(
         [python, "-c", code],
@@ -53,13 +59,15 @@ def test_authenticated_projection_preserves_actual_old_parser_pointers(tmp_path:
         check=True,
         timeout=8,
     )
+    oracle = json.loads(result.stdout)
     expected = [
         {key: item[key] for key in ("id", "source_pointer", "text_sha256")}
-        for item in json.loads(result.stdout)
+        for item in oracle["definitions"]
     ]
     snapshot, contract = _archived_project(tmp_path, source, expected)
     actual = project_requirements(InputReader(tmp_path), snapshot, contract)
     assert actual["requirements"] == expected
+    _verify_current_sources(tmp_path, source, oracle["semantic_sha256"], snapshot)
 
 
 def _archived_project(
@@ -92,3 +100,23 @@ def _archived_project(
         "outcome_expectations": [],
     }
     return snapshot, contract
+
+
+def _verify_current_sources(
+    root: Path, source: str, historical_hash: str, snapshot: dict[str, Any]
+) -> None:
+    assert semantic_text_sha256(source) != historical_hash
+    record = snapshot["inputs"]["sources"][0]
+    record["semantic_sha256"] = historical_hash
+    spec = root / record["path"]
+    spec.parent.mkdir(parents=True)
+    spec.write_text(source)
+    plan = spec.with_name("plan.md")
+    plan.write_text(source)
+    snapshot["inputs"]["plans"] = [{**record, "path": plan.relative_to(root).as_posix()}]
+    _current_sources(InputReader(root), snapshot)
+    for path in (spec, plan):
+        path.write_text(source + "\n" + uuid4().hex)
+        with pytest.raises(VerificationInputError, match="requirements.source.semantic_changed"):
+            _current_sources(InputReader(root), snapshot)
+        path.write_text(source)
