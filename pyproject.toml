@@ -66,6 +66,7 @@ include = [
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = ["integration: exercises an actual external dependency boundary"]
 
 [tool.ruff]
 line-length = 100

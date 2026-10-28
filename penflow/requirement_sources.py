@@ -59,6 +59,10 @@ def _current_sources(reader: InputReader, snapshot: dict[str, Any]) -> None:
         for record in records:
             current = reader.read(record["path"])
             archived = reader.reference(record["reviewed_snapshot"], archive="source")
+            # The archive digest is authenticated before this check. Exact bytes
+            # cannot contain source drift, regardless of historical AST versions.
+            if current == archived:
+                continue
             for raw in (current, archived):
                 if semantic_text_sha256(raw.decode("utf-8")) != record["semantic_sha256"]:
                     raise VerificationInputError("requirements.source.semantic_changed")
