@@ -11,12 +11,6 @@
 
 # Penflow
 
-Requirement approval replays authenticated Mistune3.2 table projections with a
-read-only historical grammar; new parsing uses the pinned current dependency.
-Every archived ID, pointer and text hash must match a complete recomputation.
-To exercise the compatibility regression against the actual old parser, set
-`PENFLOW_LEGACY_PYTHON` to a Python interpreter containing Mistune3.2.0.
-
 **Deterministic design contracts for [pen.dev](https://pen.dev) mockups.**
 
 Penflow is a Python CLI that turns a pen.dev `.pen` file into a verifiable contract. It parses `.pen` JSON, validates the semantic `context` attached to screens and components, exports the *expected* UI tree, validates the *actual* UI tree produced by your app's runtime adapter, and compares both structurally. Every result is a deterministic JSON report, so agents and CI can tell whether an implementation still matches its design.

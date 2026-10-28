@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -56,6 +57,14 @@ def test_authenticated_projection_preserves_actual_old_parser_pointers(tmp_path:
         {key: item[key] for key in ("id", "source_pointer", "text_sha256")}
         for item in json.loads(result.stdout)
     ]
+    snapshot, contract = _archived_project(tmp_path, source, expected)
+    actual = project_requirements(InputReader(tmp_path), snapshot, contract)
+    assert actual["requirements"] == expected
+
+
+def _archived_project(
+    tmp_path: Path, source: str, expected: list[dict[str, str]]
+) -> tuple[dict[str, Any], dict[str, Any]]:
     raw = source.encode()
     sha = digest(raw)
     archive = f".specs/penflow-approvals/source-{sha}.md"
@@ -82,5 +91,4 @@ def test_authenticated_projection_preserves_actual_old_parser_pointers(tmp_path:
         },
         "outcome_expectations": [],
     }
-    actual = project_requirements(InputReader(tmp_path), snapshot, contract)
-    assert actual["requirements"] == expected
+    return snapshot, contract

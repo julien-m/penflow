@@ -72,16 +72,11 @@ def _qe7_receipt(
     """Record actual reference-host metadata and the unchanged QE7 measurements."""
     if platform.system() == "Darwin":
         df_result = subprocess.run(
-            ["df", "-P", str(project)],
-            check=True,
-            capture_output=True,
-            text=True,
+            ["df", "-P", str(project)], check=True, capture_output=True, text=True
         )
         mount_point = df_result.stdout.splitlines()[-1].split()[-1]
         filesystem_result = subprocess.run(
-            ["/usr/sbin/diskutil", "info", "-plist", mount_point],
-            check=True,
-            capture_output=True,
+            ["/usr/sbin/diskutil", "info", "-plist", mount_point], check=True, capture_output=True
         )
         filesystem_info = plistlib.loads(filesystem_result.stdout)
         filesystem = str(filesystem_info.get("FilesystemType", "unknown"))

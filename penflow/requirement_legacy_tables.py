@@ -1,10 +1,5 @@
-"""Read historical Mistune3.2 table ASTs without changing the installed parser.
-
-Only authenticated archived requirement projections may select this reader.
-The original table grammar is retained because its trailing-newline consumption
-and cell splitting affect source pointers; adjusting numeric offsets is unsafe.
-Adapted from Mistune3.2.0, Copyright(c)2014 Hsiaoming Yang, BSD-3-Clause.
-See third-party-notices.md for the retained license.
+"""Historical Mistune3.2 table grammar for authenticated approval archives.
+Adapted from Mistune3.2.0,(c)2014 Hsiaoming Yang,BSD-3-Clause; see third-party-notices.md.
 """
 
 from __future__ import annotations
@@ -15,32 +10,23 @@ from typing import Any, Dict, List, Match, Optional, Tuple, Union
 from mistune import BlockParser, BlockState, Markdown
 from mistune.helpers import PREVENT_BACKSLASH
 
+# @spec FR-007: Preserve authenticated requirement identities.
+# — .specs/features/077-complete-verification-workflow/spec.md#fr-007
 TABLE_PATTERN = (
     r"^ {0,3}\|(?P<table_head>.+)\|[ \t]*\n"
     r" {0,3}\|(?P<table_align> *[-:]+[-| :]*)\|[ \t]*\n"
     r"(?P<table_body>(?: {0,3}\|.*\|[ \t]*(?:\n|$))*)\n*"
 )
-
-
 NP_TABLE_PATTERN = (
     r"^ {0,3}(?P<nptable_head>\S.*\|.*)\n"
     r" {0,3}(?P<nptable_align>[-:]+ *\|[-| :]*)\n"
     r"(?P<nptable_body>(?:.*\|.*(?:\n|$))*)\n*"
 )
 
-
 TABLE_CELL = re.compile(r"^ {0,3}\|(.+)\|[ \t]*$")
-
-
 CELL_SPLIT = re.compile(r" *" + PREVENT_BACKSLASH + r"\| *")
-
-
 ALIGN_CENTER = re.compile(r"^ *:-+: *$")
-
-
 ALIGN_LEFT = re.compile(r"^ *:-+ *$")
-
-
 ALIGN_RIGHT = re.compile(r"^ *-+: *$")
 
 
