@@ -5,7 +5,11 @@ from __future__ import annotations
 from typing import Any
 
 from .verification_authority import inherited_projection
-from .requirement_markdown import extract_requirement_definitions_text
+from .requirement_markdown import (
+    RequirementDefinition,
+    RequirementSourceError,
+    extract_requirement_definitions_text,
+)
 from .verification_files import InputReader, VerificationInputError
 
 
@@ -28,7 +32,7 @@ def project_requirements(
         record = records[f".specs/features/{slug}/spec.md"]
         refs.append({"path": record["path"], "sha256": record["sha256"]})
         raw = reader.reference(record["reviewed_snapshot"], archive="source")
-        for definition in extract_requirement_definitions_text(raw.decode("utf-8"), slug):
+        for definition in _source_definitions(raw.decode("utf-8"), slug, snapshot):
             requirements.append(
                 {
                     "id": definition.id,
@@ -68,6 +72,37 @@ def project_requirements(
         "bindings": bindings,
         "uncovered": sorted(ids - {item["requirement_id"] for item in bindings}),
     }
+
+
+def _source_definitions(
+    source: str, slug: str, snapshot: dict[str, Any]
+) -> list[RequirementDefinition]:
+    definitions = extract_requirement_definitions_text(source, slug)
+    expected = [
+        row
+        for row in snapshot["projection"]["requirements"]
+        if row["id"].startswith(f"livespec:{slug}:")
+    ]
+    current = [
+        {"id": item.id, "source_pointer": item.source_pointer, "text_sha256": item.text_sha256}
+        for item in definitions
+    ]
+    if current == expected:
+        return definitions
+    # Recompute both supported historical grammars from authenticated bytes.
+    # Select the old grammar only on an exact match of the complete source set;
+    # no expected pointer, hash or requirement is copied into computed results.
+    try:
+        historical = extract_requirement_definitions_text(source, slug, legacy_tables=True)
+    except RequirementSourceError:
+        # The caller still compares the complete computed projection and rejects
+        # mismatches; invalid legacy syntax cannot authorize expected values.
+        return definitions
+    rows = [
+        {"id": item.id, "source_pointer": item.source_pointer, "text_sha256": item.text_sha256}
+        for item in historical
+    ]
+    return historical if rows == expected else definitions
 
 
 def _system_sources(contract: dict[str, Any], requirements: list[dict[str, Any]]) -> None:

@@ -69,10 +69,13 @@ def _definition_lines(node: Node) -> str:
     return "".join(_definition_lines(child) for child in _nodes(node.get("children")))
 
 
-def _parse(source: str) -> tuple[dict[str, object], list[Node]]:
+def _parse(source: str, *, legacy_tables: bool = False) -> tuple[dict[str, object], list[Node]]:
+    from .requirement_legacy_tables import legacy_table
+
     try:
         metadata, content = _frontmatter(source)
-        ast = mistune.create_markdown(renderer="ast", plugins=["table"])(content)
+        plugins = [legacy_table] if legacy_tables else ["table"]
+        ast = mistune.create_markdown(renderer="ast", plugins=plugins)(content)
     except (OSError, UnicodeError, YAMLError, ValueError) as exc:
         raise RequirementSourceError(f"requirement_source_unreadable: {exc}") from exc
     return metadata, _nodes(ast)
@@ -152,12 +155,12 @@ def extract_requirement_definitions(path: Path, feature_slug: str) -> list[Requi
 
 
 def extract_requirement_definitions_text(
-    source: str, feature_slug: str
+    source: str, feature_slug: str, *, legacy_tables: bool = False
 ) -> list[RequirementDefinition]:
     """Extract definitions from the exact authenticated source bytes decoded as UTF-8."""
     if not SLUG_REGEX.fullmatch(feature_slug):
         raise RequirementSourceError("invalid_feature_namespace")
-    _, nodes = _parse(source)
+    _, nodes = _parse(source, legacy_tables=legacy_tables)
     prefix: str | None = None
     results: list[RequirementDefinition] = []
     for index, node in enumerate(nodes):
