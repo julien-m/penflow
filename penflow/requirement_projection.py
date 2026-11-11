@@ -11,6 +11,7 @@ from .requirement_markdown import (
     extract_requirement_definitions_text,
 )
 from .verification_files import InputReader, VerificationInputError
+from .verification_schema import schema_issues
 
 
 def project_requirements(
@@ -25,21 +26,15 @@ def project_requirements(
             "bindings": [],
             "uncovered": [],
         }
-    records = {record["path"]: record for record in snapshot["inputs"]["sources"]}
-    requirements = []
-    refs = []
-    for slug in active:
-        record = records[f".specs/features/{slug}/spec.md"]
-        refs.append({"path": record["path"], "sha256": record["sha256"]})
-        raw = reader.reference(record["reviewed_snapshot"], archive="source")
-        for definition in _source_definitions(raw.decode("utf-8"), slug, snapshot):
-            requirements.append(
-                {
-                    "id": definition.id,
-                    "source_pointer": definition.source_pointer,
-                    "text_sha256": definition.text_sha256,
-                }
-            )
+    definitions, refs = _native_sources(reader, snapshot, active)
+    requirements = [
+        {
+            "id": definition.id,
+            "source_pointer": definition.source_pointer,
+            "text_sha256": definition.text_sha256,
+        }
+        for definition in definitions
+    ]
     imported = None
     policy_ref = snapshot["inputs"].get("verification_policy")
     if policy_ref is not None:
@@ -65,13 +60,80 @@ def project_requirements(
         seen.add(pair)
         expected = outcomes[pair[1]]
         bindings.append({**binding, "category": expected["category"], "expected": expected})
-    return {
+    bound = {item["requirement_id"] for item in bindings}
+    delegated = _reviewed_delegations(declared, definitions, ids, bound)
+    projection = {
         "source_kind": "livespec-fr-ac-v1",
         "sources": refs,
         "requirements": requirements,
         "bindings": bindings,
-        "uncovered": sorted(ids - {item["requirement_id"] for item in bindings}),
+        "uncovered": sorted(ids - bound - {item["requirement_id"] for item in delegated}),
     }
+    return _with_delegated(projection, delegated)
+
+
+# @spec FR-003: Omit delegated when empty — .specs/features/082-reviewed-requirement-delegation-to-upstream-acceptance/spec.md#fr-003
+def _with_delegated(projection: dict[str, Any], delegated: list[dict[str, Any]]) -> dict[str, Any]:
+    """Add the delegated records only when the contract declares some.
+
+    A projection without delegation therefore keeps the exact bytes and digest
+    stored by earlier baselines.
+    """
+    if delegated:
+        projection["delegated"] = delegated
+    return projection
+
+
+def _native_sources(
+    reader: InputReader, snapshot: dict[str, Any], active: list[str]
+) -> tuple[list[RequirementDefinition], list[dict[str, str]]]:
+    """Read the reviewed source of every active feature, in selection order."""
+    records = {record["path"]: record for record in snapshot["inputs"]["sources"]}
+    definitions: list[RequirementDefinition] = []
+    refs = []
+    for slug in active:
+        record = records[f".specs/features/{slug}/spec.md"]
+        refs.append({"path": record["path"], "sha256": record["sha256"]})
+        raw = reader.reference(record["reviewed_snapshot"], archive="source")
+        definitions.extend(_source_definitions(raw.decode("utf-8"), slug, snapshot))
+    return definitions, refs
+
+
+# @spec FR-002: Project reviewed delegations — .specs/features/082-reviewed-requirement-delegation-to-upstream-acceptance/spec.md#fr-002
+# @spec FR-004: Reject invalid delegations — .specs/features/082-reviewed-requirement-delegation-to-upstream-acceptance/spec.md#fr-004
+def _reviewed_delegations(
+    declared: dict[str, Any],
+    definitions: list[RequirementDefinition],
+    known: set[str],
+    bound: set[str],
+) -> list[dict[str, Any]]:
+    """Validate the declared delegations and return them sorted by requirement id.
+
+    Raises:
+        VerificationInputError: ``requirements.delegation.invalid`` for a record that
+            violates the closed shape, names an unknown, duplicate or bound requirement,
+            or names a native FR whose reviewed text references no AC.
+    """
+    if "delegations" not in declared:
+        return []
+    records = declared["delegations"]
+    # @spec FR-001: Closed delegations declaration — .specs/features/082-reviewed-requirement-delegation-to-upstream-acceptance/spec.md#fr-001
+    if schema_issues(records, "requirement-delegations"):
+        raise VerificationInputError("requirements.delegation.invalid")
+    # The upstream acceptance owns acceptance criteria: an FR that references none
+    # would have its assurance nowhere once delegated.
+    orphan_requirements = {
+        item.id for item in definitions if item.local_id.startswith("FR-") and not item.references
+    }
+    seen: set[str] = set()
+    for record in records:
+        identity = record["requirement_id"]
+        # A delegated requirement is a known source requirement named once and never bound;
+        # inherited duties are always bound, so this also refuses to delegate them.
+        if identity in seen | bound | orphan_requirements or identity not in known:
+            raise VerificationInputError("requirements.delegation.invalid")
+        seen.add(identity)
+    return sorted(records, key=lambda record: record["requirement_id"])
 
 
 def _source_definitions(

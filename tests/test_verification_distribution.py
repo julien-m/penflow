@@ -16,6 +16,15 @@ import zipfile
 import pytest
 
 from penflow.verification_schema import schema_issues
+from tests.c51_design_workspace import (
+    DesignProject,
+    build_design_project,
+    default_delegations,
+    review_request,
+    uncertified,
+    unknown_delegation_request,
+)
+from tests.c51_review_chain import CONTRACT_PATH
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -243,3 +252,61 @@ def test_wheel_actual_schema_preserves_positive_and_negative(
     actual.write_text(json.dumps(value))
     results = _pair(installed_distribution, consumer, ["validate-actual", str(actual), "--schema"])
     assert results[0]["exit_code"] == (1 if invalid_version else 0)
+
+
+def _bundled_schema_verdicts(distribution: dict[str, Any], contracts: list[Path]) -> list[bool]:
+    """Ask the installed package whether its bundled schema accepts each contract requirements."""
+    code = (
+        "import json,sys; from penflow.verification_schema import schema_issues; "
+        "print(json.dumps([not schema_issues(json.load(open(path))['requirements'],"
+        "'contract-requirements') for path in sys.argv[1:]]))"
+    )
+    result = _execute(
+        [str(distribution["python"]), "-I", "-c", code, *map(str, contracts)],
+        distribution["directory"],
+    )
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+# @spec AC-012: Wheel matches source for delegations — .specs/features/082-reviewed-requirement-delegation-to-upstream-acceptance/spec.md#ac-012
+def test_wheel_matches_source_for_delegated_and_invalid_fixtures(
+    tmp_path: Path, installed_distribution: dict[str, Any], governed_consumer_project
+) -> None:
+    valid = build_design_project(
+        tmp_path / "valid",
+        governed_consumer_project,
+        review_request(delegations=default_delegations()),
+    )
+    invalid = build_design_project(
+        tmp_path / "invalid", governed_consumer_project, unknown_delegation_request()
+    )
+    contracts = [project.root / CONTRACT_PATH for project in (valid, invalid)]
+    source_verdicts = [
+        not schema_issues(project.link.contract["requirements"], "contract-requirements")
+        for project in (valid, invalid)
+    ]
+    assert _bundled_schema_verdicts(installed_distribution, contracts) == source_verdicts
+    assert source_verdicts == [True, True]
+
+    def run(project: DesignProject) -> dict[str, Any]:
+        arguments = ["run", "--target", str(project.workspace), "--profile", "design"]
+        return _pair(installed_distribution, project.root, arguments)[0]
+
+    passed = run(valid)
+    declared = valid.link.contract["requirements"]["delegations"]
+    assert (passed["exit_code"], passed["value"]["status"]) == (0, "PASS"), passed["value"]
+    assert passed["value"]["delegated_requirements"] == uncertified(declared)
+    report = valid.workspace / "run-report.json"
+    revalidated = _pair(
+        installed_distribution,
+        valid.root,
+        ["validate-report", str(report), "--schema", "--required-profile", "design"],
+    )[0]
+    assert (revalidated["exit_code"], revalidated["value"]["status"]) == (0, "PASS")
+    rejected = run(invalid)
+    assert rejected["exit_code"] == 1
+    assert "delegated_requirements" not in rejected["value"]
+    assert ("verification.source.invalid", "requirements.delegation.invalid") in {
+        (row["code"], row["message"]) for row in rejected["value"]["issues"]
+    }

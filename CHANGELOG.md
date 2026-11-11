@@ -9,6 +9,7 @@ All notable public changes will be recorded here. Penflow follows semantic versi
 - Public MIT licensing, contribution, security, provenance, release, and third-party notices.
 - Reproducible source installation and wheel/source-distribution build documentation.
 - Dependabot configuration for `uv` and GitHub Actions dependencies.
+- C51 reviewed requirement delegation: optional `requirements.delegations` in the contract, `projection.delegated` and report `delegated_requirements` (always `certified: false`), with the diagnostics `requirements.delegation.invalid` and `product.delegation.forbidden`. Artifacts without delegations keep their exact bytes.
 
 ### Changed
 

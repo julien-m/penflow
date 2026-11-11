@@ -15,6 +15,12 @@ def load_brainstorm_requirements(reader: InputReader, workspace: Path) -> dict[s
     product, sources = load_frozen_product(reader, workspace)
     requirements = product_requirements(product)
     contract = reader.object(reader.read(workspace / "flow-ui-contract/contract.json"))
+    # @spec FR-004: Refuse Brainstorm delegations — .specs/features/082-reviewed-requirement-delegation-to-upstream-acceptance/spec.md#fr-004
+    # Frozen product duties have no upstream acceptance to delegate to. The key is refused
+    # before contract validation so a well-formed and a malformed value get the same code.
+    declared_requirements = contract.get("requirements")
+    if isinstance(declared_requirements, dict) and "delegations" in declared_requirements:
+        raise VerificationInputError("product.delegation.forbidden")
     if any(item["severity"] == "error" for item in validate_flow_contract_v2(contract)):
         raise VerificationInputError("product.c20.invalid")
     declared = contract.get("requirements", {})
