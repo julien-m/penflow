@@ -146,6 +146,7 @@ def evaluate_verification(
             ]
         ),
     )
+    _expose_delegated_requirements(report, snapshot)
     manifest = _verification_manifest(snapshot, profile, manifest_path, report)
     values = evaluate_design(
         snapshot, gates, produce=produce and gates.rows["project-scope"]["status"] == "PASS"
@@ -158,6 +159,25 @@ def evaluate_verification(
     report["sources"] = snapshot.sources(excluding={report_path} if report_path else set())
     report["evidence"] = _evidence_references(snapshot, report["sources"])
     return _finish_report(report, gates)
+
+
+# @spec FR-006: List delegated requirements uncertified — .specs/features/082-reviewed-requirement-delegation-to-upstream-acceptance/spec.md#fr-006
+def _expose_delegated_requirements(report: dict[str, Any], snapshot: VerificationSnapshot) -> None:
+    """List the requirements Penflow did not certify, in authenticated projection order.
+
+    The key is added only for a projection that delegates, so a report without
+    delegation keeps its exact bytes.
+    """
+    delegated = snapshot.projection.get("delegated")
+    if delegated:
+        report["delegated_requirements"] = [
+            {
+                "requirement_id": record["requirement_id"],
+                "acceptance_owner": record["acceptance_owner"],
+                "certified": False,
+            }
+            for record in delegated
+        ]
 
 
 def _doctor(reader: InputReader, workspace: Path) -> list[dict[str, Any]]:

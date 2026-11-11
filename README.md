@@ -105,6 +105,8 @@ For design closure, the workflow selects `design` and omits the build manifest. 
 
 C51 derives requirements and applicability from reviewed LiveSpec sources or an authenticated frozen Brainstorm contract. It joins those requirements to contract obligations, native evidence and typed observations. Every required gate and obligation must pass: missing, skipped, stale or unknown evidence blocks closure. Revalidation checks current inputs and caller identities instead of trusting a stored `PASS`. Historical reports and the opt-in C47 `--strict-closure` path remain readable but do not certify C51.
 
+A reviewed LiveSpec contract may delegate a requirement that carries no UI-contract obligation to the upstream acceptance through `requirements.delegations`; the report then lists it under `delegated_requirements` with `certified: false`. A `PASS` certifies the UI-contract obligations only, so the consumer checks the delegated requirements itself. Read [the verification workflow](docs/verification-workflow.md) before declaring a delegation.
+
 The public Python boundary is `penflow.verification.produce_verification_report(...)` and `validate_verification_report(...)`. The latter returns `penflow-verification-validation` version 1 with the checked report hash, exact project/workspace, profile and build-manifest identity. **Read** [the verification workflow](docs/verification-workflow.md) for the schemas, automatic producer steps and integration contract; **read** [the adapter guides](docs/adapters/README.md) for the external runtime boundary. Generated code remains a scaffold until these implementation checks pass.
 
 ## Strict by Default (Breaking Change, Feature 049 / C24)
