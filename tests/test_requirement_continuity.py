@@ -20,7 +20,12 @@ from penflow.requirement_continuity import evidence_declarations
 from penflow.requirement_sources import load_livespec_requirements
 from penflow.verification_files import InputReader, VerificationInputError
 from penflow.verification_json import canonical_bytes, digest
-from tests.c51_continuity_support import SPEC_WITH_SECTIONS, with_static, write_continuity
+from tests.c51_continuity_support import (
+    SPEC_WITH_SECTIONS,
+    STATIC_LINES as STATIC_LINES_FOR_TEST,
+    with_static,
+    write_continuity,
+)
 from tests.c51_design_workspace import review_request
 from tests.c51_review_chain import (
     BASELINE_PATH,
@@ -32,11 +37,13 @@ from tests.c51_review_chain import (
 )
 
 
-def _approved(root: Path) -> ReviewLink:
+STATIC_002 = ("AC-002", "execution", "static")
+EXPLICIT = "**Evidence:** execution\n"
+
+
+def _approved(root: Path, spec: str = SPEC_WITH_SECTIONS) -> ReviewLink:
     request = review_request()
-    return write_review_link(
-        root, replace(request, features=(FeatureSource(spec=SPEC_WITH_SECTIONS),))
-    )
+    return write_review_link(root, replace(request, features=(FeatureSource(spec=spec),)))
 
 
 def _loaded(root: Path) -> dict | str:
@@ -60,7 +67,7 @@ def test_the_static_evidence_lines_need_the_revision(tmp_path: Path) -> None:
     spec.write_text(with_static(SPEC_WITH_SECTIONS, "AC-002"))
     # Without a revision the evidence lines are a change of the reviewed source.
     assert _loaded(tmp_path) == "requirements.source.semantic_changed"
-    write_continuity(link, spec=with_static(SPEC_WITH_SECTIONS, "AC-002"), declared=("AC-002",))
+    write_continuity(link, spec=with_static(SPEC_WITH_SECTIONS, "AC-002"), declared=(STATIC_002,))
     loaded = _loaded(tmp_path)
     assert isinstance(loaded, dict), loaded
     expected = copy.deepcopy(link.projection)
@@ -79,7 +86,7 @@ def test_a_representation_only_contract_revision_is_consumed(tmp_path: Path) -> 
         link,
         spec=with_static(SPEC_WITH_SECTIONS, "AC-002"),
         contract=revised,
-        declared=("AC-002",),
+        declared=(STATIC_002,),
     )
     loaded = _loaded(tmp_path)
     assert isinstance(loaded, dict), loaded
@@ -94,6 +101,11 @@ def test_a_representation_only_contract_revision_is_consumed(tmp_path: Path) -> 
         ("contract-copy", "continuity.contract.functional_change"),
         ("contract-field", "continuity.contract.functional_change"),
         ("tampered-receipt", "input.stale: .specs/penflow-approvals/continuity-"),
+        ("declared-level", "continuity.source.declared_level_mismatch"),
+        ("to-review", "continuity.source.evidence_weakened"),
+        ("existing-states", "continuity.contract.functional_change"),
+        ("removed-repeat", "continuity.contract.functional_change"),
+        ("new-node", "continuity.contract."),  # Invalid or functional: refused either way.
         ("edited-projection", "continuity.envelope.mismatch"),
         ("altered-record", "input.stale: .specs/penflow-approvals/continuity-record-"),
     ],
@@ -104,7 +116,7 @@ def test_a_change_of_meaning_or_a_broken_link_stays_refused(
     link = _approved(tmp_path)
     spec = with_static(SPEC_WITH_SECTIONS, "AC-002")
     contract = None
-    declared = ("AC-002",)
+    declared: tuple[tuple[str, str, str], ...] = (STATIC_002,)
     if case == "criterion-text":
         spec = spec.replace("accepted upstream", "accepted downstream")
     elif case == "undeclared-criterion":
@@ -112,6 +124,24 @@ def test_a_change_of_meaning_or_a_broken_link_stays_refused(
     elif case == "contract-copy":
         contract = _states(link.contract)
         next(row for row in contract["nodes"] if row["id"] == "checkout.pay")["text"] = "Pay now"
+    elif case == "declared-level":
+        declared = (("AC-002", "execution", "native"),)
+    elif case == "to-review":
+        spec = with_static(SPEC_WITH_SECTIONS, "AC-002", "**Evidence:** review\n")
+        declared = (("AC-002", "execution", "review"),)
+    elif case in ("existing-states", "removed-repeat"):
+        link = _with_representation(tmp_path, link)
+        contract = copy.deepcopy(link.contract)
+        node = next(row for row in contract["nodes"] if row["id"] == "checkout.pay")
+        if case == "existing-states":
+            node["states"] = ["default"]
+        else:
+            del next(row for row in contract["nodes"] if row["id"] == "checkout.title")[
+                "repeat_model"
+            ]
+    elif case == "new-node":
+        contract = copy.deepcopy(link.contract)
+        contract["nodes"].append({**contract["nodes"][1], "id": "checkout.extra"})
     elif case == "contract-field":
         contract = copy.deepcopy(link.contract)
         contract["entities"][0]["fields"].append({"id": "coupon", "type": "string"})
@@ -150,7 +180,31 @@ def receipt_record(root: Path, baseline: dict) -> str:
 
 def test_a_repeat_model_and_its_collection_fields_are_representation(tmp_path: Path) -> None:
     link = _approved(tmp_path)
-    revised = copy.deepcopy(link.contract)
+    write_continuity(link, contract=_repeat(link.contract))
+    loaded = _loaded(tmp_path)
+    assert isinstance(loaded, dict), loaded
+
+
+def test_a_second_revision_continues_the_first(tmp_path: Path) -> None:
+    link = _approved(tmp_path)
+    first = write_continuity(
+        link, spec=with_static(SPEC_WITH_SECTIONS, "AC-002"), declared=(STATIC_002,)
+    )
+    raw = (tmp_path / BASELINE_PATH).read_bytes()
+    archived = write_file(tmp_path, f".specs/penflow-approvals/baseline-{digest(raw)}.json", raw)
+    contract = json.loads((tmp_path / "penflow/flow-ui-contract/contract.json").read_text())
+    second_link = replace(link, baseline=first, baseline_ref=archived, contract=contract)
+    write_continuity(
+        second_link,
+        spec=with_static(with_static(SPEC_WITH_SECTIONS, "AC-002"), "AC-001"),
+        declared=(("AC-001", "execution", "static"),),
+    )
+    loaded = _loaded(tmp_path)
+    assert isinstance(loaded, dict), loaded
+
+
+def _repeat(contract: dict) -> dict:
+    revised = _states(contract)
     revised["entities"][0]["fields"] += [
         {"id": "lines", "type": "string"},
         {"id": "id", "type": "string"},
@@ -162,24 +216,21 @@ def test_a_repeat_model_and_its_collection_fields_are_representation(tmp_path: P
         "item_key": "id",
         "instance_id_template": "line-{checkout.id}",
     }
-    write_continuity(link, contract=revised)
-    loaded = _loaded(tmp_path)
-    assert isinstance(loaded, dict), loaded
+    return revised
 
 
-def test_a_second_revision_continues_the_first(tmp_path: Path) -> None:
-    link = _approved(tmp_path)
-    first = write_continuity(
-        link, spec=with_static(SPEC_WITH_SECTIONS, "AC-002"), declared=("AC-002",)
-    )
-    raw = (tmp_path / BASELINE_PATH).read_bytes()
-    archived = write_file(tmp_path, f".specs/penflow-approvals/baseline-{digest(raw)}.json", raw)
-    contract = json.loads((tmp_path / "penflow/flow-ui-contract/contract.json").read_text())
-    second_link = replace(link, baseline=first, baseline_ref=archived, contract=contract)
-    write_continuity(
-        second_link,
-        spec=with_static(with_static(SPEC_WITH_SECTIONS, "AC-002"), "AC-001"),
-        declared=("AC-001",),
-    )
-    loaded = _loaded(tmp_path)
-    assert isinstance(loaded, dict), loaded
+def _with_representation(root: Path, link: ReviewLink) -> ReviewLink:
+    """A first revision adds states and a repeat model; return it as the next predecessor."""
+    baseline = write_continuity(link, contract=_repeat(link.contract))
+    raw = (root / BASELINE_PATH).read_bytes()
+    archived = write_file(root, f".specs/penflow-approvals/baseline-{digest(raw)}.json", raw)
+    contract = json.loads((root / "penflow/flow-ui-contract/contract.json").read_text())
+    return replace(link, baseline=baseline, baseline_ref=archived, contract=contract)
+
+
+def test_an_explicit_execution_level_never_becomes_static(tmp_path: Path) -> None:
+    approved = with_static(SPEC_WITH_SECTIONS, "AC-002", EXPLICIT)
+    link = _approved(tmp_path, approved)
+    revised = approved.replace(EXPLICIT, STATIC_LINES_FOR_TEST)
+    write_continuity(link, spec=revised, declared=(("AC-002", "execution", "static"),))
+    assert _loaded(tmp_path) == "continuity.source.evidence_weakened"

@@ -2842,11 +2842,29 @@
               "evidence_changes": {
                 "type": "array",
                 "items": {
-                  "type": "string",
-                  "pattern": "^AC-[0-9]{3}$"
+                  "type": "object",
+                  "properties": {
+                    "requirement": {
+                      "type": "string",
+                      "pattern": "^AC-[0-9]{3}$"
+                    },
+                    "before_level": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "after_level": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "requirement",
+                    "before_level",
+                    "after_level"
+                  ],
+                  "additionalProperties": false
                 },
-                "minItems": 1,
-                "uniqueItems": true
+                "minItems": 1
               }
             },
             "required": [

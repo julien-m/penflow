@@ -32,6 +32,7 @@ CONTRACT_PATH = "penflow/flow-ui-contract/contract.json"
 # LiveSpec spec-system evidence declaration lines of an acceptance criterion.
 EVIDENCE_PREFIXES = (
     "**Evidence:**",
+    "**Review inputs:**",
     "**Static command:**",
     "**Static directory:**",
     "**Static inputs:**",
@@ -39,6 +40,11 @@ EVIDENCE_PREFIXES = (
 _HEADING = re.compile(r"^#{1,6}\s+(.*)$")
 _CRITERION = re.compile(r"^(AC-[0-9]{3})\b")
 _REPRESENTATION_KEYS = ("states", "repeat_model")
+_EVIDENCE = re.compile(r"^\*\*Evidence:\*\*\s*([a-z-]+)\s*$")
+# An explicitly declared level that no technical change may move (LiveSpec floors).
+_FIXED_LEVELS = ("execution", "native")
+# LiveSpec reads an acceptance criterion without an Evidence line as an execution one.
+_IMPLICIT_LEVEL = "execution"
 # Keys of a baseline that a continuity revision must carry over unchanged.
 _CARRIED = ("scope", "selection", "disposition", "retired_features", "approval_receipts")
 
@@ -60,32 +66,59 @@ def evidence_declarations(text: str) -> tuple[str, dict[str, tuple[str, ...]]]:
     return "".join(kept), {key: tuple(value) for key, value in found.items()}
 
 
-def verify_source_change(before: bytes, after: bytes, declared: list[str]) -> None:
-    """Refuse unless only the declared criteria's evidence declarations differ."""
+def evidence_level(lines: tuple[str, ...]) -> tuple[str, bool]:
+    """The evidence level of one criterion and whether it is explicitly declared."""
+    for line in lines:
+        match = _EVIDENCE.match(line)
+        if match:
+            return match.group(1), True
+    return _IMPLICIT_LEVEL, False
+
+
+def verify_source_change(before: bytes, after: bytes, declared: list[dict[str, Any]]) -> None:
+    """Refuse unless only the declared criteria changed their declarations, without a
+    weaker level: an explicit execution or native level never moves, and no criterion
+    becomes review-only. ``declared`` names each criterion with its levels before/after."""
     old_text, old = evidence_declarations(before.decode("utf-8"))
     new_text, new = evidence_declarations(after.decode("utf-8"))
     if semantic_text_sha256(old_text) != semantic_text_sha256(new_text):
         raise VerificationInputError("continuity.source.meaning_changed")
     changed = sorted(key for key in old.keys() | new.keys() if old.get(key) != new.get(key))
-    if changed != sorted(declared):
+    if changed != sorted(item["requirement"] for item in declared):
         raise VerificationInputError("continuity.source.undeclared_evidence_change")
+    for item in declared:
+        (level, explicit), (later, _) = (
+            evidence_level(old.get(item["requirement"], ())),
+            evidence_level(new.get(item["requirement"], ())),
+        )
+        if [item["before_level"], item["after_level"]] != [level, later]:
+            raise VerificationInputError("continuity.source.declared_level_mismatch")
+        if (explicit and level in _FIXED_LEVELS and later != level) or (
+            later == "review" and level != "review"
+        ):
+            raise VerificationInputError("continuity.source.evidence_weakened")
 
 
 def functional_contract(
-    contract: dict[str, Any], introduced: set[tuple[str, str]], moved: set[str]
+    contract: dict[str, Any], added: set[tuple[str, str]], moved: set[str]
 ) -> Any:
-    """The contract without its representation-only keys, introduced entity fields and the
-    digests of the source references whose continuity is proved separately."""
+    """The contract without the representation keys a revision ADDED to a node, the entity
+    fields its new repeat models introduced, and the digests of the source references whose
+    continuity is proved separately. ``added`` lists ``(node id, key)`` pairs, or
+    ``(entity id, field id)`` pairs prefixed by ``"field:"`` for introduced fields."""
     view = copy.deepcopy(contract)
     for ref in view.get("requirements", {}).get("source_refs", []):
         if ref.get("path") in moved:
             ref["sha256"] = None
     for node in view.get("nodes", []):
         for key in _REPRESENTATION_KEYS:
-            node.pop(key, None)
+            if (str(node.get("id")), key) in added:
+                node.pop(key, None)
     for entity in view.get("entities", []):
         entity["fields"] = [
-            field for field in entity["fields"] if (entity["id"], field["id"]) not in introduced
+            field
+            for field in entity["fields"]
+            if (f"field:{entity['id']}", str(field["id"])) not in added
         ]
     return view
 
@@ -93,8 +126,10 @@ def functional_contract(
 def verify_contract_change(
     before: dict[str, Any], after: dict[str, Any], moved: dict[str, tuple[str, str]]
 ) -> None:
-    """Refuse unless the contracts differ only in their representation and in the digests
-    of the source references moved by a proved source change (``path: (old, new)``)."""
+    """Refuse unless the revision only ADDS state scopes and repeat models to nodes that had
+    none, the entity fields those new repeat models name, and the source digests moved by a
+    proved source change (``path: (old, new)``). An existing scope or model, a binding, an
+    order, an action, a guard, a transition or an expectation never changes this way."""
     if any(item["severity"] == "error" for item in validate_flow_contract_v2(after)):
         raise VerificationInputError("continuity.contract.invalid")
     for contract, side in ((before, 0), (after, 1)):
@@ -104,25 +139,30 @@ def verify_contract_change(
         }
         if any(refs.get(path) != digests[side] for path, digests in moved.items()):
             raise VerificationInputError("continuity.contract.source_ref_mismatch")
-    known = {
-        (entity["id"], field["id"])
-        for entity in before.get("entities", [])
-        for field in entity["fields"]
+    old_nodes = {str(node.get("id")): node for node in before.get("nodes", [])}
+    added = {
+        (str(node.get("id")), key)
+        for node in after.get("nodes", [])
+        for key in _REPRESENTATION_KEYS
+        if key in node and key not in old_nodes.get(str(node.get("id")), {key: None})
     }
-    introduced = _repeat_fields(after) - known
+    new_models = [
+        node["repeat_model"]
+        for node in after.get("nodes", [])
+        if (str(node.get("id")), "repeat_model") in added and isinstance(node["repeat_model"], dict)
+    ]
+    known = {(e["id"], f["id"]) for e in before.get("entities", []) for f in e["fields"]}
+    added |= {(f"field:{owner}", name) for owner, name in _repeat_fields(new_models) - known}
     if canonical_bytes(functional_contract(before, set(), set(moved))) != canonical_bytes(
-        functional_contract(after, introduced, set(moved))
+        functional_contract(after, added, set(moved))
     ):
         raise VerificationInputError("continuity.contract.functional_change")
 
 
-def _repeat_fields(contract: dict[str, Any]) -> set[tuple[str, str]]:
+def _repeat_fields(models: list[dict[str, Any]]) -> set[tuple[str, str]]:
     """The entity fields that repeat models name: their collection and item key."""
     fields: set[tuple[str, str]] = set()
-    for node in contract.get("nodes", []):
-        model = node.get("repeat_model")
-        if not isinstance(model, dict):
-            continue
+    for model in models:
         owner, _, collection = str(model.get("collection", "")).partition(".")
         if owner and collection:
             fields.add((owner, collection))

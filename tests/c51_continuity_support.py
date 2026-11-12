@@ -44,13 +44,13 @@ STATIC_LINES = (
 )
 
 
-def with_static(spec: str, criterion: str) -> str:
-    """Declare static evidence under one criterion, as the observed Atlas patch did."""
+def with_static(spec: str, criterion: str, lines: str = STATIC_LINES) -> str:
+    """Declare evidence lines under one criterion (static by default, as the Atlas patch)."""
     heading = f"### {criterion}\n\n"
     start = spec.index(heading)
     end = spec.find("\n### ", start + len(heading))
     end = len(spec) if end < 0 else end
-    return spec[:end].rstrip("\n") + "\n" + STATIC_LINES + spec[end:]
+    return spec[:end].rstrip("\n") + "\n" + lines + spec[end:]
 
 
 def write_continuity(
@@ -58,7 +58,7 @@ def write_continuity(
     *,
     spec: str | None = None,
     contract: Json | None = None,
-    declared: tuple[str, ...] = (),
+    declared: tuple[tuple[str, str, str], ...] = (),
     slug: str = DEFAULT_SLUG,
 ) -> Json:
     """Republish ``link`` with a changed spec and/or contract; return the new baseline."""
@@ -80,7 +80,10 @@ def write_continuity(
                 "path": path,
                 "before": before,
                 "after": after,
-                "evidence_changes": list(declared),
+                "evidence_changes": [
+                    {"requirement": key, "before_level": old, "after_level": new}
+                    for key, old, new in declared
+                ],
             }
         )
         baseline["sources"] = [after if row["path"] == path else row for row in baseline["sources"]]
