@@ -396,6 +396,11 @@
               ]
             }
           }
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Text of the label associated with a form control (HTML <label for> or aria-labelledby); expected from a sibling label-for node."
         }
       }
     },

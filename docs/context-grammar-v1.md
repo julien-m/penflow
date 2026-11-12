@@ -33,6 +33,11 @@ Forbidden: runtime/platform terms such as SwiftUI, React, Xcode, Playwright, And
 - `semantic` requires `semantic_id`, `test_id`, and `role`; it forbids inheritance and decorative fields.
 - `inherited` requires `inherits_from` and `relation`; it forbids semantic and decorative fields.
 - `decorative` requires `decorative_owner` and `decorative_reason`; it forbids semantic and inheritance fields.
+- The owner of an `inherited` or `decorative` node is an anchored ancestor, with one exception: `relation=label-for`.
+  - A `label-for` text node names a sibling semantic form control (role `input`, `select`, `toggle`, `checkbox` or `radio`), as an HTML `<label for>` names its control.
+  - Its content is the control's authored copy when the control has none of its own.
+  - The expected tree gives the control that text as `label`, and the comparison requires the runtime to associate the same label (`label` in the actual node, from `<label for>`/`id` or `aria-labelledby`).
+  - The label must have text. A control has at most one `label-for` sibling. Any other target is refused (`pencil.label_target_not_control`, `pencil.label_without_copy`, `pencil.label_duplicate`).
 - Stable identifiers are exact, case-sensitive, Unicode NFC join keys. Visible text, geometry, styling,
   colors, names, and similarity never imply a classification.
 

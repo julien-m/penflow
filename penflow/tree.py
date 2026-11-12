@@ -35,13 +35,30 @@ def expected_tree_from_pen(path: str | Path) -> dict[str, Any]:
 
 
 def _screen_to_expected(root: PenNode) -> dict[str, Any]:
+    expected = root.to_expected()
+    attach_labels(expected)
     return {
         "screen_id": root.semantic_id or root.id,
         "pencil_id": root.id,
         "name": root.name,
         "viewport": root.bbox.to_dict(),
-        "root": root.to_expected(),
+        "root": expected,
     }
+
+
+def attach_labels(node: dict[str, Any]) -> None:
+    """Give each control the text of its single sibling ``label-for`` node as ``label``."""
+    children = node.get("children") or []
+    labels: dict[str, list[Any]] = {}
+    for child in children:
+        context = child.get("context") or {}
+        if context.get("classification") == "inherited" and context.get("relation") == "label-for":
+            labels.setdefault(str(context.get("inherits_from")), []).append(child.get("text"))
+    for child in children:
+        found = labels.get(str(child.get("semantic_id")))
+        if found and len(found) == 1 and isinstance(found[0], str) and found[0].strip():
+            child["label"] = found[0]
+        attach_labels(child)
 
 
 def write_expected_tree(pen_path: str | Path, out_path: str | Path) -> dict[str, Any]:

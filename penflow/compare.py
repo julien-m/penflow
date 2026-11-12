@@ -259,6 +259,19 @@ def compare_node(
                 )
             )
 
+    # A control labelled by a sibling label (``label-for``): the runtime must associate the
+    # same label text with it (HTML ``<label for>`` and the control ``id``).
+    expected_label = expected.get("label")
+    if expected_label not in (None, "") and expected_label != actual.get("label"):
+        issues.append(
+            _issue(
+                "error",
+                "node.label.missing" if actual.get("label") is None else "node.label",
+                semantic_id,
+                "associated label differs or is unobserved",
+            )
+        )
+
     if (
         expected.get("_parent_key")
         and actual.get("_parent_key")
