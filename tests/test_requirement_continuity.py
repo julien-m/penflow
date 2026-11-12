@@ -102,7 +102,7 @@ def test_a_representation_only_contract_revision_is_consumed(tmp_path: Path) -> 
         ("contract-field", "continuity.contract.functional_change"),
         ("tampered-receipt", "input.stale: .specs/penflow-approvals/continuity-"),
         ("declared-level", "continuity.source.declared_level_mismatch"),
-        ("to-review", "continuity.source.evidence_weakened"),
+        ("to-review", "continuity.source.level_not_approved"),  # The table says static.
         ("existing-states", "continuity.contract.functional_change"),
         ("removed-repeat", "continuity.contract.functional_change"),
         ("new-node", "continuity.contract."),  # Invalid or functional: refused either way.
@@ -194,11 +194,9 @@ def test_a_second_revision_continues_the_first(tmp_path: Path) -> None:
     archived = write_file(tmp_path, f".specs/penflow-approvals/baseline-{digest(raw)}.json", raw)
     contract = json.loads((tmp_path / "penflow/flow-ui-contract/contract.json").read_text())
     second_link = replace(link, baseline=first, baseline_ref=archived, contract=contract)
-    write_continuity(
-        second_link,
-        spec=with_static(with_static(SPEC_WITH_SECTIONS, "AC-002"), "AC-001"),
-        declared=(("AC-001", "execution", "static"),),
-    )
+    once = with_static(SPEC_WITH_SECTIONS, "AC-002")
+    twice = once.replace("`npm run lint`", "`npm run lint -- --max-warnings 0`")
+    write_continuity(second_link, spec=twice, declared=(("AC-002", "static", "static"),))
     loaded = _loaded(tmp_path)
     assert isinstance(loaded, dict), loaded
 
@@ -234,3 +232,49 @@ def test_an_explicit_execution_level_never_becomes_static(tmp_path: Path) -> Non
     revised = approved.replace(EXPLICIT, STATIC_LINES_FOR_TEST)
     write_continuity(link, spec=revised, declared=(("AC-002", "execution", "static"),))
     assert _loaded(tmp_path) == "continuity.source.evidence_weakened"
+
+
+@pytest.mark.parametrize(
+    ("case", "expected"),
+    [
+        ("native-table", "continuity.source.level_not_approved"),
+        ("no-floor", "continuity.source.level_not_approved"),
+        ("several-levels", "continuity.source.level_not_approved"),
+        ("fenced-table", "continuity.source.level_not_approved"),
+    ],
+)
+def test_an_inline_level_must_be_the_approved_one(tmp_path: Path, case: str, expected: str) -> None:
+    """Without an inline line, the approved floor is the normative level table, never a guess."""
+    table = "| static | AC-002 (report check) |\n"
+    approved = SPEC_WITH_SECTIONS
+    if case == "no-floor":
+        approved = approved.replace(table, "")
+    elif case == "several-levels":
+        approved = approved.replace(table, "| static | AC-002 |\n| native | AC-002 (run) |\n")
+    elif case == "fenced-table":
+        start = approved.index("## Required evidence level per AC")
+        end = approved.index("### AC-001")
+        approved = (
+            approved[:start] + "```markdown\n" + approved[start:end] + "```\n\n" + approved[end:]
+        )
+    link = _approved(tmp_path, approved)
+    criterion, declared = (
+        ("AC-001", ("AC-001", "execution", "static"))
+        if case == "native-table"
+        else (
+            "AC-002",
+            STATIC_002,
+        )
+    )
+    write_continuity(link, spec=with_static(approved, criterion), declared=(declared,))
+    assert _loaded(tmp_path) == expected
+
+
+def test_editing_the_level_table_is_a_change_of_meaning(tmp_path: Path) -> None:
+    link = _approved(tmp_path)
+    native = "| native (real browser on the deployed screen) | AC-001 |"
+    relabelled = SPEC_WITH_SECTIONS.replace(native, "| static | AC-001 |")
+    write_continuity(
+        link, spec=with_static(relabelled, "AC-001"), declared=(("AC-001", "execution", "static"),)
+    )
+    assert _loaded(tmp_path) == "continuity.source.meaning_changed"

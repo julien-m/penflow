@@ -75,17 +75,73 @@ def evidence_level(lines: tuple[str, ...]) -> tuple[str, bool]:
     return _IMPLICIT_LEVEL, False
 
 
+_LEVELS = ("static", "unit", "integration", "mocked-web", "native", "execution", "review")
+_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+_CRITERIA = re.compile(r"\b(?:acs?|acceptance criteri(?:on|a)|criteri(?:on|a))\b")
+_ID_OR_RANGE = re.compile(r"AC-([0-9]{3})(?:\s*(?:\u2013|\u2014|-|to)\s*AC-([0-9]{3}))?")
+
+
+def _cells(line: str) -> list[str]:
+    return [cell.strip() for cell in line.strip().strip("|").split("|")]
+
+
+def level_table(text: str) -> dict[str, set[str]]:
+    """The evidence levels each criterion receives from normative level tables.
+
+    A level table is a Markdown table outside fences and HTML comments whose header has
+    a cell naming the level and a cell naming the criteria. Each row reads the first word
+    of its level cell (one of ``_LEVELS``) and every ``AC-NNN`` or ``AC-NNN–AC-MMM`` range
+    of its criteria cell; a parenthetical qualifier keeps the criterion.
+    """
+    found: dict[str, set[str]] = {}
+    lines = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL).splitlines()
+    fence = False
+    columns: tuple[int, int] | None = None
+    for index, line in enumerate(lines):
+        if _FENCE.match(line):
+            fence, columns = not fence, None
+            continue
+        if fence or not line.strip().startswith("|"):
+            columns = None
+            continue
+        cells = _cells(line)
+        if columns is None:
+            header = [cell.casefold() for cell in cells]
+            separator = index + 1 < len(lines) and set(
+                lines[index + 1].replace("|", "").strip()
+            ) <= set("-: ")
+            level = next((i for i, cell in enumerate(header) if "level" in cell), None)
+            criteria = next((i for i, cell in enumerate(header) if _CRITERIA.search(cell)), None)
+            if separator and level is not None and criteria is not None and level != criteria:
+                columns = (level, criteria)
+            continue
+        if set(line.replace("|", "").strip()) <= set("-: ") or max(columns) >= len(cells):
+            continue
+        words = cells[columns[0]].split()
+        name = words[0].casefold() if words else ""
+        if name not in _LEVELS:
+            continue
+        for start, end in _ID_OR_RANGE.findall(cells[columns[1]]):
+            for number in range(int(start), int(end or start) + 1):
+                found.setdefault(f"AC-{number:03d}", set()).add(name)
+    return found
+
+
 def verify_source_change(before: bytes, after: bytes, declared: list[dict[str, Any]]) -> None:
-    """Refuse unless only the declared criteria changed their declarations, without a
-    weaker level: an explicit execution or native level never moves, and no criterion
-    becomes review-only. ``declared`` names each criterion with its levels before/after."""
-    old_text, old = evidence_declarations(before.decode("utf-8"))
+    """Refuse unless only the declared criteria changed their declarations, to a level the
+    approved document already grants: the level table's only level for that criterion,
+    or, without a table entry, a move that keeps an explicit floor (execution and native
+    never move, nothing becomes review). Without any approved level, nothing is guessed.
+    ``declared`` names each criterion with its levels before/after."""
+    old_source = before.decode("utf-8")
+    old_text, old = evidence_declarations(old_source)
     new_text, new = evidence_declarations(after.decode("utf-8"))
     if semantic_text_sha256(old_text) != semantic_text_sha256(new_text):
         raise VerificationInputError("continuity.source.meaning_changed")
     changed = sorted(key for key in old.keys() | new.keys() if old.get(key) != new.get(key))
     if changed != sorted(item["requirement"] for item in declared):
         raise VerificationInputError("continuity.source.undeclared_evidence_change")
+    approved = level_table(old_text)
     for item in declared:
         (level, explicit), (later, _) = (
             evidence_level(old.get(item["requirement"], ())),
@@ -93,6 +149,10 @@ def verify_source_change(before: bytes, after: bytes, declared: list[dict[str, A
         )
         if [item["before_level"], item["after_level"]] != [level, later]:
             raise VerificationInputError("continuity.source.declared_level_mismatch")
+        table = approved.get(item["requirement"])
+        # Every approved floor holds: the level table's level and an explicit inline one.
+        if (table is not None and table != {later}) or (table is None and not explicit):
+            raise VerificationInputError("continuity.source.level_not_approved")
         if (explicit and level in _FIXED_LEVELS and later != level) or (
             later == "review" and level != "review"
         ):

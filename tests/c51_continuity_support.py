@@ -28,6 +28,13 @@ Json = dict[str, Any]
 SPEC_WITH_SECTIONS = (
     SPEC_TEXT
     + """
+## Required evidence level per AC
+
+| Level | ACs |
+|---|---|
+| native (real browser on the deployed screen) | AC-001 |
+| static | AC-002 (report check) |
+
 ### AC-001
 
 **Criterion:** The checkout screen is visible.
