@@ -162,8 +162,15 @@
           "additionalProperties": true,
           "properties": {
             "fill": {
-              "type": "string",
-              "minLength": 1
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1
+                },
+                {
+                  "$ref": "#/$defs/imagePaint"
+                }
+              ]
             },
             "stroke": {
               "anyOf": [
@@ -316,6 +323,31 @@
         "height": {
           "type": "number",
           "minimum": 0
+        }
+      }
+    },
+    "imagePaint": {
+      "$comment": "Native Pencil image paint, exported unchanged (a bitmap reference, not a color).",
+      "type": "object",
+      "required": [
+        "type",
+        "url"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "image"
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "mode": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }
