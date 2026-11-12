@@ -1573,6 +1573,29 @@
       ],
       "additionalProperties": false
     },
+    "penflow-identity": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executable": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executable_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "version",
+        "executable",
+        "executable_sha256"
+      ],
+      "additionalProperties": false
+    },
     "review-approval": {
       "type": "object",
       "properties": {
@@ -1746,6 +1769,9 @@
           },
           "minItems": 0,
           "uniqueItems": true
+        },
+        "penflow_identity": {
+          "$ref": "#/$defs/penflow-identity"
         }
       },
       "required": [
@@ -2021,6 +2047,9 @@
           },
           "minItems": 0,
           "uniqueItems": true
+        },
+        "penflow_identity": {
+          "$ref": "#/$defs/penflow-identity"
         }
       },
       "required": [
@@ -2750,6 +2779,9 @@
             ],
             "additionalProperties": false
           }
+        },
+        "penflow_identity": {
+          "$ref": "#/$defs/penflow-identity"
         }
       },
       "required": [

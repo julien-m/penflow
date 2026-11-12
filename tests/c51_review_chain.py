@@ -80,6 +80,8 @@ class ReviewRequest:
     retired: tuple[str, ...] = ()
     previous: ReviewLink | None = None
     overrides: ChainOverrides = field(default_factory=ChainOverrides)
+    # LiveSpec adds the identity of the Penflow CLI it invoked to the snapshot and the approval.
+    penflow_identity: Json | None = None
 
 
 @dataclass(frozen=True)
@@ -253,15 +255,17 @@ def write_review_link(root: Path, request: ReviewRequest) -> ReviewLink:
 def _write_envelopes(
     root: Path, request: ReviewRequest, envelope: Json, contract: Json, projection: Json
 ) -> ReviewLink:
+    identity = _identity_field(request.penflow_identity)
     snapshot = {
         "kind": "livespec-penflow-review-snapshot",
         "version": 1,
         "command": "spec-plan",
         **envelope,
         "projection": projection,
+        **identity,
     }
     snapshot_ref = archive(root, "snapshot", encode(snapshot))
-    approval_ref = _approval(root, envelope, snapshot_ref)
+    approval_ref = _approval(root, {**envelope, **identity}, snapshot_ref)
     reused = request.overrides.approval_from
     contract_ref = envelope["inputs"]["contract"]
     edited = request.overrides.baseline_projection
@@ -287,6 +291,11 @@ def _write_envelopes(
     return ReviewLink(
         root, baseline, archive(root, "baseline", raw), approval_ref, snapshot, contract, projection
     )
+
+
+def _identity_field(identity: Json | None) -> Json:
+    """Write the key only when a Penflow CLI was invoked, as LiveSpec does; never null."""
+    return {} if identity is None else {"penflow_identity": identity}
 
 
 def _approval(root: Path, envelope: Json, snapshot_ref: Json) -> Json:
@@ -369,7 +378,9 @@ class InheritedAuthority:
     inherited_ids: tuple[str, ...]
 
 
-def write_inherited_authority(root: Path, fixture: Path) -> InheritedAuthority:
+def write_inherited_authority(
+    root: Path, fixture: Path, *, penflow_identity: Json | None = None
+) -> InheritedAuthority:
     """Import the frozen Brainstorm fixture and reuse its records in a LiveSpec contract.
 
     The import package lists the exact fixture bytes and a synthetic schema-valid
@@ -396,6 +407,7 @@ def write_inherited_authority(root: Path, fixture: Path) -> InheritedAuthority:
         "workspace": IMPORT_WORKSPACE,
         "report": report,
         "files": files,
+        **_identity_field(penflow_identity),
     }
     package_ref = write_file(root, IMPORT_PACKAGE_PATH, encode(package))
     imported = [package_ref, *({"path": row["path"], "sha256": row["sha256"]} for row in files)]
