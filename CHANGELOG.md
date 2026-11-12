@@ -18,6 +18,10 @@ All notable public changes will be recorded here. Penflow follows semantic versi
 - Test helpers read machine-specific runtime paths from environment variables instead of hard-coded absolute paths.
 - Feature 045 accepts mutation-free local form submits while preserving strict request duties for mutation-bearing submits.
 
+### Fixed
+
+- C51 accepts the optional `penflow_identity` (Penflow version text, executable path and executable SHA-256) that LiveSpec writes in its review snapshot, review approval and Brainstorm authority import. Before, `--profile design` blocked `upstream-requirements` with `input.invalid_object: review-approval`. Records without the key validate as before; a present key must hold exactly these three non-empty fields.
+
 ## [0.1.0] - Unreleased
 
 The package metadata reserves `0.1.0` for the first alpha release. No package-registry publication or signed release is claimed.
