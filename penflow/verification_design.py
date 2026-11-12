@@ -6,6 +6,7 @@ from typing import Any
 from .code_ir import code_ir_from_pen, validate_code_ir
 from .consistency import check_consistency
 from .drift import canonical_drift_issues
+from .expected_constraints import apply_contract_constraints
 from .flow_contract import validate_flow_contract_v2
 from .flow_docs import check_generated_docs
 from .json_filesystem import write_json_atomically
@@ -164,6 +165,7 @@ def _expected(
     }
     for screen in expected["screens"]:
         screen["screen_id"] = root_screens[screen["root"]["semantic_id"]]
+    apply_contract_constraints(expected, snapshot.contract)
     if snapshot.policy is None:
         raise ValueError("verification.policy.native_geometry_unknown")
     if snapshot.policy["native_geometry"] == "required":

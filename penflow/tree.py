@@ -157,12 +157,21 @@ def flatten_nodes(
 def _tree_identity_issues(tree: dict[str, Any]) -> list[dict[str, Any]]:
     # Check each screen's unique identities, finite geometry, then typed numeric observations.
     issues: list[dict[str, Any]] = []
-    screens: set[str] = set()
+    screens: set[tuple[str, str | None]] = set()
+    scoped: dict[str, set[bool]] = {}
     for index, screen in enumerate(tree["screens"]):
         path = f"$.screens[{index}]"
-        if screen["screen_id"] in screens:
-            issues.append(_issue("error", path, "duplicate screen identity"))
-        screens.add(screen["screen_id"])
+        # A screen may hold one capture per contract state (state-scoped comparison);
+        # a stateless capture stays the single capture of its screen.
+        identity = (screen["screen_id"], screen.get("state"))
+        if identity in screens:
+            message = "duplicate screen state" if identity[1] else "duplicate screen identity"
+            issues.append(_issue("error", path, message))
+        screens.add(identity)
+        kinds = scoped.setdefault(screen["screen_id"], set())
+        kinds.add("state" in screen)
+        if len(kinds) == 2:
+            issues.append(_issue("error", path, "screen mixes state-scoped and stateless captures"))
         for key, value in screen.get("viewport", {}).items():
             if isinstance(value, (int, float)) and (
                 abs(value) > MAX_ABSOLUTE_OBSERVATION or not math.isfinite(value)
