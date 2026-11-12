@@ -62,3 +62,13 @@ For a node whose contract declares `repeat_model`, emit one node per real item, 
 ## Not covered by Penflow
 
 Running the application, reaching each state, choosing scenarios and writing the UI snapshots stay the adapter's job. A field annotated on the wrong `.pen` node (for example a field group annotated as the select it contains) is a design-source correction, not a comparison rule.
+
+## Data-conditioned controls within one state
+
+A contract node may declare `visible_when: {"fact": "<entity.field>", "in": [values]}`: the controls a record status offers, inside one contract state. Capture that state once per relevant set of facts.
+- Each capture carries `facts: {"<entity.field>": value}`, and its `observed_states` witness carries the same `facts`. A witness with other facts does not witness it.
+- Captures of one state are distinct by their facts.
+- A conditioned node is required exactly in the captures whose facts meet its condition, and refused where they do not (`node.condition_unexpected`).
+- Each conditioned node must be required by at least one capture (`node.condition_unwitnessed`), so no control is left unobserved.
+- A capture without the fact a condition reads fails with `node.condition_fact_missing`.
+- Do not invent a composite state for a data condition.

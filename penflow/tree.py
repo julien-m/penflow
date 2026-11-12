@@ -174,13 +174,15 @@ def flatten_nodes(
 def _tree_identity_issues(tree: dict[str, Any]) -> list[dict[str, Any]]:
     # Check each screen's unique identities, finite geometry, then typed numeric observations.
     issues: list[dict[str, Any]] = []
-    screens: set[tuple[str, str | None]] = set()
+    screens: set[tuple[str, str | None, str | None]] = set()
     scoped: dict[str, set[bool]] = {}
     for index, screen in enumerate(tree["screens"]):
         path = f"$.screens[{index}]"
         # A screen may hold one capture per contract state (state-scoped comparison);
         # a stateless capture stays the single capture of its screen.
-        identity = (screen["screen_id"], screen.get("state"))
+        # Captures of one state differ by their observed data facts (record status...).
+        facts = json.dumps(screen.get("facts"), sort_keys=True) if "facts" in screen else None
+        identity = (screen["screen_id"], screen.get("state"), facts)
         if identity in screens:
             message = "duplicate screen state" if identity[1] else "duplicate screen identity"
             issues.append(_issue("error", path, message))

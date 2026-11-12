@@ -33,4 +33,6 @@ def apply_contract_constraints(expected: dict[str, Any], contract: dict[str, Any
                     node["states"] = list(declared["states"])
                 if isinstance(declared.get("repeat_model"), dict):
                     node["repeat_model"] = deepcopy(declared["repeat_model"])
+                if isinstance(declared.get("visible_when"), dict):
+                    node["visible_when"] = deepcopy(declared["visible_when"])
             pending.extend(node.get("children", []) or [])

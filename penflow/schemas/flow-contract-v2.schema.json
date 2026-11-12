@@ -461,6 +461,34 @@
           "items": {
             "type": "string"
           }
+        },
+        "visible_when": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fact",
+            "in"
+          ],
+          "description": "Data condition under which the node exists within its states (for example the controls a record status offers). Proved by the facts each capture records with its witness.",
+          "properties": {
+            "fact": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*(?:[._-][a-z0-9_]+)*$"
+            },
+            "in": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          }
         }
       }
     },

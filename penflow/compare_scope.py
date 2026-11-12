@@ -36,6 +36,7 @@ class Join:
     issues: list[dict[str, Any]] = field(default_factory=list)
     checks: int = 0
     failed: int = 0
+    applicable: set[str] = field(default_factory=set)
 
 
 def template_pattern(template: str) -> re.Pattern[str]:
@@ -84,14 +85,33 @@ def declared_states(nodes: list[dict[str, Any]]) -> dict[str, list[str]]:
 
 
 def witnessed(actual: dict[str, Any], capture: dict[str, Any]) -> bool:
-    """Whether ``observed_states`` names this capture's screen, state and scenario."""
+    """Whether ``observed_states`` names this capture's screen, state, scenario and facts."""
     return any(
         isinstance(entry, dict)
         and entry.get("screen_id") == capture.get("screen_id")
         and entry.get("state") == capture.get("state")
         and entry.get("scenario_id") == capture.get("scenario_id")
+        and entry.get("facts") == capture.get("facts")
         for entry in actual.get("observed_states", []) or []
     )
+
+
+def effective_conditions(nodes: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """Each expected node's data conditions, its own and its ancestors' (all must hold)."""
+    result: dict[str, list[dict[str, Any]]] = {}
+    for node in nodes:  # Preorder: a parent precedes its children.
+        inherited = result.get(str(node.get("_parent_key")), []) if node.get("_parent_key") else []
+        own = node.get("visible_when")
+        result[str(node["_semantic_key"])] = [*inherited, *([own] if isinstance(own, dict) else [])]
+    return result
+
+
+def _condition(conditions: list[dict[str, Any]], facts: Any) -> bool | None:
+    """Whether every condition holds on ``facts``; None when a needed fact is unobserved."""
+    observed = facts if isinstance(facts, dict) else {}
+    if any(condition["fact"] not in observed for condition in conditions):
+        return None
+    return all(observed[condition["fact"]] in condition["in"] for condition in conditions)
 
 
 def join_nodes(
@@ -99,6 +119,7 @@ def join_nodes(
     actual_nodes: list[dict[str, Any]],
     state: str | None,
     masked: Callable[[dict[str, Any]], bool] = lambda node: False,
+    facts: Any = None,
 ) -> Join:
     """Pair the expected nodes applicable in ``state`` with the actual capture's nodes.
 
@@ -114,13 +135,32 @@ def join_nodes(
     applicable_ids: set[str] = set()
     applicable_keys: set[str] = set()
     excluded_ids: set[str] = set()
-    applicable = [
+    in_state = [
         node
         for node in expected_nodes
         if state is None
         or scope.get(str(node["_semantic_key"])) is None
         or state in (scope.get(str(node["_semantic_key"])) or ())
     ]
+    conditions = effective_conditions(expected_nodes)
+    applicable = []
+    unmet: set[str] = set()
+    for node in in_state:
+        key = str(node["_semantic_key"])
+        holds = _condition(conditions[key], facts) if conditions[key] else True
+        if holds is None:
+            join.checks += 1
+            join.failed += 1
+            join.issues.append(
+                _issue(
+                    "node.condition_fact_missing", key, "capture lacks the fact its condition reads"
+                )
+            )
+        elif holds:
+            applicable.append(node)
+            join.applicable.add(key)
+        else:
+            unmet.add(base_identity(node))
     applicable_set = {id(node) for node in applicable}
     positions = _state_positions(applicable) if state is not None else {}
     for node in expected_nodes:
@@ -150,7 +190,15 @@ def join_nodes(
         if key in consumed or key in applicable_keys:
             continue
         identity = base_identity(actual)
-        if state is not None and identity in excluded_ids and identity not in applicable_ids:
+        if identity in unmet and identity not in applicable_ids:
+            join.issues.append(
+                _issue(
+                    "node.condition_unexpected",
+                    key,
+                    "node is present although the capture's facts do not meet its condition",
+                )
+            )
+        elif state is not None and identity in excluded_ids and identity not in applicable_ids:
             join.issues.append(
                 _issue(
                     "node.state_unexpected",

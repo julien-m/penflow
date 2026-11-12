@@ -58,6 +58,18 @@
               "sha256"
             ],
             "additionalProperties": false
+          },
+          "facts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean",
+                "null"
+              ]
+            },
+            "description": "Observed data facts of this capture (record status, mode), bound to its observed_states witness."
           }
         },
         "required": [
@@ -108,6 +120,18 @@
             "minLength": 1
           },
           "uniqueItems": true
+        },
+        "facts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "description": "Observed data facts of this capture (record status, mode), bound to its observed_states witness."
         }
       },
       "dependentRequired": {
@@ -401,6 +425,34 @@
           "type": "string",
           "minLength": 1,
           "description": "Text of the label associated with a form control (HTML <label for> or aria-labelledby); expected from a sibling label-for node."
+        },
+        "visible_when": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fact",
+            "in"
+          ],
+          "description": "Data condition under which the node exists within its states (for example the controls a record status offers). Proved by the facts each capture records with its witness.",
+          "properties": {
+            "fact": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*(?:[._-][a-z0-9_]+)*$"
+            },
+            "in": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          }
         }
       }
     },

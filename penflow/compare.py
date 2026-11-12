@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 from typing import Any, cast
 
-from .compare_scope import declared_states, join_nodes, witnessed
+from .compare_scope import declared_states, effective_conditions, join_nodes, witnessed
 from .tree import flatten_nodes, load_tree, normalize_actual_tree, validate_actual_tree
 
 DEFAULT_TOLERANCE = {
@@ -177,13 +177,16 @@ def _compare_screen(
                         + ", ".join(keys),
                     )
                 )
+    seen: set[str] = set()
     for capture, scope in targets:
         join = join_nodes(
             expected_nodes,
             flatten_nodes(capture.get("root", {})),
             scope,
             masked=(lambda node: False) if mandatory else _is_masked,
+            facts=capture.get("facts"),
         )
+        seen |= join.applicable
         issues.extend(join.issues)
         checks += join.checks
         failed += join.failed
@@ -192,6 +195,15 @@ def _compare_screen(
             failed += sum(1 for issue in node_issues if issue["severity"] in {"error", "warning"})
             checks += max(0, len(node_issues) - 1)
             issues.extend(node_issues)
+    # A data-conditioned node must be required by at least one capture: no capture may
+    # leave an expected control unobserved by choosing facts under which it never applies.
+    for key, conditions in sorted(effective_conditions(expected_nodes).items()):
+        if conditions and key not in seen:
+            checks += 1
+            failed += 1
+            issues.append(
+                _issue("error", "node.condition_unwitnessed", key, "no capture meets its condition")
+            )
     return checks, failed, issues
 
 
