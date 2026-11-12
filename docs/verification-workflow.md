@@ -75,7 +75,10 @@ The caller supplies the manifest independently. A report cannot select its own p
 
 The expected tree carries the contract `states` of each screen and node and the contract `repeat_model` of collection templates. When nodes are scoped to states, the runner captures one actual tree per state (`state`, `scenario_id`), each witnessed by an `observed_states` entry; the comparison joins each capture with the nodes of its state and refuses a missing, unknown, unwitnessed or fused state, and matches collection instances only through `instance_id_template` ([state and collection capture](adapters/state-and-collection-capture.md)).
 
-`observed_states` is an index into authenticated UI observations or standalone UI snapshots. Each tuple must join exact screen/state/session/scenario/contract/build facts. Disappearance after a native close is observed absence; unavailable geometry/state may be null only in that closed branch. Back navigation joins an actually observed previous URL, plus any source-required destination predicate.
+`observed_states` is an index into authenticated UI observations or standalone UI snapshots. Each tuple must join exact screen/state/session/scenario/contract/build facts. Disappearance after a native close is observed absence; unavailable geometry/state may be null only in that closed branch. A guard may declare `"enforcement": "absence"` when the product enforces it by not offering the action (Save is not rendered until the record is read). Its `validation:<guard>:<action>:invalid` duty stays.
+- It is proved by UI facts with `"present": false` before and after: `visible: false`, and null `bbox`, `enabled` and `text`.
+- An absent control proves only that branch (`outcome.validation.absence_undeclared`), and a guard enforced by absence needs that absence (`outcome.validation.absence_unobserved`).
+- The default `refusal` is unchanged. Back navigation joins an actually observed previous URL, plus any source-required destination predicate.
 
 ## Consumer transport and lifecycle
 

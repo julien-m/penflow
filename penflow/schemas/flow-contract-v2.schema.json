@@ -212,6 +212,13 @@
         },
         "unused_allowed": {
           "type": "boolean"
+        },
+        "enforcement": {
+          "enum": [
+            "refusal",
+            "absence"
+          ],
+          "description": "How the product enforces the guard when it does not hold: refusal (default, the action is attempted and refused) or absence (the action is not offered; its control is absent)."
         }
       }
     },

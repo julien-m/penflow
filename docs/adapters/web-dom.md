@@ -119,3 +119,8 @@ Expected output: exit 0, `"status": "PASS"`, `"issues": []`.
 - Does not turn snippet bugs into Penflow regressions — the snippet is documentation.
 
 The feature 039 demo is a static fixture, not an application run. **Read** [the bounded runtime pilot](../../tests/runtime_pilot/README.md) for the separately executed HTTP/SQLite/browser test application; it is not a general-purpose runtime adapter.
+
+## Labels and absent controls
+
+- Report the text of the label associated with a form control as `label`: the `<label for>` whose `for` equals the control's `id`, or the element named by `aria-labelledby`. The comparison requires it when the design declares a `label-for` sibling.
+- To prove the invalid branch of a guard enforced by absence, report the control as `present: false` before and after: `visible: false`, and null `bbox`, `enabled` and `text`. Report it only when the control is truly absent from the DOM.

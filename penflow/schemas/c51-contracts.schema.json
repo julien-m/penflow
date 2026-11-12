@@ -1220,6 +1220,10 @@
         },
         "navigation": {
           "$ref": "#/$defs/navigation-facts"
+        },
+        "present": {
+          "type": "boolean",
+          "description": "false: the node is absent from the rendered surface (for example an action not offered while its guard does not hold). Omitted means present."
         }
       },
       "required": [
@@ -1271,16 +1275,55 @@
             }
           },
           "else": {
-            "properties": {
-              "state": {
-                "type": "string",
-                "minLength": 1
-              },
-              "bbox": {
-                "$ref": "#/$defs/bbox"
-              },
-              "enabled": {
-                "type": "boolean"
+            "if": {
+              "required": [
+                "present"
+              ],
+              "properties": {
+                "present": {
+                  "const": false
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "visible": {
+                  "const": false
+                },
+                "state": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "bbox": {
+                  "type": "null"
+                },
+                "enabled": {
+                  "type": "null"
+                },
+                "text": {
+                  "type": "null"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "bbox": {
+                  "$ref": "#/$defs/bbox"
+                },
+                "enabled": {
+                  "type": "boolean"
+                }
               }
             }
           }

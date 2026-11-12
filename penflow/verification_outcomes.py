@@ -48,7 +48,47 @@ def evaluate_outcome(
             )
     if observation["capability"] == "storage":
         issues.extend(_storage_issues(observation))
+    if observation["capability"] == "ui":
+        issues.extend(_absence_issues(observation, contract))
     return issues
+
+
+def _absence_issues(observation: dict[str, Any], contract: dict[str, Any]) -> list[dict[str, Any]]:
+    """An absent control proves only the invalid branch of a guard enforced by absence.
+
+    For such a guard, the invalid branch is the action not being offered: the node is
+    absent before and after, and nothing is refused because nothing can be attempted. An
+    absence never proves another branch or a guard enforced by refusal.
+    """
+    absent = [side for side in ("before", "after") if observation[side].get("present") is False]
+    parts = str(observation["obligation_id"]).split(":")
+    guard = next(
+        (
+            item
+            for item in contract.get("guards", [])
+            if len(parts) == 4 and parts[0] == "validation" and item["id"] == parts[1]
+        ),
+        None,
+    )
+    by_absence = guard is not None and guard.get("enforcement") == "absence"
+    invalid = observation["result"]["outcome"] == "invalid"
+    if by_absence and invalid and absent != ["before", "after"]:
+        return [
+            issue(
+                "outcome.validation.absence_unobserved",
+                "after/present",
+                "a guard enforced by absence needs the control absent before and after",
+            )
+        ]
+    if absent and not (by_absence and invalid):
+        return [
+            issue(
+                "outcome.validation.absence_undeclared",
+                "after/present",
+                "an absent control proves only the invalid branch of a guard enforced by absence",
+            )
+        ]
+    return []
 
 
 def _source_identity_issues(
