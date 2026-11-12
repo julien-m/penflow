@@ -193,6 +193,20 @@ def _validate_actions(
             value = action.get(field)
             if value and value not in registries[registry_name]:
                 append_missing_reference(registry_name[:-1], value, f"{path}.{field}", issues)
+        if action.get("precondition") == "none":
+            # A declared absence of precondition: no transition of the action may be guarded.
+            for transition in registries["transitions"].values():
+                if (transition.get("action") or transition.get("trigger")) == action.get(
+                    "id"
+                ) and transition.get("guard"):
+                    issues.append(
+                        contract_issue(
+                            "error",
+                            "contract.reference.precondition_conflict",
+                            f"{path}.precondition",
+                            "an action without precondition has a guarded transition",
+                        )
+                    )
         if node is not None:
             issues.extend(action_binding_issues(action, node, registries["screens"], path))
             issues.extend(

@@ -732,6 +732,10 @@
         },
         "unused_allowed": {
           "type": "boolean"
+        },
+        "precondition": {
+          "const": "none",
+          "description": "Explicit declaration that a state_change submit action has no precondition (a toggle, for example); it then has no guard and no guarded transition."
         }
       },
       "allOf": [
@@ -832,7 +836,6 @@
             },
             "then": {
               "required": [
-                "guard",
                 "success_transition"
               ],
               "properties": {
@@ -871,7 +874,29 @@
                     ]
                   }
                 ]
-              }
+              },
+              "oneOf": [
+                {
+                  "required": [
+                    "guard"
+                  ],
+                  "not": {
+                    "required": [
+                      "precondition"
+                    ]
+                  }
+                },
+                {
+                  "required": [
+                    "precondition"
+                  ],
+                  "not": {
+                    "required": [
+                      "guard"
+                    ]
+                  }
+                }
+              ]
             },
             "else": {
               "if": {
