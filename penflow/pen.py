@@ -101,7 +101,6 @@ def _parse_node(data: dict[str, Any], parent_id: str | None, order: int) -> PenN
     return node
 
 
-# @spec FR-004: Design sizing reaches the expected tree (C51 F3)
 def design_sizing(value: Any) -> str:
     """How the design source sizes one dimension: ``fixed``, ``fill``, ``hug`` or ``unspecified``.
 

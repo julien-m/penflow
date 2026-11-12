@@ -11,7 +11,6 @@ from copy import deepcopy
 from typing import Any
 
 
-# @spec FR-006: Contract states and repeat models reach the expected comparison (C51)
 def apply_contract_constraints(expected: dict[str, Any], contract: dict[str, Any]) -> None:
     """Annotate ``expected`` in place with the contract's screen states and node constraints.
 

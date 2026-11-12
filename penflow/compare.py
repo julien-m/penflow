@@ -105,7 +105,6 @@ def compare_trees(
     return _comparison_report(issues, total_checks, failed_checks, threshold)
 
 
-# @spec FR-006: State-scoped and collection-aware node join (C51)
 def _compare_screen(
     expected_screen: dict[str, Any],
     expected_nodes: list[dict[str, Any]],

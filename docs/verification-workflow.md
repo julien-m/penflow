@@ -63,6 +63,8 @@ penflow validate-report penflow/run-report.json --schema --required-profile impl
 
 The caller supplies the manifest independently. A report cannot select its own project or build. Revalidation reads current bytes and reruns the same policy; changing only report status or recomputing its hash cannot make an incomplete run pass. Missing evidence, unknown capabilities, omitted obligations, stale sources and required warnings remain blocking.
 
+The expected tree carries the contract `states` of each screen and node and the contract `repeat_model` of collection templates. When nodes are scoped to states, the runner captures one actual tree per state (`state`, `scenario_id`), each witnessed by an `observed_states` entry; the comparison joins each capture with the nodes of its state and refuses a missing, unknown, unwitnessed or fused state, and matches collection instances only through `instance_id_template` ([state and collection capture](adapters/state-and-collection-capture.md)).
+
 `observed_states` is an index into authenticated UI observations or standalone UI snapshots. Each tuple must join exact screen/state/session/scenario/contract/build facts. Disappearance after a native close is observed absence; unavailable geometry/state may be null only in that closed branch. Back navigation joins an actually observed previous URL, plus any source-required destination predicate.
 
 ## Consumer transport and lifecycle

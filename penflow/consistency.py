@@ -285,7 +285,6 @@ _ABSENT = _Absent()
 
 def _property_value(node: dict[str, Any], prop: str) -> Any:
     if prop == "bbox.height":
-        # @spec FR-004: Heights of content-sized members are not compared (C51 F3)
         # A tree without sizing keeps the strict comparison; with sizing, only heights
         # the design source fixes are homologous and comparable.
         if "sizing" in node and _height_sizing(node) != "fixed":
