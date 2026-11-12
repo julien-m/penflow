@@ -181,7 +181,9 @@ def _tree_identity_issues(tree: dict[str, Any]) -> list[dict[str, Any]]:
         # A screen may hold one capture per contract state (state-scoped comparison);
         # a stateless capture stays the single capture of its screen.
         # Captures of one state differ by their observed data facts (record status...).
-        facts = json.dumps(screen.get("facts"), sort_keys=True) if "facts" in screen else None
+        # Only state captures may be distinguished by facts; a stateless capture is unique.
+        scoped_facts = "state" in screen and "facts" in screen
+        facts = json.dumps(screen.get("facts"), sort_keys=True) if scoped_facts else None
         identity = (screen["screen_id"], screen.get("state"), facts)
         if identity in screens:
             message = "duplicate screen state" if identity[1] else "duplicate screen identity"

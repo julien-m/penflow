@@ -260,24 +260,60 @@ def _join_instances(
             continue
         matched += 1
         join.checks += 1
-        join.pairs.append((_instance_view(node, governing, actual), actual))
+        join.pairs.append((_instance_view(node, governing, actual, actual_keys), actual))
+    if identity != owner:
+        # A repeated descendant is required in EVERY owning instance, never in one for all.
+        owners = _owner_instances(owner, pattern, actual_nodes)
+        for instance in owners:
+            key = f"{identity}::{instance}"
+            if key not in actual_keys:
+                join.checks += 1
+                join.failed += 1
+                join.issues.append(_missing(key, state))
+        if owners:
+            return
     if matched == 0:
         join.checks += 1
         join.failed += 1
         join.issues.append(_missing(str(node["_semantic_key"]), state))
 
 
+def _owner_instances(
+    owner: str, pattern: re.Pattern[str], actual_nodes: list[dict[str, Any]]
+) -> list[str]:
+    """The conforming instances of the collection template that owns a repeated descendant."""
+    return sorted(
+        str(actual["instance_id"])
+        for actual in actual_nodes
+        if base_identity(actual) == owner
+        and actual.get("instance_id")
+        and pattern.fullmatch(str(actual["instance_id"]))
+    )
+
+
 def _instance_view(
-    node: dict[str, Any], governing: dict[str, Any], actual: dict[str, Any]
+    node: dict[str, Any],
+    governing: dict[str, Any],
+    actual: dict[str, Any],
+    actual_keys: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """The template node as this instance: its key, parent instance and, for the owner, order.
+    """The template node as this instance: key, parent instance, order and origin.
 
     The position of a collection item among its siblings depends on the collection size,
-    so the template owner's order is the instance's; its descendants keep theirs.
+    so the template owner's order is the instance's; its descendants keep theirs. The
+    instance is drawn where its owning row is: the template geometry is translated by the
+    offset between that row and the template row. Sizes and relative positions are kept,
+    so a shifted descendant or another size still differs.
     """
     view = dict(node)
     instance = actual["instance_id"]
     view["_semantic_key"] = actual["_semantic_key"]
+    owner_row = (actual_keys or {}).get(f"{base_identity(governing)}::{instance}") or {}
+    template_box, row_box, box = governing.get("bbox"), owner_row.get("bbox"), node.get("bbox")
+    if isinstance(template_box, dict) and isinstance(row_box, dict) and isinstance(box, dict):
+        dx = float(row_box["x"]) - float(template_box["x"])
+        dy = float(row_box["y"]) - float(template_box["y"])
+        view["bbox"] = {**box, "x": float(box["x"]) + dx, "y": float(box["y"]) + dy}
     if node["_semantic_key"] == governing["_semantic_key"]:
         view["_order"] = actual.get("_order", node.get("_order"))
     elif node.get("_parent_key"):
