@@ -93,11 +93,30 @@ def _parse_node(data: dict[str, Any], parent_id: str | None, order: int) -> PenN
         visual=visual,
         parent_id=parent_id,
         order=order,
+        sizing={key: design_sizing(data.get(key)) for key in ("width", "height")},
     )
     for child_index, child in enumerate(data.get("children", []) or []):
         if isinstance(child, dict):
             node.children.append(_parse_node(child, node.id, child_index))
     return node
+
+
+def design_sizing(value: Any) -> str:
+    """How the design source sizes one dimension: ``fixed``, ``fill``, ``hug`` or ``unspecified``.
+
+    A number is a fixed size; ``fill_container`` follows the parent; ``fit_content`` and
+    ``fit_content(<min>)`` follow the content; no value (or one Pencil does not define)
+    declares nothing and is never read as fixed.
+    """
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return "fixed"
+    if isinstance(value, str):
+        keyword = value.strip()
+        if keyword == "fill_container":
+            return "fill"
+        if _PEN_SIZING_KEYWORD_RE.match(keyword):
+            return "hug"
+    return "unspecified"
 
 
 def all_nodes(roots: list[PenNode]) -> list[PenNode]:

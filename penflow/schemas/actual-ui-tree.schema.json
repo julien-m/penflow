@@ -58,6 +58,18 @@
               "sha256"
             ],
             "additionalProperties": false
+          },
+          "facts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean",
+                "null"
+              ]
+            },
+            "description": "Observed data facts of this capture (record status, mode), bound to its observed_states witness."
           }
         },
         "required": [
@@ -89,7 +101,46 @@
         },
         "root": {
           "$ref": "#/$defs/node"
+        },
+        "state": {
+          "description": "Contract state this capture witnesses (state-scoped comparison); one capture per (screen_id, state).",
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario_id": {
+          "description": "Scenario of the observed_states witness of this state capture.",
+          "type": "string",
+          "minLength": 1
+        },
+        "states": {
+          "description": "Expected trees only: every state the contract declares for the screen.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "facts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          },
+          "description": "Observed data facts of this capture (record status, mode), bound to its observed_states witness."
         }
+      },
+      "dependentRequired": {
+        "state": [
+          "scenario_id"
+        ],
+        "scenario_id": [
+          "state"
+        ]
       }
     },
     "viewport": {
@@ -296,6 +347,111 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/node"
+          }
+        },
+        "instance_id": {
+          "description": "Runtime instance of a repeated node; the comparison key is semantic_id::instance_id.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!.*::)\\S+$"
+        },
+        "states": {
+          "description": "Expected trees only: the contract states in which this node exists; absent means every state.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "repeat_model": {
+          "description": "Expected trees only: the contract repeat model of a collection template node.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "collection",
+            "item_model",
+            "item_key",
+            "instance_id_template"
+          ],
+          "properties": {
+            "collection": {
+              "type": "string",
+              "minLength": 1
+            },
+            "item_model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "item_key": {
+              "type": "string",
+              "minLength": 1
+            },
+            "instance_id_template": {
+              "type": "string",
+              "pattern": "^(?!.*::)[^{}\\s]*(?:\\{[^{}\\s]+\\}[^{}\\s]*)+$"
+            }
+          }
+        },
+        "sizing": {
+          "description": "Expected trees only: the design source sizing of each dimension (fixed number, fill_container, fit_content, or no value).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "width",
+            "height"
+          ],
+          "properties": {
+            "width": {
+              "enum": [
+                "fixed",
+                "fill",
+                "hug",
+                "unspecified"
+              ]
+            },
+            "height": {
+              "enum": [
+                "fixed",
+                "fill",
+                "hug",
+                "unspecified"
+              ]
+            }
+          }
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Text of the label associated with a form control (HTML <label for> or aria-labelledby); expected from a sibling label-for node."
+        },
+        "visible_when": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fact",
+            "in"
+          ],
+          "description": "Data condition under which the node exists within its states (for example the controls a record status offers). Proved by the facts each capture records with its witness.",
+          "properties": {
+            "fact": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*(?:[._-][a-z0-9_]+)*$"
+            },
+            "in": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
           }
         }
       }

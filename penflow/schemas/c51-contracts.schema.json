@@ -1220,6 +1220,10 @@
         },
         "navigation": {
           "$ref": "#/$defs/navigation-facts"
+        },
+        "present": {
+          "type": "boolean",
+          "description": "false: the node is absent from the rendered surface (for example an action not offered while its guard does not hold). Omitted means present."
         }
       },
       "required": [
@@ -1271,16 +1275,55 @@
             }
           },
           "else": {
-            "properties": {
-              "state": {
-                "type": "string",
-                "minLength": 1
-              },
-              "bbox": {
-                "$ref": "#/$defs/bbox"
-              },
-              "enabled": {
-                "type": "boolean"
+            "if": {
+              "required": [
+                "present"
+              ],
+              "properties": {
+                "present": {
+                  "const": false
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "visible": {
+                  "const": false
+                },
+                "state": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "bbox": {
+                  "type": "null"
+                },
+                "enabled": {
+                  "type": "null"
+                },
+                "text": {
+                  "type": "null"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "bbox": {
+                  "$ref": "#/$defs/bbox"
+                },
+                "enabled": {
+                  "type": "boolean"
+                }
               }
             }
           }
@@ -1864,6 +1907,10 @@
           },
           "minItems": 0,
           "uniqueItems": true
+        },
+        "continuity": {
+          "$ref": "#/$defs/file",
+          "$comment": "Technical continuity revision: the archived requirements-continuity receipt. Requires previous; approval_receipts, scope, selection, disposition, retired_features and projection equal the previous baseline's."
         }
       },
       "required": [
@@ -2791,6 +2838,124 @@
         "workspace",
         "report",
         "files"
+      ],
+      "additionalProperties": false
+    },
+    "requirements-continuity": {
+      "type": "object",
+      "$comment": "Produced by LiveSpec when its delivery continuity accepts a technical change of reviewed sources. Penflow re-proves every change itself: evidence declarations only for sources, representation only for the contract, the same projection.",
+      "properties": {
+        "kind": {
+          "const": "livespec-penflow-requirements-continuity"
+        },
+        "version": {
+          "const": 1
+        },
+        "scope": {
+          "$ref": "#/$defs/scope"
+        },
+        "feature": {
+          "type": "string",
+          "minLength": 1
+        },
+        "previous": {
+          "$ref": "#/$defs/file"
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "collection": {
+                "enum": [
+                  "sources",
+                  "plans"
+                ]
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "before": {
+                "$ref": "#/$defs/approved-source"
+              },
+              "after": {
+                "$ref": "#/$defs/approved-source"
+              },
+              "evidence_changes": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "requirement": {
+                      "type": "string",
+                      "pattern": "^AC-[0-9]{3}$"
+                    },
+                    "before_level": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "after_level": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "requirement",
+                    "before_level",
+                    "after_level"
+                  ],
+                  "additionalProperties": false
+                },
+                "minItems": 1
+              }
+            },
+            "required": [
+              "collection",
+              "path",
+              "before",
+              "after",
+              "evidence_changes"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "contract": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "before": {
+                  "$ref": "#/$defs/file"
+                },
+                "after": {
+                  "$ref": "#/$defs/file"
+                }
+              },
+              "required": [
+                "before",
+                "after"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "livespec_record": {
+          "$ref": "#/$defs/file"
+        }
+      },
+      "required": [
+        "kind",
+        "version",
+        "scope",
+        "feature",
+        "previous",
+        "changes",
+        "contract",
+        "livespec_record"
       ],
       "additionalProperties": false
     }

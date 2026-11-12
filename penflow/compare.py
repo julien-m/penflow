@@ -10,6 +10,7 @@ import json
 from pathlib import Path
 from typing import Any, cast
 
+from .compare_scope import declared_states, effective_conditions, join_nodes, witnessed
 from .tree import flatten_nodes, load_tree, normalize_actual_tree, validate_actual_tree
 
 DEFAULT_TOLERANCE = {
@@ -76,43 +77,134 @@ def compare_trees(
         return _comparison_report(issues, 0, 0, threshold)
 
     expected_screens = {screen["screen_id"]: screen for screen in expected.get("screens", [])}
-    actual_screens = {screen.get("screen_id"): screen for screen in actual.get("screens", [])}
+    captures: dict[str, list[dict[str, Any]]] = {}
+    for screen in actual.get("screens", []):
+        captures.setdefault(screen.get("screen_id"), []).append(screen)
+    actual_screens = {screen_id: screens[0] for screen_id, screens in captures.items()}
 
     total_checks = 0
     failed_checks = 0
     for screen_id, expected_screen in expected_screens.items():
-        actual_screen = actual_screens.get(screen_id)
-        if actual_screen is None:
+        screen_captures = captures.get(screen_id, [])
+        if not screen_captures:
             issues.append(
                 _issue("error", "screen.missing", screen_id, "screen missing in actual tree")
             )
             failed_checks += 1
             total_checks += 1
             continue
-
-        expected_nodes = _index(flatten_nodes(expected_screen["root"]))
-        actual_nodes = _index(flatten_nodes(actual_screen.get("root", {})))
-        issues.extend(_unexpected_controls(expected_nodes, actual_nodes))
-        for semantic_id, expected_node in expected_nodes.items():
-            if not mandatory and _is_masked(expected_node):
-                continue
-            total_checks += 1
-            actual_node = actual_nodes.get(semantic_id)
-            if actual_node is None:
-                failed_checks += 1
-                issues.append(
-                    _issue("error", "node.missing", semantic_id, "node missing in actual tree")
-                )
-                continue
-            node_issues = compare_node(expected_node, actual_node, mandatory=mandatory)
-            failed_checks += sum(
-                1 for issue in node_issues if issue["severity"] in {"error", "warning"}
-            )
-            total_checks += max(0, len(node_issues) - 1)
-            issues.extend(node_issues)
+        expected_flat = flatten_nodes(expected_screen["root"])
+        checks, failed, screen_issues = _compare_screen(
+            expected_screen, expected_flat, screen_captures, actual, mandatory=mandatory
+        )
+        total_checks += checks
+        failed_checks += failed
+        issues.extend(screen_issues)
 
     issues.extend(_unexpected_screens(expected_screens, actual_screens))
     return _comparison_report(issues, total_checks, failed_checks, threshold)
+
+
+def _compare_screen(
+    expected_screen: dict[str, Any],
+    expected_nodes: list[dict[str, Any]],
+    captures: list[dict[str, Any]],
+    actual: dict[str, Any],
+    *,
+    mandatory: bool,
+) -> tuple[int, int, list[dict[str, Any]]]:
+    """Compare one expected screen with its capture, or with one capture per state.
+
+    A stateless capture (validation allows only one per screen) is the strict
+    comparison: every expected node is required in it. State captures are each compared
+    with the nodes of their state, must be declared and witnessed, and every state an
+    expected node is scoped to must be captured.
+    """
+    issues: list[dict[str, Any]] = []
+    checks = failed = 0
+    scoped = [capture for capture in captures if capture.get("state") is not None]
+    if not scoped:
+        targets: list[tuple[dict[str, Any], str | None]] = [(captures[0], None)]
+    else:
+        declared = expected_screen.get("states")
+        targets = []
+        for capture in scoped:
+            state = str(capture["state"])
+            if not isinstance(declared, list):
+                issues.append(
+                    _issue(
+                        "error",
+                        "screen.state_undeclared",
+                        expected_screen["screen_id"],
+                        f"state capture {state} of a screen without declared contract states",
+                    )
+                )
+                failed += 1
+            elif state not in declared:
+                issues.append(
+                    _issue(
+                        "error",
+                        "screen.state_unknown",
+                        expected_screen["screen_id"],
+                        f"state {state} is not a contract state of the screen",
+                    )
+                )
+                failed += 1
+            else:
+                if not witnessed(actual, capture):
+                    issues.append(
+                        _issue(
+                            "error",
+                            "screen.state_unwitnessed",
+                            expected_screen["screen_id"],
+                            f"state capture {state} has no observed_states witness of its scenario",
+                        )
+                    )
+                    failed += 1
+                targets.append((capture, state))
+            checks += 1
+        captured = {state for _, state in targets}
+        for state, keys in sorted(declared_states(expected_nodes).items()):
+            if state not in captured:
+                checks += len(keys)
+                failed += len(keys)
+                issues.append(
+                    _issue(
+                        "error",
+                        "screen.state_missing",
+                        expected_screen["screen_id"],
+                        f"state {state} was not captured; its nodes are unobserved: "
+                        + ", ".join(keys),
+                    )
+                )
+    seen: set[str] = set()
+    for capture, scope in targets:
+        join = join_nodes(
+            expected_nodes,
+            flatten_nodes(capture.get("root", {})),
+            scope,
+            masked=(lambda node: False) if mandatory else _is_masked,
+            facts=capture.get("facts"),
+        )
+        seen |= join.applicable
+        issues.extend(join.issues)
+        checks += join.checks
+        failed += join.failed
+        for expected_node, actual_node in join.pairs:
+            node_issues = compare_node(expected_node, actual_node, mandatory=mandatory)
+            failed += sum(1 for issue in node_issues if issue["severity"] in {"error", "warning"})
+            checks += max(0, len(node_issues) - 1)
+            issues.extend(node_issues)
+    # A data-conditioned node must be required by at least one capture: no capture may
+    # leave an expected control unobserved by choosing facts under which it never applies.
+    for key, conditions in sorted(effective_conditions(expected_nodes).items()):
+        if conditions and key not in seen:
+            checks += 1
+            failed += 1
+            issues.append(
+                _issue("error", "node.condition_unwitnessed", key, "no capture meets its condition")
+            )
+    return checks, failed, issues
 
 
 def _comparison_report(
@@ -179,6 +271,19 @@ def compare_node(
                 )
             )
 
+    # A control labelled by a sibling label (``label-for``): the runtime must associate the
+    # same label text with it (HTML ``<label for>`` and the control ``id``).
+    expected_label = expected.get("label")
+    if expected_label not in (None, "") and expected_label != actual.get("label"):
+        issues.append(
+            _issue(
+                "error",
+                "node.label.missing" if actual.get("label") is None else "node.label",
+                semantic_id,
+                "associated label differs or is unobserved",
+            )
+        )
+
     if (
         expected.get("_parent_key")
         and actual.get("_parent_key")
@@ -233,10 +338,6 @@ def report_to_markdown(report: dict[str, Any]) -> str:
             f"| {issue['severity']} | {issue['code']} | {issue.get('semantic_id') or '-'} | {issue['message']} |"
         )
     return "\n".join(lines) + "\n"
-
-
-def _index(nodes: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    return {str(node["_semantic_key"]): node for node in nodes if node.get("_semantic_key")}
 
 
 def _is_masked(node: dict[str, Any]) -> bool:
@@ -399,31 +500,6 @@ def _unexpected_screens(
     issues: list[dict[str, Any]] = []
     for screen_id in actual_screens.keys() - expected_screens.keys():
         issues.append(_issue("error", "screen.unexpected", screen_id, "unexpected actual screen"))
-    return issues
-
-
-def _unexpected_controls(
-    expected_nodes: dict[str, Any], actual_nodes: dict[str, Any]
-) -> list[dict[str, Any]]:
-    issues: list[dict[str, Any]] = []
-    for semantic_id in actual_nodes.keys() - expected_nodes.keys():
-        if actual_nodes[semantic_id].get("role") in {
-            "button",
-            "link",
-            "input",
-            "select",
-            "toggle",
-            "form",
-            "component",
-        }:
-            issues.append(
-                _issue(
-                    "error",
-                    "node.unexpected_interactive",
-                    semantic_id,
-                    "unexpected interactive control",
-                )
-            )
     return issues
 
 

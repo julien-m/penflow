@@ -8,6 +8,7 @@ from .verification_applicability import read_policy_source, validate_plan_policy
 from .verification_files import InputReader, VerificationInputError
 from .verification_json import canonical_bytes, digest
 from .requirement_projection import project_requirements
+from .requirement_continuity import resolve_continuity
 
 
 def validate_history(reader: InputReader, baseline: dict[str, Any]) -> dict[str, Any]:
@@ -36,7 +37,9 @@ def validate_history(reader: InputReader, baseline: dict[str, Any]) -> dict[str,
             raise VerificationInputError("approval.delta.mismatch")
         if prior is None:
             break
-        current = prior
+        # A continuity revision has no review of its own: it re-proves its link down to
+        # the approved baseline it continues, which keeps the full review check.
+        current = resolve_continuity(reader, prior)[0]
     assert latest is not None
     return latest
 

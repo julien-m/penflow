@@ -155,7 +155,9 @@ def _classify_node(
         return
     if classification == "semantic" and context.semantic_id:
         semantic_nodes.setdefault(context.semantic_id, []).append(node)
-        _semantic_checks(node, context, registries, buckets)
+        _semantic_checks(node, context, registries, buckets, graph_by_id)
+    elif classification == "inherited" and context.relation == LABEL_RELATION:
+        _label_check(node, context, graph_by_id, buckets)
     elif classification == "inherited":
         _owner_check(node, context.inherits_from, graph_by_id, buckets, "valid_inheritance")
     elif classification == "decorative":
@@ -167,6 +169,7 @@ def _semantic_checks(
     context: Context,
     registries: dict[str, Any],
     buckets: dict[str, list[dict[str, Any]]],
+    graph_by_id: dict[str, PencilGraphNode] | None = None,
 ) -> None:
     contract_node = registries["semantic_ids"].get(context.semantic_id)
     if contract_node is None:
@@ -199,6 +202,8 @@ def _semantic_checks(
         )
     _business_slot_checks(node, context, contract_node, registries, buckets)
     authored = _authored_copy(node.node, context.semantic_id)
+    if authored is None and graph_by_id is not None:
+        authored = label_copy(node, context.semantic_id, graph_by_id)
     expected = contract_node.get("text")
     if isinstance(expected, str) and authored != expected:
         _node_finding(
@@ -224,6 +229,81 @@ def _authored_copy(node: dict[str, Any], semantic_id: str | None) -> Any:
         ):
             contents.append(child.get("content"))
     return contents[0] if len(contents) == 1 else None
+
+
+# An inherited text node that labels a form control it does not contain: the label and
+# the control are siblings, as an HTML <label for> next to its <select> or <input>.
+LABEL_RELATION = "label-for"
+LABELABLE_ROLES = frozenset({"input", "select", "toggle", "checkbox", "radio"})
+
+
+def _siblings(node: PencilGraphNode, graph_by_id: dict[str, PencilGraphNode]) -> list[Any]:
+    return [
+        other
+        for other in graph_by_id.values()
+        if other.parent_id == node.parent_id and other.node_id != node.node_id
+    ]
+
+
+def _labels_of(
+    control: PencilGraphNode, semantic_id: str | None, graph_by_id: dict[str, PencilGraphNode]
+) -> list[PencilGraphNode]:
+    return [
+        other
+        for other in _siblings(control, graph_by_id)
+        if (context := Context.from_raw(other.node.get("context"))).classification == "inherited"
+        and context.relation == LABEL_RELATION
+        and context.inherits_from == semantic_id
+    ]
+
+
+def label_copy(
+    control: PencilGraphNode, semantic_id: str | None, graph_by_id: dict[str, PencilGraphNode]
+) -> Any:
+    """The authored copy a single sibling ``label-for`` node gives a form control."""
+    labels = _labels_of(control, semantic_id, graph_by_id)
+    return labels[0].node.get("content") if len(labels) == 1 else None
+
+
+def _label_check(
+    node: PencilGraphNode,
+    context: Context,
+    graph_by_id: dict[str, PencilGraphNode],
+    buckets: dict[str, list[dict[str, Any]]],
+) -> None:
+    """A ``label-for`` node names one sibling semantic form control and carries its copy."""
+    owner = context.inherits_from
+    control = next(
+        (
+            other
+            for other in _siblings(node, graph_by_id)
+            if (found := Context.from_raw(other.node.get("context"))).classification == "semantic"
+            and found.semantic_id == owner
+        ),
+        None,
+    )
+    if control is None:
+        _owner_check(node, owner, graph_by_id, buckets, "valid_inheritance")
+        return
+    role = Context.from_raw(control.node.get("context")).role
+    if role not in LABELABLE_ROLES:
+        code, message = "pencil.label_target_not_control", f"label-for target role {role!r}"
+    elif not isinstance(node.node.get("content"), str) or not node.node["content"].strip():
+        code, message = "pencil.label_without_copy", "label-for node has no text content"
+    elif len(_labels_of(control, owner, graph_by_id)) != 1:
+        code, message = "pencil.label_duplicate", "control has several label-for siblings"
+    else:
+        _node_finding(
+            buckets,
+            "valid_inheritance",
+            "pencil.valid_inheritanc_valid",
+            node,
+            context,
+            "valid sibling label",
+            blocking=False,
+        )
+        return
+    _node_finding(buckets, "reference_invalid", code, node, context, message)
 
 
 def _owner_check(

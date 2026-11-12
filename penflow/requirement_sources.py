@@ -6,6 +6,7 @@ from __future__ import annotations
 from typing import Any
 
 from .requirement_approval_history import validate_history
+from .requirement_continuity import resolve_continuity
 from .requirement_projection import project_requirements
 from .flow_contract import validate_flow_contract_v2
 from .requirement_markdown import SLUG_REGEX, semantic_text_sha256
@@ -22,7 +23,11 @@ def load_livespec_requirements(reader: InputReader) -> dict[str, Any]:
     expected_scope = {"project_root": str(reader.root), "workspace": str(reader.path("penflow"))}
     if baseline["scope"] != expected_scope or baseline["disposition"] != "active":
         raise VerificationInputError("requirements.scope_or_disposition")
-    snapshot = validate_history(reader, baseline)
+    # A continuity revision republishes the approved inputs with re-proved technical changes.
+    approved, effective = resolve_continuity(reader, baseline)
+    snapshot = validate_history(reader, approved)
+    if effective is not None:
+        snapshot = {**snapshot, "inputs": effective}
     _current_sources(reader, snapshot)
     contract_raw = reader.reference(baseline["contract"])
     if contract_raw != reader.reference(snapshot["inputs"]["contract"], archive="contract"):
@@ -63,6 +68,9 @@ def _current_sources(reader: InputReader, snapshot: dict[str, Any]) -> None:
             # cannot contain source drift, regardless of historical AST versions.
             if current == archived:
                 continue
-            for raw in (current, archived):
-                if semantic_text_sha256(raw.decode("utf-8")) != record["semantic_sha256"]:
-                    raise VerificationInputError("requirements.source.semantic_changed")
+            # One parser on both sides: the hash recorded at approval may come from an
+            # earlier normalization that no longer reproduces it, even on the archive.
+            if semantic_text_sha256(current.decode("utf-8")) != semantic_text_sha256(
+                archived.decode("utf-8")
+            ):
+                raise VerificationInputError("requirements.source.semantic_changed")

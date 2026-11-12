@@ -35,13 +35,30 @@ def expected_tree_from_pen(path: str | Path) -> dict[str, Any]:
 
 
 def _screen_to_expected(root: PenNode) -> dict[str, Any]:
+    expected = root.to_expected()
+    attach_labels(expected)
     return {
         "screen_id": root.semantic_id or root.id,
         "pencil_id": root.id,
         "name": root.name,
         "viewport": root.bbox.to_dict(),
-        "root": root.to_expected(),
+        "root": expected,
     }
+
+
+def attach_labels(node: dict[str, Any]) -> None:
+    """Give each control the text of its single sibling ``label-for`` node as ``label``."""
+    children = node.get("children") or []
+    labels: dict[str, list[Any]] = {}
+    for child in children:
+        context = child.get("context") or {}
+        if context.get("classification") == "inherited" and context.get("relation") == "label-for":
+            labels.setdefault(str(context.get("inherits_from")), []).append(child.get("text"))
+    for child in children:
+        found = labels.get(str(child.get("semantic_id")))
+        if found and len(found) == 1 and isinstance(found[0], str) and found[0].strip():
+            child["label"] = found[0]
+        attach_labels(child)
 
 
 def write_expected_tree(pen_path: str | Path, out_path: str | Path) -> dict[str, Any]:
@@ -157,12 +174,25 @@ def flatten_nodes(
 def _tree_identity_issues(tree: dict[str, Any]) -> list[dict[str, Any]]:
     # Check each screen's unique identities, finite geometry, then typed numeric observations.
     issues: list[dict[str, Any]] = []
-    screens: set[str] = set()
+    screens: set[tuple[str, str | None, str | None]] = set()
+    scoped: dict[str, set[bool]] = {}
     for index, screen in enumerate(tree["screens"]):
         path = f"$.screens[{index}]"
-        if screen["screen_id"] in screens:
-            issues.append(_issue("error", path, "duplicate screen identity"))
-        screens.add(screen["screen_id"])
+        # A screen may hold one capture per contract state (state-scoped comparison);
+        # a stateless capture stays the single capture of its screen.
+        # Captures of one state differ by their observed data facts (record status...).
+        # Only state captures may be distinguished by facts; a stateless capture is unique.
+        scoped_facts = "state" in screen and "facts" in screen
+        facts = json.dumps(screen.get("facts"), sort_keys=True) if scoped_facts else None
+        identity = (screen["screen_id"], screen.get("state"), facts)
+        if identity in screens:
+            message = "duplicate screen state" if identity[1] else "duplicate screen identity"
+            issues.append(_issue("error", path, message))
+        screens.add(identity)
+        kinds = scoped.setdefault(screen["screen_id"], set())
+        kinds.add("state" in screen)
+        if len(kinds) == 2:
+            issues.append(_issue("error", path, "screen mixes state-scoped and stateless captures"))
         for key, value in screen.get("viewport", {}).items():
             if isinstance(value, (int, float)) and (
                 abs(value) > MAX_ABSOLUTE_OBSERVATION or not math.isfinite(value)

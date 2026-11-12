@@ -285,6 +285,10 @@ _ABSENT = _Absent()
 
 def _property_value(node: dict[str, Any], prop: str) -> Any:
     if prop == "bbox.height":
+        # A tree without sizing keeps the strict comparison; with sizing, only heights
+        # the design source fixes are homologous and comparable.
+        if "sizing" in node and _height_sizing(node) != "fixed":
+            return _ABSENT
         bbox = node.get("bbox")
         # Same measurability rule as compare.py: unmeasurable boxes (drafted
         # pens without layout) carry no height information worth comparing.
@@ -295,6 +299,21 @@ def _property_value(node: dict[str, Any], prop: str) -> Any:
     if isinstance(visual, dict) and prop in visual:
         return _canonical_value(prop, visual[prop])
     return _ABSENT
+
+
+_SIZING_VALUES = frozenset({"fixed", "fill", "hug", "unspecified"})
+
+
+def _height_sizing(node: dict[str, Any]) -> str:
+    """The node's declared height sizing; malformed sizing fails closed (exit 2)."""
+    sizing = node.get("sizing")
+    if (
+        not isinstance(sizing, dict)
+        or set(sizing) != {"width", "height"}
+        or not all(value in _SIZING_VALUES for value in sizing.values())
+    ):
+        raise ValueError(f"malformed sizing on {node.get('_semantic_key') or node.get('id')}")
+    return str(sizing["height"])
 
 
 def _canonical_value(prop: str, value: Any) -> Any:

@@ -212,6 +212,13 @@
         },
         "unused_allowed": {
           "type": "boolean"
+        },
+        "enforcement": {
+          "enum": [
+            "refusal",
+            "absence"
+          ],
+          "description": "How the product enforces the guard when it does not hold: refusal (default, the action is attempted and refused) or absence (the action is not offered; its control is absent)."
         }
       }
     },
@@ -453,6 +460,34 @@
           "type": "array",
           "items": {
             "type": "string"
+          }
+        },
+        "visible_when": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fact",
+            "in"
+          ],
+          "description": "Data condition under which the node exists within its states (for example the controls a record status offers). Proved by the facts each capture records with its witness.",
+          "properties": {
+            "fact": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*(?:[._-][a-z0-9_]+)*$"
+            },
+            "in": {
+              "type": "array",
+              "items": {
+                "type": [
+                  "string",
+                  "number",
+                  "boolean",
+                  "null"
+                ]
+              },
+              "minItems": 1,
+              "uniqueItems": true
+            }
           }
         }
       }
@@ -732,6 +767,10 @@
         },
         "unused_allowed": {
           "type": "boolean"
+        },
+        "precondition": {
+          "const": "none",
+          "description": "Explicit declaration that a state_change submit action has no precondition (a toggle, for example); it then has no guard and no guarded transition."
         }
       },
       "allOf": [
@@ -832,7 +871,6 @@
             },
             "then": {
               "required": [
-                "guard",
                 "success_transition"
               ],
               "properties": {
@@ -871,7 +909,29 @@
                     ]
                   }
                 ]
-              }
+              },
+              "oneOf": [
+                {
+                  "required": [
+                    "guard"
+                  ],
+                  "not": {
+                    "required": [
+                      "precondition"
+                    ]
+                  }
+                },
+                {
+                  "required": [
+                    "precondition"
+                  ],
+                  "not": {
+                    "required": [
+                      "guard"
+                    ]
+                  }
+                }
+              ]
             },
             "else": {
               "if": {

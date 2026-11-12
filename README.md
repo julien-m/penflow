@@ -180,7 +180,7 @@ integrity bind all workspace input bytes. Missing, `BLOCKED_VISUAL_NOT_RUN`,
 tampered evidence exits 1 with structured issues. Without `--strict-closure`, existing
 `penflow run` behavior is unchanged.
 
-For dense multi-screen mockups, prefer `penflow check-consistency expected-ui-tree.json --group-by role+intent+variant+size-class --out consistency-report.json --json`. The size class buckets node height so compact headers are not compared with full-height panels; anonymous containers without stable intent, variant, or human name are skipped, and repeated divergences are aggregated per group.
+For dense multi-screen mockups, prefer `penflow check-consistency expected-ui-tree.json --group-by role+intent+variant+size-class --out consistency-report.json --json`. Heights are compared only between members whose design height is fixed (`sizing.height` of the expected export: `fixed`, `fill`, `hug` or `unspecified`); trees without `sizing` keep the strict comparison. The size class buckets node height so compact headers are not compared with full-height panels; anonymous containers without stable intent, variant, or human name are skipped, and repeated divergences are aggregated per group.
 
 ### Theme Token Contract
 
@@ -325,6 +325,8 @@ Strict default: `reverse-pen` exits 1 while clarification markers remain (`rever
 After implementation, an external runtime adapter writes `actual-ui-tree.json`. Penflow validates and compares that file; it does not launch or inspect the running app.
 
 `compare-tree` checks presence, role, text, hierarchy, order, bbox (±`bbox_px`), colors, radius (±`radius_px`), typography (±`font_px`), and — feature 048 — layout properties: `layout` and `alignItems` exact-match (`node.visual.layout`, `node.visual.alignItems`), `gap` and `padding` within ±`spacing_px` (default 2; `node.visual.gap`, `node.visual.padding`). Padding forms are normalized (`16` ≡ `[16, 16]` ≡ `[16, 16, 16, 16]`). Tolerances are overridable per node via `context.tolerance` (e.g. `tolerance: {spacing_px: 4}`); absent keys are never compared, so pre-048 trees stay green.
+
+A board that documents several mutually exclusive states is compared state by state: the expected tree carries the contract `states` of each screen and node, and the actual tree holds one capture per state (`state`, `scenario_id`, witnessed by `observed_states`). A contract `repeat_model` makes a node a collection template whose runtime instances (`semantic_id::instance_id`) must match `instance_id_template` exactly. **Read** [`docs/adapters/state-and-collection-capture.md`](docs/adapters/state-and-collection-capture.md) before capturing such screens.
 
 ```bash
 penflow validate-actual actual-ui-tree.json --schema --json

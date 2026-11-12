@@ -44,6 +44,8 @@ class PenNode:
     children: list["PenNode"] = field(default_factory=list)
     parent_id: str | None = None
     order: int = 0
+    # Design-source sizing per dimension: fixed, fill, hug or unspecified (C51 F3).
+    sizing: dict[str, str] | None = None
 
     @property
     def semantic_id(self) -> str | None:
@@ -70,6 +72,7 @@ class PenNode:
             "bbox": self.bbox.to_dict(),
             "visual": self.visual,
             "context": self.context.to_dict(),
+            **({"sizing": dict(self.sizing)} if self.sizing is not None else {}),
             "children": [child.to_expected() for child in self.children],
         }
 
