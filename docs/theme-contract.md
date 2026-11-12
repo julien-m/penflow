@@ -22,7 +22,7 @@ Project-specific radius slots: any `radius-*` or `pf-radius-*` numeric custom pr
 
 `penflow lint-tokens <ui.pen> --theme-css theme.css --out token-lint-report.json --json` loads the theme and checks:
 
-- Colors: every `fill`/`stroke.fill` must resolve to a color declared by known theme tokens or `palette-*` slots.
+- Colors: every color `fill`/`stroke.fill` must resolve to a color declared by known theme tokens or `palette-*` slots. A native Pencil image paint (`{"type": "image", "url": …, "enabled"?, "mode"?}`) is not a color: it is exported unchanged to the expected tree, compared as a whole and never resolved against the palette; any other object fill is refused by the tree schema.
 - Fonts: `fontFamily` must match exactly one declared theme font. Declaring `font-sans` and `font-mono` allows only those two families; random families still fail.
 - Font sizes: the effective scale is the documented default plus declared `font-size-*` values unless `--fontsize-scale` is passed.
 - Radius: the effective scale is the documented default plus `radius` and declared `radius-*` values unless `--radius-scale` is passed.

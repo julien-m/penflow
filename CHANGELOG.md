@@ -20,6 +20,7 @@ All notable public changes will be recorded here. Penflow follows semantic versi
 
 ### Fixed
 
+- The expected and actual UI tree schema accepts a native Pencil image paint as `visual.fill` (`type` `image`, non-empty `url`, optional boolean `enabled` and non-empty `mode`, no other key). Before, `export-expected` failed with `... is not of type 'string'` on a frame painted with a reference image. Color fills are unchanged; any other object, an empty string or a malformed image paint is still refused, and a different image still differs in comparison.
 - C51 accepts the optional `penflow_identity` (Penflow version text, executable path and executable SHA-256) that LiveSpec writes in its review snapshot, review approval and Brainstorm authority import. Before, `--profile design` blocked `upstream-requirements` with `input.invalid_object: review-approval`. Records without the key validate as before; a present key must hold exactly these three non-empty fields.
 
 ## [0.1.0] - Unreleased
