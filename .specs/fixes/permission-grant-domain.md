@@ -23,9 +23,14 @@ The shared pure resolver owns grant membership; obligation derivation, expected 
 - Exact source port committed as 3704a9f; no unrelated consumer fixes included.
 - Targeted permission/obligation/adversarial/guard/docs tests: 98 passed in 6.91s.
 - Whole-repo Ruff, format and mypy: passed (269 Python files).
-- Full suite and one fresh independent native final review: pending.
+- One fresh independent native final review: accepted, no material findings. The reviewer independently reran the 98 scoped tests and checked the pointer-only/action-binding union edge.
+- Full-suite and CI results are retained on the delivery PR; merge requires observing their actual result. No runtime application observation is claimed.
 - User authorized publication and merge; no changes to Atlas or installed consumers are implied.
 
 ## Changelog
 
 - 2026-11-13: ported the reviewed source variant; one common resolver replaces single-actor authorization assumptions in all three consumers. Explicit historical diagnostics retain real fail results, including missing required denials. Test packets are synthetic local validator coverage, not application-runtime observations.
+
+## Independent native review record
+
+Accepted: no material findings in 80e3307..3704a9f. The shared resolver unions both action bindings within the exact entity; denied duties omit impossible negatives and each grant retains its own positive actor. Outcome validation uses the source permission entity and preserves unknown-actor rejection. Architecture remains stateless and runtime independent with no new persistence/network dependency. The reviewer independently reran all five scoped test files (98 passed) and an in-memory pointer-only grant check. No corrections required. Synthetic protocol validation does not establish live application behavior.
