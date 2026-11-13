@@ -5,8 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from .flow_contract import validate_flow_contract_v2
 from .contract_actions import action_mode
+from .flow_contract import validate_flow_contract_v2
+from .verification_permissions import authorized_permission_actors
 
 
 @dataclass(frozen=True)
@@ -99,6 +100,10 @@ def _functional_slots(contract: dict[str, Any]) -> list[ObligationSlot]:
             actions = _record_actions(contract, collection, record)
             for action in actions:
                 for outcome in outcomes:
+                    if collection == "permissions" and outcome == "denied":
+                        actors = {actor["id"] for actor in contract["actors"]}
+                        if not actors - authorized_permission_actors(contract, action, record):
+                            continue
                     slots.append(
                         ObligationSlot(
                             f"{category}:{record['id']}:{action['id']}:{outcome}",
