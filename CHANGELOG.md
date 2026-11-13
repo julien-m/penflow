@@ -23,6 +23,8 @@ All notable public changes will be recorded here. Penflow follows semantic versi
 
 ### Fixed
 
+- C51 derives permission-denial duties from all grants for the effective action and entity. Singleton or fully authorized actor domains need no impossible denial witness; each grant still requires its own allowed actor, and real unauthorized actors retain mandatory denial checks.
+
 - Standalone read-only validation no longer depends on unrelated Doctor project hygiene.
 - Ordinary producer postflight cleanup refusals remain visible on stderr while preserving the product result/exit; unsafe deletion stays refused.
 
