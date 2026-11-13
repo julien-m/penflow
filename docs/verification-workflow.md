@@ -1,3 +1,5 @@
+> Historical opt-in C51 certification. Read [the current review led workflow](review-led-workflow.md) for normal work. The contracts and verdicts below remain unchanged for explicit diagnostics; they do not decide normal delivery.
+
 <!-- @spec(FR-001) -->
 <!-- @spec(FR-011) -->
 <!-- @spec(FR-012) -->

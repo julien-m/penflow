@@ -23,8 +23,19 @@ REQUIRED_BBOX_KEYS = {"x", "y", "width", "height"}
 MAX_ABSOLUTE_OBSERVATION = 1e12
 
 
-def expected_tree_from_pen(path: str | Path) -> dict[str, Any]:
-    roots = parse_pen(path)
+def expected_tree_from_pen(
+    path: str | Path, *, pen_data: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Export expected structure, optionally reusing an already read document.
+
+    Args:
+        path: Source path recorded in the tree; read when pen_data is absent.
+        pen_data: Current document snapshot supplied by a composing checker.
+
+    Returns:
+        Normalized expected tree without writing a file.
+    """
+    roots = parse_pen(path if pen_data is None else pen_data)
     issues = validate_pen_context(roots)
     return {
         "version": 1,

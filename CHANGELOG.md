@@ -6,6 +6,9 @@ All notable public changes will be recorded here. Penflow follows semantic versi
 
 ### Added
 
+- `penflow check`: read-only diagnostics from current local inputs, with explicit missing observations, independent-check continuation and bounded regular-file reads.
+- Review led skill/workflow guidance with retained opt-in historical certification instructions and migration/rollback documentation.
+
 - Public MIT licensing, contribution, security, provenance, release, and third-party notices.
 - Reproducible source installation and wheel/source-distribution build documentation.
 - Dependabot configuration for `uv` and GitHub Actions dependencies.
@@ -19,6 +22,9 @@ All notable public changes will be recorded here. Penflow follows semantic versi
 - Feature 045 accepts mutation-free local form submits while preserving strict request duties for mutation-bearing submits.
 
 ### Fixed
+
+- Standalone read-only validation no longer depends on unrelated Doctor project hygiene.
+- Ordinary producer postflight cleanup refusals remain visible on stderr while preserving the product result/exit; unsafe deletion stays refused.
 
 - C51 compares a documentation board state by state. The expected tree carries the contract `states` of each screen and node; an actual tree may hold one capture per declared state (`state` and `scenario_id`, witnessed by `observed_states`). A declared state without capture (`screen.state_missing`), an unknown (`screen.state_unknown`) or undeclared (`screen.state_undeclared`) state, an unwitnessed capture (`screen.state_unwitnessed`), a node of another state (`node.state_unexpected`) and two captures of one state are refused. A single stateless capture keeps the strict comparison.
 - C51 matches collection instances: a contract `repeat_model` reaches the expected template node, and each runtime instance (`semantic_id::instance_id`) must match `instance_id_template` exactly (`node.instance_unexpected`), with repeated descendants in the same instance (`node.instance_mismatch`). Without `repeat_model`, instances stay strict.

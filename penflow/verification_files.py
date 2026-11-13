@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import os
+import stat
 from pathlib import Path
 from typing import Any
 
@@ -17,8 +19,11 @@ class VerificationInputError(ValueError):
 class InputReader:
     """Read caller-contained inputs and retain observed hashes for one verification."""
 
-    def __init__(self, project_root: Path) -> None:
+    def __init__(self, project_root: Path, *, read_limit: int | None = None) -> None:
         self.root = project_root.resolve(strict=True)
+        if read_limit is not None and read_limit <= 0:
+            raise ValueError("read_limit must be positive")
+        self.read_limit = read_limit
         self.observed: dict[Path, str] = {}
         self.resolutions: dict[Path, Path] = {}
         self.presence: dict[Path, bool] = {}
@@ -43,11 +48,30 @@ class InputReader:
         """Read current bytes, rejecting inputs that change during a single run."""
         resolved = self.path(path)
         self.read_log.append(resolved)
-        raw = resolved.read_bytes()
+        raw = self._read_bytes(resolved)
         sha = digest(raw)
         previous = self.observed.setdefault(resolved, sha)
         if previous != sha:
             raise VerificationInputError(f"input.changed: {path}")
+        return raw
+
+    def _read_bytes(self, path: Path) -> bytes:
+        """Optionally bound regular-file reads; legacy callers keep their behavior."""
+        if self.read_limit is None:
+            return path.read_bytes()
+        if not stat.S_ISREG(path.lstat().st_mode):
+            raise VerificationInputError(f"input.not_regular: {path}")
+        flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0)
+        descriptor = os.open(path, flags)
+        with os.fdopen(descriptor, "rb") as stream:
+            info = os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode):
+                raise VerificationInputError(f"input.not_regular: {path}")
+            if info.st_size > self.read_limit:
+                raise VerificationInputError(f"input.too_large: {path} (limit {self.read_limit})")
+            raw = stream.read(self.read_limit + 1)
+        if len(raw) > self.read_limit:
+            raise VerificationInputError(f"input.too_large: {path} (limit {self.read_limit})")
         return raw
 
     def exists(self, path: str | Path) -> bool:
@@ -118,7 +142,7 @@ class InputReader:
             if path.exists() != present:
                 raise VerificationInputError(f"input.presence_changed: {path}")
         for path, sha in self.observed.items():
-            if digest(path.read_bytes()) != sha:
+            if digest(self._read_bytes(path)) != sha:
                 raise VerificationInputError(f"input.changed: {path}")
         for (path, pattern), members in self.directories.items():
             if self._members(path, pattern) != members:

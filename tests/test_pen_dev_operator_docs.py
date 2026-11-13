@@ -2,7 +2,7 @@
 # @spec AC-007: ordered C46 file-copy protocol, no filesystem prohibition — .specs/features/078-pen-dev-operator-compatibility/spec.md#ac-007
 # @spec AC-008: C46 at design closure, preparation noncertifying — .specs/features/078-pen-dev-operator-compatibility/spec.md#ac-008
 # @spec AC-014: save helper Accessibility grant and MCP save limitation — .specs/features/078-pen-dev-operator-compatibility/spec.md#ac-014
-"""Operator guidance matches the pen.dev 1.2 MCP surface and the C46 verifier."""
+"""Retained certification operator guidance matches the pen.dev 1.2 MCP surface and the C46 verifier."""
 
 from __future__ import annotations
 
@@ -12,8 +12,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-PENFLOW_SKILL = ROOT / ".agent-sync/skills/penflow/SKILL.md"
-MOCKUP_SKILL = ROOT / ".agent-sync/skills/mockup-factory/SKILL.md"
+PENFLOW_SKILL = ROOT / ".agent-sync/skills/penflow/certification.md"
+MOCKUP_SKILL = ROOT / ".agent-sync/skills/mockup-factory/certification.md"
 GUIDES = (
     PENFLOW_SKILL,
     MOCKUP_SKILL,
@@ -101,7 +101,7 @@ def test_mockup_factory_requires_c46_at_design_closure_not_before_first_read() -
     ("guide", "anchor", "steps"),
     [
         (
-            ".agent-sync/skills/mockup-factory/SKILL.md",
+            ".agent-sync/skills/mockup-factory/certification.md",
             "Before any pen.dev MCP call",
             (
                 "copy `ui.pen` to a pre snapshot",

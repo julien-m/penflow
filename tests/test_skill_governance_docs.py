@@ -76,7 +76,8 @@ def test_project_integration_guide_documents_existing_project_adoption() -> None
         assert phrase in guide
 
 
-PRIMARY_GOVERNANCE_DOCS = (README, PROJECT_INTEGRATION, PENFLOW_SKILL, FLOW_SKILL, MOCKUP_SKILL)
+# Historical producer/certification policy, not the normal read-only workflow.
+PRIMARY_GOVERNANCE_DOCS = (PROJECT_INTEGRATION, PENFLOW_SKILL, FLOW_SKILL, MOCKUP_SKILL)
 GOVERNANCE_CONTRACTS = (
     pytest.param(
         ("penflow doctor --project", "--check --json", "start", "end"), (), id="doctor-receipts"

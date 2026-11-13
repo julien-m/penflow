@@ -14,8 +14,8 @@ SKILL_DIR = ROOT / ".agent-sync" / "skills" / "flow-ui-contract"
 
 
 def test_flow_ui_contract_skill_documents_installed_name_and_legacy_wording() -> None:
-    skill = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
-    readme = (SKILL_DIR / "README.md").read_text(encoding="utf-8")
+    skill = (SKILL_DIR / "certification.md").read_text(encoding="utf-8")
+    readme = (SKILL_DIR / "certification-readme.md").read_text(encoding="utf-8")
 
     assert "name: flow-ui-contract" in skill
     assert "flow-ui-contract` skill" in skill

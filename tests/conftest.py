@@ -146,7 +146,7 @@ def governed_in_process_cli(
         argv: list[str] | None = None,
         **kwargs: Any,
     ) -> int:
-        if argv is None or not argv or "--project" in argv:
+        if argv is None or not argv or "--project" in argv or "check" in argv:
             return production_main(argv, **kwargs)
         command = _command_from_argv(argv)
         if command in {*PRODUCER_COMMANDS, *_PRODUCER_ALIASES}:

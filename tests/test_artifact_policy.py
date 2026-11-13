@@ -127,6 +127,7 @@ def test_command_registry_matches_the_normative_closed_sets() -> None:
             "validate-code-ir",
             "validate-report",
             "authority",
+            "check",
         }
     )
     assert LIFECYCLE_EXEMPT_COMMANDS == frozenset({"doctor", "--help", "--version"})
