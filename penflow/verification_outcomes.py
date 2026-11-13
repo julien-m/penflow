@@ -5,10 +5,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from .verification_assertions import evaluate_assertion
+from .contract_actions import action_mode
+from .verification_assertions import evaluate_assertion, resolve_pointer
+from .verification_permissions import authorized_permission_actors
 from .verification_schema import issue, schema_issues
 from .verification_system_returns import system_return_issues
-from .contract_actions import action_mode
 
 
 # @spec FR-008: typed observed values — .specs/features/077-complete-verification-workflow/spec.md#fr-008
@@ -31,7 +32,7 @@ def evaluate_outcome(
             issues.append(
                 issue("outcome.identity", field, f"observation {field} differs from expectation")
             )
-    issues.extend(_source_identity_issues(observation, contract))
+    issues.extend(_source_identity_issues(observation, contract, expected))
     for index, assertion in enumerate(expected["assertions"]):
         try:
             passed = evaluate_assertion(assertion, observation)
@@ -92,7 +93,7 @@ def _absence_issues(observation: dict[str, Any], contract: dict[str, Any]) -> li
 
 
 def _source_identity_issues(
-    observation: dict[str, Any], contract: dict[str, Any]
+    observation: dict[str, Any], contract: dict[str, Any], expected: dict[str, Any]
 ) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
     result = observation["result"]
@@ -122,20 +123,22 @@ def _source_identity_issues(
                 "observation is attached to another action node",
             )
         )
-    if action_mode(action) == "local":
-        if observation["capability"] != "ui" or any(
+    if action_mode(action) == "local" and (
+        observation["capability"] != "ui"
+        or any(
             observation[side]["semantic_id"] != node["semantic_id"]
             or observation[side]["role"] != node["role"]
             for side in ("before", "after")
-        ):
-            issues.append(
-                issue(
-                    "outcome.local.identity",
-                    "after",
-                    "local editing must observe the same actual input before and after",
-                )
+        )
+    ):
+        issues.append(
+            issue(
+                "outcome.local.identity",
+                "after",
+                "local editing must observe the same actual input before and after",
             )
-    _permission_actor_issues(observation, contract, action, result, issues)
+        )
+    _permission_actor_issues(observation, contract, action, result, issues, expected)
     return issues
 
 
@@ -219,6 +222,7 @@ def _permission_actor_issues(
     action: dict[str, Any],
     result: dict[str, Any],
     issues: list[dict[str, Any]],
+    expected: dict[str, Any],
 ) -> None:
     permission = next(
         (
@@ -228,8 +232,14 @@ def _permission_actor_issues(
         ),
         None,
     )
+    if observation["category"] == "permission":
+        source = resolve_pointer(contract, expected["source_pointer"])
+        if isinstance(source, dict) and source in contract.get("permissions", []):
+            permission = source
     if permission:
-        authorized = result["actor_id"] == permission["actor"]
+        authorized = result["actor_id"] in authorized_permission_actors(
+            contract, action, permission
+        )
         if (result["outcome"] == "denied") == authorized:
             issues.append(
                 issue(

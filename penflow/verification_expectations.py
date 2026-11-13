@@ -5,10 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from .contract_actions import action_mode
 from .verification_assertions import json_values_equal, resolve_pointer
 from .verification_obligations import ObligationSlot, derive_obligations
+from .verification_permissions import authorized_permission_actors
 from .verification_schema import issue, schema_issues
-from .contract_actions import action_mode
 
 
 @dataclass
@@ -102,7 +103,7 @@ def validate_expected_semantics(
         ]
     required: dict[str, Any] = _identity_expectations(slot, source, contract, equalities, issues)
     _transition_expectations(slot, source, contract, equalities, required, issues)
-    _functional_expectations(expected, slot, source, equalities, required, issues)
+    _functional_expectations(expected, slot, source, equalities, required, issues, contract)
     for pointer, value in required.items():
         if pointer not in equalities or not json_values_equal(equalities[pointer], value):
             issues.append(
@@ -233,6 +234,7 @@ def _functional_expectations(
     equalities: dict[str, Any],
     required: dict[str, Any],
     issues: list[dict[str, Any]],
+    contract: dict[str, Any],
 ) -> None:
     if slot.category == "effect":
         required.update({"/before/method": source["method"], "/before/url": source["endpoint"]})
@@ -271,13 +273,19 @@ def _functional_expectations(
                 )
             )
     if slot.category == "permission":
-        authorized = equalities.get("/result/actor_id") == source["actor"]
-        if authorized != (slot.outcome == "allowed"):
+        actor = equalities.get("/result/actor_id")
+        action = next(item for item in contract["actions"] if item["id"] == slot.action_id)
+        authorized = actor in authorized_permission_actors(contract, action, source)
+        # Each grant retains its own positive witness; a negative must be outside
+        # every grant for this action/entity, not just different from this actor.
+        if (slot.outcome == "allowed" and actor != source["actor"]) or (
+            slot.outcome == "denied" and authorized
+        ):
             issues.append(
                 issue(
                     "obligation.expected.permission",
                     slot.source_pointer,
-                    "permission expectation contradicts source actor",
+                    "permission expectation contradicts source grants",
                 )
             )
 
