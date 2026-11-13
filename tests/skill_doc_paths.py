@@ -14,11 +14,13 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-PENFLOW_SKILL = ROOT / ".agent-sync" / "skills" / "penflow" / "SKILL.md"
-FLOW_SKILL = ROOT / ".agent-sync" / "skills" / "flow-ui-contract" / "SKILL.md"
-FLOW_README = ROOT / ".agent-sync" / "skills" / "flow-ui-contract" / "README.md"
-MOCKUP_SKILL = ROOT / ".agent-sync" / "skills" / "mockup-factory" / "SKILL.md"
-MOCKUP_README = ROOT / ".agent-sync" / "skills" / "mockup-factory" / "README.md"
+# These tests retain the historical C24-C51 guidance contract. Normal skill
+# entry points are covered separately by test_review_workflow_docs.py.
+PENFLOW_SKILL = ROOT / ".agent-sync" / "skills" / "penflow" / "certification.md"
+FLOW_SKILL = ROOT / ".agent-sync" / "skills" / "flow-ui-contract" / "certification.md"
+FLOW_README = ROOT / ".agent-sync" / "skills" / "flow-ui-contract" / "certification-readme.md"
+MOCKUP_SKILL = ROOT / ".agent-sync" / "skills" / "mockup-factory" / "certification.md"
+MOCKUP_README = ROOT / ".agent-sync" / "skills" / "mockup-factory" / "certification-readme.md"
 MOCKUP_WORKFLOW = ROOT / ".agent-sync" / "skills" / "mockup-factory" / "references" / "workflow.md"
 MOCKUP_RUBRIC = (
     ROOT / ".agent-sync" / "skills" / "mockup-factory" / "references" / "audit-rubric.md"
@@ -37,7 +39,7 @@ SEMANTIC_TREE_REFERENCE = (
     ROOT / ".agent-sync" / "skills" / "flow-ui-contract" / "references" / "semantic-ui-tree.md"
 )
 README = ROOT / "README.md"
-PROJECT_INTEGRATION = ROOT / "docs" / "project-integration.md"
+PROJECT_INTEGRATION = ROOT / "docs" / "project-integration-certification.md"
 THEME_CONTRACT = ROOT / "docs" / "theme-contract.md"
 PENCIL_EXPORT_BATCH_ISSUE = ROOT / "docs" / "pencil-export-nodes-batch-issue.md"
 

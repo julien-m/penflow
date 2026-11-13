@@ -65,9 +65,9 @@ penflow demo --out penflow --project .
 
 `doctor --fix` creates the canonical `penflow/ui.pen` and the managed `.gitignore` block; `demo` then writes a sample contract, semantic tree, expected and actual UI trees, generated code stubs and the comparison report under `penflow/`, so you can inspect the three-tree workflow described in [Three Trees](#three-trees) before wiring your own project.
 
-## Consumer Project Hygiene
+## Explicit Doctor and Producer Hygiene
 
-Run Penflow against the exact consumer project, never the Penflow source checkout. At the start and end of every Penflow task, capture a read-only Doctor receipt:
+For explicit hygiene diagnostics and existing producer setup, select the exact consumer project. Doctor is not a prerequisite for `check` or standalone read-only validation. To inspect project hygiene, run:
 
 ```bash
 penflow doctor --project . --check --json
@@ -90,9 +90,23 @@ transition to be observed. See the local submit clarification of the JSON-only c
 
 `flow-ui-contract/contract.json` is the canonical strict v2 business contract. Flow/screen Markdown is a deterministic, hash-bound projection produced by `export-flow-docs`; legacy Markdown is accepted only through explicit migration. Strict coverage is bidirectional: every contract node has one Pencil anchor and every authored Pencil node is explicitly semantic, inherited, or decorative.
 
-## Complete Verification (C51)
+## Current Checks and Delivery
 
-The normal workflow produces one versioned `run-report.json` and revalidates it at the consumer's final transition. Its profile comes from the requested deliverable: `design` checks the approved contract and native design; `implementation` adds the actual application build, executed scenarios and observed outcomes. Missing runtime evidence never changes an implementation request into a design request.
+The normal workflow runs useful checks and one independent native final review. Inspect current files without setting up a Git repository, Doctor receipts, upstream approval history or a runtime build manifest:
+
+```bash
+penflow check --target penflow --project . --json
+```
+
+`check` validates the current contract and canvas, computes token/consistency/visual diagnostics, and compares a supplied actual tree to structure derived from the current canvas in memory. It continues independent checks after a failure and writes no files. Missing inputs are `NOT_RUN` with a null exit; failed checks retain their issues and nonzero result. Top-level exit is `1` for any failed/errored executed diagnostic, `2` for an invalid workspace and otherwise `0`. Missing observations may coexist with exit `0`; `certified: false` and `review_status: required` always apply. Warnings remain findings with nonzero check results; no global leniency changes comparison thresholds.
+
+The report does not observe rendered appearance, runtime interactions, capture freshness or build identity. Review the actual UI and behavior when relevant. Give real results and missing observations to one fresh independent native reviewer; correct material defects and disclose accepted limitations. Metadata/certificate failure alone is not a delivery veto. Existing CLI generators remain available when their outputs are useful, and retain confined write/cleanup protections. A refused ordinary-producer postflight cleanup is reported separately on stderr without replacing its product stdout/exit.
+
+Read [the workflow](docs/review-led-workflow.md) for the review contract and [migration/rollback](docs/review-led-migration.md) before adopting a package. Historical commands and the detailed command examples below are explicitly invoked tools, not a mandatory chain.
+
+## Historical Complete Verification (C51)
+
+The explicitly requested C51 workflow produces one versioned `run-report.json` and revalidates it at the consumer's final transition. Its profile comes from the requested deliverable: `design` checks the approved contract and native design; `implementation` adds the actual application build, executed scenarios and observed outcomes. Missing runtime evidence never changes an implementation request into a design request.
 
 The workflow supplies these inputs automatically; the equivalent CLI calls are:
 
@@ -109,7 +123,7 @@ A reviewed LiveSpec contract may delegate a requirement that carries no UI-contr
 
 The public Python boundary is `penflow.verification.produce_verification_report(...)` and `validate_verification_report(...)`. The latter returns `penflow-verification-validation` version 1 with the checked report hash, exact project/workspace, profile and build-manifest identity. **Read** [the verification workflow](docs/verification-workflow.md) for the schemas, automatic producer steps and integration contract; **read** [the adapter guides](docs/adapters/README.md) for the external runtime boundary. Generated code remains a scaffold until these implementation checks pass.
 
-## Strict by Default (Breaking Change, Feature 049 / C24)
+## Diagnostic Exit Policy (Feature 049 / C24)
 
 Penflow exits non-zero on **warning-severity issues by default**. Errors always fail; warnings fail unless you pass the global `--lenient` flag (accepted before or after the subcommand on every validating command):
 
@@ -235,6 +249,10 @@ penflow run --target "$fresh" --json
 **Read** [`docs/project-integration.md`](docs/project-integration.md) when adding Penflow to an existing app repository. It explains the recommended `penflow/` workspace layout, forward adoption, Pencil enrichment, legacy reverse migration, implementation handoff through `code-ir.json`, runtime `actual-ui-tree.json` verification, and a minimal CI gate.
 
 ### Guided Mockup Optimization
+
+For normal work, read [the current workflow](docs/review-led-workflow.md) and inspect actual renders plus useful diagnostics before independent review. The following retained certificate protocol applies **only to an explicitly requested historical certification**, never as an automatic delivery gate.
+
+#### Explicit historical mockup certification
 
 **Read** [`.agent-sync/skills/mockup-factory/SKILL.md`](.agent-sync/skills/mockup-factory/SKILL.md) when generating, auditing, or optimizing Pencil mockups. The Penflow-local Mockup Factory uses `flow-ui-contract`, `semantic-ui-tree.json`, `.pen`, `pencil-context-map.json`, `expected-ui-tree.json`, and `detect-drift` reports as deterministic anchors. Since feature 052 the audit rubric is prescriptive: every category maps to a scripted gate (`lint-tokens`, `check-consistency`, `audit-visual`, `detect-drift`, `compare-tree`, `validate-visual-evidence`), Critical is exactly any error-severity gate issue or `blocking: true` item, and fixes run in a bounded fix-re-audit loop (max 3 iterations, full chain rerun, no PASS without a final clean run; residual criticals escalate). The design audit verdict is the strict `audit-report.json` (`kind: penflow-mockup-audit`, with `iterations`, per-gate `{gate, command, exit_code, report_path, result}`, and `residual_issues[]`) — `penflow validate-report audit-report.json --schema` checks that audit. C51 `run-report.json` production and fresh revalidation close the complete design workflow afterward.
 

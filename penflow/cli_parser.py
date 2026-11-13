@@ -37,6 +37,7 @@ from .cli_commands_b import (
     cmd_validate_visual_evidence,
 )
 from .cli_authority import register_authority
+from .cli_checks import register_checks
 from .cli_reporting import _add_lenient
 from .token_lint import DEFAULT_FONTSIZE_SCALE, DEFAULT_RADIUS_SCALE, DEFAULT_SPACING_SCALE
 
@@ -319,7 +320,7 @@ def _register_project_health_arguments(sub: Any) -> None:
         command_parser.add_argument(
             "--project",
             default=None,
-            help="consumer Git project root for Doctor health governance",
+            help="exact consumer project root (check defaults to its workspace)",
         )
         configured_parsers.add(id(command_parser))
 
@@ -335,6 +336,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--lenient", dest="lenient_global", action="store_true", help="do not fail on warnings"
     )
     sub = parser.add_subparsers(dest="command", required=True)
+    register_checks(sub)
     _register_doctor_run(sub)
     _register_inspect_persistence(sub)
     _register_validation_contracts(sub)

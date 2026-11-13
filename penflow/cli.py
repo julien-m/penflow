@@ -74,8 +74,8 @@ def main(
     Side effects:
         Structured command and governance results are written to stdout; usage
         and contract-boundary errors are written to stderr. Every non-exempt
-        command runs the Doctor health boundary against ``--project`` or the
-        current directory; only producers enter the managed-run lifecycle.
+        producer runs the Doctor health boundary. Read-only diagnostics inspect
+        their explicit inputs; C51 requests retain historical governance.
     """
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -124,10 +124,16 @@ def _dispatch(
     policy = command_policy_for(str(args.command))
     if policy.category is CommandClassification.LIFECYCLE_EXEMPT:
         return int(args.func(args) or 0)
+    if str(args.command) == "check":
+        return int(args.func(args) or 0)
     if getattr(args, "project", None) is None:
         args.project = "."
+    # A diagnostic's explicit input does not depend on unrelated Git/canvas
+    # hygiene. C51 retains its historical closed project boundary.
+    if policy.category is CommandClassification.READ_ONLY and not is_verification_request(args):
+        return int(args.func(args) or 0)
     if str(args.command) == "export-flow-docs" and bool(getattr(args, "check", False)):
-        return _run_project_health_checked(args)
+        return int(args.func(args) or 0)
     if policy.category is CommandClassification.PRODUCER:
         return _run_governed_producer(args)
     return _run_project_health_checked(args)

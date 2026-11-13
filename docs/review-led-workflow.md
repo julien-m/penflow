@@ -1,0 +1,28 @@
+# Review led Penflow workflow
+
+This is the normal workflow for Penflow, flow-ui-contract and Mockup Factory. Existing diagnostic commands keep their real verdicts; their certification protocols have no automatic veto over delivery.
+
+```mermaid
+flowchart LR
+    A[Current product intent and design] --> B[Implement or improve]
+    B --> C[Useful local and runtime checks]
+    C --> D[One independent native final review]
+    D --> E[Correct material defects and deliver]
+```
+
+- Read the actual project conventions and relevant design references. Keep the current product contract, actions, permissions, state changes and outcomes truthful. A missing approval ledger does not prevent reading current requirements.
+- Use `penflow check --target <workspace> --project <consumer-project-root> --json` to collect available local diagnostics. The workspace/project are explicit caller choices; no Git repository, Doctor receipt, approval history, native receipt packet or build manifest is needed for this read-only command. Capture the command, exit, concise findings and limitations.
+- `check` reads current `ui.pen`, optional `flow-ui-contract/contract.json`, `theme.css` and `actual-ui-tree.json`. It derives expected structure in memory, never trusts a stale expected file, and runs independent checks after a failure. It writes no files. Missing dependencies are `NOT_RUN` with null exit; malformed inputs are `ERROR`, never PASS. Exit 1 means at least one executed diagnostic failed or errored; exit 0 means those executed checks found no warning/error. Either may include unavailable observations. `certified: false` and `review_status: required` always apply.
+- Source JSON must be valid and contained in the selected project; input changes during a run remain findings. Metadata/history/doc projections are not prerequisites for independent checks. Existing contract validators still reject real action/permission/state defects.
+- Local checks do not observe rendered appearance, runtime interactions, freshness or build identity. A supplied actual tree permits structural comparison without an administrative build manifest; it cannot prove a real interaction occurred. Inspect the real rendered UI and exercise behavior when relevant. Essential missing observations remain explicitly unverified for review.
+- Run proportionate product tests/builds/typing/lint/runtime observations. Reuse passing results while their relevant inputs remain unchanged. Fix real product defects; report unrelated warnings, unavailable tooling and legacy debt without restarting every check or the whole feature pipeline. Do not fabricate PASS, hide errors, delete failing tests, weaken requirements or copy expected results into runtime evidence.
+- Dispatch one fresh generic native reviewer without implementer conversation history. Give it the user request, accepted decisions, spec/plan, applicable conventions, full diff, relevant existing code and actual check results, including failures/unavailable observations. The host's response is the review record; no JSON verdict, model certificate, hash chain or review ingestion is needed. Use this same reviewer for correction follow-up, not a new whole-feature review.
+- The reviewer judges correctness, acceptance coverage, architecture, file placement, maintainability and concrete security/data risks. Only material defects, essential missing observations with material risk, missing authority or unresolved functional decisions delay delivery. Carry minor/pre-existing findings as disclosed follow-ups. If native review is unavailable, state it; do not substitute self-approval.
+- Preserve exact consumer project boundaries and ambiguous-write/deletion protections. Prefer the selected `ui.pen` canvas; keep real active/draft/archive revisions intact. Read-only validators inspect explicit files without Doctor hygiene. Producers still use their existing confined Doctor/managed-run boundary; `doctor --fix` is explicit setup/repair, never an automatic certificate retry loop. On an ordinary producer, a refused postflight cleanup is a separate `penflow-cleanup-finding` JSON line on stderr; product stdout/exit remain intact and unproven data stays untouched. Historical `run` retains its old cleanup behavior.
+- Update specs/mappings/changelog/registry as ordinary confined documents; mark Implemented after independent review accepts the behavior. Commit, publish, merge or install only within user authorization. Never silently upgrade an installed consumer or resume a mission under another policy.
+
+## Historical diagnostics
+
+Only when the user explicitly requests certification or an old diagnostic, read [the retained C51 guide](verification-workflow.md) and the invoked skill's `certification.md`. Existing `run` (C42), `run --strict-closure` (C47), `run --profile design|implementation` (C51), `validate-report --required-profile`, `authority`, native receipt and visual-evidence validators retain their real commands, exit codes and historical interpretation. A historical FAIL/BLOCKED remains FAIL/BLOCKED. Do not run these automatically to advance review led delivery, and do not mix their reports with `penflow-check-report`.
+
+Read [migration and rollback guidance](review-led-migration.md) before adopting a new package or changing an active consumer. Read [the adapter guides](adapters/README.md) for external runtime capture; Penflow never starts browsers, simulators, Xcode or application builds.

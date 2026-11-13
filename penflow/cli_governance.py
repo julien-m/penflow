@@ -9,6 +9,8 @@
 # @spec FR-001 FR-002 FR-003 FR-004 FR-007: Feature 075 governed project boundary.
 
 import argparse
+import json
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -184,7 +186,26 @@ def _execute_managed_producer(
         updated_at=datetime.now(UTC).isoformat(),
     )
     save_manifest(context.project_root, terminal)
-    _cleanup_current_run(context, canonical, terminal, LifecyclePhase.POSTFLIGHT)
+    try:
+        _cleanup_current_run(context, canonical, terminal, LifecyclePhase.POSTFLIGHT)
+    except LifecycleBlockedError as error:
+        # Historical run diagnostics keep their exit semantics. Ordinary
+        # producers retain the product result while refusing unsafe cleanup.
+        if command == "run":
+            raise
+        print(
+            json.dumps(
+                {
+                    "kind": "penflow-cleanup-finding",
+                    "status": "BLOCKED",
+                    "producer_exit": producer_exit,
+                    "code": error.code,
+                    "message": error.message,
+                },
+                sort_keys=True,
+            ),
+            file=sys.stderr,
+        )
     return producer_exit
 
 
