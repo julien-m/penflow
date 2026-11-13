@@ -273,3 +273,35 @@ def test_cleanup_refusal_preserves_product_result_and_reports_stderr(
     assert finding["status"] == "BLOCKED"
     assert finding["producer_exit"] == product_exit
     assert (tmp_path / "penflow/ui.pen").exists()
+
+
+def test_token_warnings_are_preserved_as_failed_check_findings(workspace: Path) -> None:
+    (workspace / "theme.css").write_text(":root { --radius: nonsense; }")
+    result = by_name(check_workspace(workspace))["lint-tokens"]
+    warnings = [issue for issue in result["issues"] if issue["severity"] == "warning"]
+    assert warnings
+    assert any(issue["code"] == "theme.value.unparsed" for issue in warnings)
+    assert result["exit_code"] == 1
+    assert result["status"] == "FAIL"
+
+
+def test_single_screen_actual_shape_compares_like_multiscreen_envelope(tmp_path: Path) -> None:
+    raw = json.loads((ROOT / "examples/full/ui.pen").read_text())
+    raw["children"] = raw["children"][:1]
+    pen = tmp_path / "ui.pen"
+    pen.write_text(json.dumps(raw))
+    screen = expected_tree_from_pen(pen)["screens"][0]
+    actual = {
+        "version": 1,
+        "screen_id": screen["screen_id"],
+        "root": screen["root"],
+        "viewport": screen["viewport"],
+    }
+    path = tmp_path / "actual-ui-tree.json"
+    path.write_text(json.dumps(actual))
+    checks = by_name(check_workspace(tmp_path))
+    assert checks["validate-actual"]["exit_code"] == 0
+    assert checks["compare-tree"]["exit_code"] == 0
+    actual["root"]["bbox"]["width"] += 50
+    path.write_text(json.dumps(actual))
+    assert by_name(check_workspace(tmp_path))["compare-tree"]["exit_code"] == 1

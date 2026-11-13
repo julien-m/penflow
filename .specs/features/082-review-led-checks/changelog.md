@@ -8,3 +8,9 @@
 - Simplified three skill entries and public guidance; archived historical protocols and documented migration/rollback.
 - Corrected the independent review finding: regular-file, nonblocking, 64 MiB bounded reads and rechecks only for the new checker; legacy reads remain unchanged.
 - Validation and limitations: read [progress](progress.md). No installation, publication or consumer-runtime change by this source task.
+
+## 2026-11-13 — PR review corrections
+
+- Preserve token warnings from the existing violations field in check issues and nonzero outcomes.
+- Normalize the supported single-screen actual envelope before comparison; genuine mismatches still fail.
+- Both regressions reproduced before correction and pass afterwards.

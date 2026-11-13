@@ -14,7 +14,7 @@ from .pen import bbox_issues, parse_pen, validate_pen_context_against_contract
 from .pen_lifecycle import CanvasLifecycleError
 from .theme import theme_from_css
 from .token_lint import lint_tokens
-from .tree import expected_tree_from_pen, validate_actual_tree
+from .tree import expected_tree_from_pen, normalize_actual_tree, validate_actual_tree
 from .verification_files import InputReader
 from .visual_metrics import audit_visual
 
@@ -79,7 +79,7 @@ class _Checks:
     def run(self, name: str, action: Callable[[], JsonObject]) -> JsonObject | None:
         try:
             report = action()
-            issues = report.get("issues", [])
+            issues = report.get("issues", []) + report.get("violations", [])
             code = int(
                 report.get("status") in {"FAIL", "FAILED", "BLOCKED"}
                 or any(issue.get("severity") in {"error", "warning"} for issue in issues)
@@ -164,7 +164,9 @@ def check_workspace(
     if expected is not None and actual is not None:
         checks.run(
             "compare-tree",
-            lambda: compare_trees(expected, actual, threshold=STRICT_THRESHOLD, mandatory=True),
+            lambda: compare_trees(
+                expected, normalize_actual_tree(actual), threshold=STRICT_THRESHOLD, mandatory=True
+            ),
         )
     else:
         checks.missing(
