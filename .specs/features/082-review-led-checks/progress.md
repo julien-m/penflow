@@ -18,3 +18,10 @@
 - Public and consumer SDK lineages differ; do not downgrade a consumer to this public wheel. No global tool, Atlas SDK/runtime, mission, publish or merge change was made by this task.
 
 User-authorized exception: tool repair implemented directly with ordinary LiveSpec structure; no old certificate pipeline executed or forged.
+
+## 2026-11-14 operator clarification
+
+- Read [the live editor observations](../../../docs/pen-dev-editor-observations.md): the final controlled run changed and read A, independently read B, and observed changed A disk metadata/digest with the chat hidden and all four displays asleep in six samples. Initial connection failures, delayed save evidence and the mutation that appeared after timeout remain disclosed.
+- Clarified one canonical canvas per product across features in the current workflow, integration guide and README. No technical one-editor-per-chat restriction, Python behavior change, consumer upgrade or new certification gate.
+- Validation: `uv run --offline pytest -q tests/test_review_workflow_docs.py` exited 0, 4 passed in 0.15 s. Added local links resolve and `git diff --check` exited 0. No runtime suite repeated for this documentation-only clarification.
+- The independent coordinating reviewer accepted the full correction and live records, with no material findings; no tests were duplicated during review.

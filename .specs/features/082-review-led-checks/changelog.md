@@ -1,5 +1,11 @@
 # Changelog — Review led checks
 
+## 2026-11-14 — Existing canvas and editor connection
+
+- Restore the single product canvas rule prominently in the normal workflow and integration guide; enrich existing screens across features instead of creating a canvas per feature.
+- Separate editor-opening acknowledgements, actual file connection, mutation readback and disk persistence. Document measured background/multiple-document behavior without inventing a one-editor-per-chat limit or a new test gate.
+- Read [the operator observations](../../../docs/pen-dev-editor-observations.md) for the bounded live tests and their limits.
+
 ## 2026-11-13 — Implemented
 
 - Added non-certifying current-input checks; failures and missing observations remain visible while independent diagnostics continue.
