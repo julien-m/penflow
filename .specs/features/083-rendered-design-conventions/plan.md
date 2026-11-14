@@ -31,3 +31,17 @@ flowchart LR
 ## Validation and delivery
 
 Focused pytest then full python -m pytest, ruff, mypy, build, installed-wheel smoke. One fresh native independent final reviewer receives request/spec/plan/conventions/diff and actual evidence; same reviewer checks material fixes. Update mappings/registry, commit scoped changes, publish PR and merge after CI subject to protections. Prepare private Atlas port files/contracts, never install or replace its SDK package.
+
+## Targeted fix — exact typography scale handoff
+
+Gap: a valid compact13px source passes the desktop profile rule but fails the independent default token scale. Inventory: optional profile typography object, exact positive finite numeric scale/source label, theme font-size declarations, defaults, malformed/missing profile/source, source confinement/recheck and independent diagnostics.
+
+| Convention / requirement | Scoped decision | Verification |
+|---|---|---|
+| Validated configuration / FR-001,002 | Add optional typography.font_size_scale + source to design-profile schema; reject empty/duplicate/nonpositive/nonfinite/nonnumeric values | Real native .pen normal-check regression, direct boundary tests |
+| One resolved configuration | Resolve profile once before design lint; pass exact values to existing lint_tokens fontsize_scale | 13 accepted, actual offscale still fails, no default/theme union |
+| Explicit contradiction | Compare theme-declared font sizes with profile exact set; report typography-scale findings, never silently add them | Theme outside exact set fails even if source label valid |
+| Independent results / compatibility | Missing scale retains current theme-plus-default behavior; invalid profile reports ERROR and independent checks use an explicitly labelled legacy fallback | Invalid/absent/no-write/CLI and existing review checks |
+| Traceable workflow | Agent reads real conventions/exclusions and materializes surface, role/variant rules and exact scale once; sources hashes are provenance only | Current docs/skill references and same-reviewer correction follow-up |
+
+No adapter/runtime/schema-C12/private consumer change. Reuse unchanged real-browser evidence; run affected pure/check/doc suites, lint/types, packaging smoke and required remote CI. Source authority remains existing repository-owned skills; no global projection write.

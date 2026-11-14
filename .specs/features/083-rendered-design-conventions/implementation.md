@@ -23,3 +23,12 @@
 ## Delivery
 
 Implementation commit `a9c6510` is published in [PR 26](https://github.com/julien-m/penflow/pull/26). The accepted implementation and this documentation follow-up share the same reviewed code inputs. The PR records the live protected CI and merge outcome.
+
+## Targeted fix — product typography scale
+
+- FR-001/002, AC-001: optional validated `typography.font_size_scale`/`source` in the profile schema; positive finite unique values with the existing observation safety bound. The profile is resolved once before lint and the exact values reach the existing `fontsize_scale` parameter. Theme/default values cannot silently expand that set; `typography-scale` reports theme contradictions explicitly.
+- Core delta is confined to `design_profile.py`, `review_checks.py`, `token_lint.py` and `schemas/design-profile.schema.json`. No adapter, runtime tree, dependency, private SDK/FactsIdentity or consumer environment change.
+- Regression through native .pen/check: initial13/15 tests failed (RED), then24 new tests pass. Covered valid and genuinely offscale sizes, explicit theme contradictions, absent/invalid/nonfinite/huge scale, CLI wiring, confinement, single resolution and unchanged files.
+- Affected code/profile/lint/check/docs/schema suites:153 passed in4.00s. Ruff check/format passed (282 files); mypy passed279 source files; diff check passed. No new full local suite or browser rerun: unchanged adapter/demo/rendered-comparison inputs preserve the existing real-browser evidence. Repository CI remains required for publication.
+- Build passed. A fresh isolated wheel outside the checkout exercised normal CLI check against native labels: valid13 exits0/lintPASS/policyPASS; disallowed14 exits1/lintFAIL; valid13 with conflicting theme14 exits1/lintPASS/policyFAIL. All three keep exact scale[13] and source inputs unchanged; disposable environment removed.
+- The same native reviewer accepted this correction after116 independently executed tests, including35 historical token-lint tests. Read [the correction review](review.md#targeted-typography-correction). No private port/adoption acceptance is implied.

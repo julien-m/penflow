@@ -41,3 +41,20 @@ The report `inputs` block records:
 - `fontsize_scale`: effective type-scale values after theme extension or CLI override.
 
 Generators should write a complete `theme.css`, then gate the generated `.pen` with `lint-tokens`; a PASS report is the portable handoff proof for downstream orchestration.
+
+## Exact product typography in normal check
+
+Read the project's applicable typography/component conventions and platform exclusions first. Materialize the resolved product scale once in workspace `design-profile.json`, alongside its surface/platform and component/variant rules. This illustrative fragment is not a universal type scale:
+
+```json
+"typography": {
+  "font_size_scale": [13, 14, 16],
+  "source": "conventions-resolved.md#web-type-scale"
+}
+```
+
+- `font_size_scale` is a nonempty unique list of positive finite numbers in the selected platform's logical font units (CSS px for Web), bounded by the existing observation safety limit. `source` is a nonblank policy reference. Missing either inside a supplied typography object is invalid; omit the entire object to preserve existing behavior.
+- With this object, normal `check` passes the exact scale to the existing token lint. No default or theme size is silently added. A declared theme font size outside the exact scale produces `profile.typography.theme_conflict` in the independent `typography-scale` diagnostic. A valid label need not grow to satisfy an old theme; reconcile the actual product contract/theme instead.
+- Without this object, the existing default-plus-theme scale remains. Standalone `lint-tokens --fontsize-scale` retains its existing explicit-override behavior. A malformed profile remains ERROR; other diagnostics continue, and token lint labels its legacy fallback as `legacy-fallback-invalid-profile`.
+- Token-lint details record the effective `inputs.fontsize_scale` and `fontsize_scale_origin`. The policy diagnostic records the selected exact values/source and conflicts; this is not a runtime/freshness certificate.
+- `sources[]` lists project-contained files whose bytes are hashed. A local resolved-convention excerpt/snapshot can document the applicable table, origin and exclusions; the `source` reference can point to its section. Hashing an index does not read its links or prove semantic derivation. An operator resolves the real references and materializes rules; the core never interprets arbitrary Markdown or reads outside the selected project.

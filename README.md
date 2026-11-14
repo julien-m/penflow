@@ -202,6 +202,8 @@ For dense multi-screen mockups, prefer `penflow check-consistency expected-ui-tr
 
 ### Theme Token Contract
 
+Normal `check` resolves optional `design-profile.json` typography before lint: `typography.font_size_scale` is an exact product allowlist, while a conflicting theme declaration remains a finding. Without it, the legacy default-plus-theme behavior remains. Read [the resolved typography contract](docs/theme-contract.md#exact-product-typography-in-normal-check); project source hashes are provenance, not automatic interpretation of linked conventions.
+
 **Read** [`docs/theme-contract.md`](docs/theme-contract.md) before generating `theme.css` for `draft-pen-from-tree`, `lint-tokens`, or Brander-style handoff. The stable contract accepts canonical and `--pf-*` aliases for core colors, `panel`/`panel-2`, `success`/`warning`/`info`, `font-sans`/`font-mono`, `font-size-xs` through `font-size-xl`, plus dynamic `palette-*` color slots and `radius-*` numeric slots. `lint-tokens` records the effective `spacing_scale`, `radius_scale`, and `fontsize_scale` in the strict report inputs; theme-declared font sizes and radii extend defaults unless the matching CLI override is passed.
 
 ### Pencil Editor Sync

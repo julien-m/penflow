@@ -9,7 +9,7 @@ from typing import Any, Literal
 
 from .compare import STRICT_THRESHOLD, compare_trees
 from .consistency import check_consistency
-from .design_profile import audit_design_profile, resolve_profile
+from .design_profile import audit_design_profile, resolve_profile, typography_theme_issues
 from .expected_constraints import apply_contract_constraints
 from .flow_contract import validate_flow_contract_v2
 from .pen import bbox_issues, parse_pen, validate_pen_context_against_contract
@@ -17,7 +17,7 @@ from .pen_components import resolve_pen_components
 from .pen_lifecycle import CanvasLifecycleError
 from .rendered_measurements import compare_rendered
 from .theme import theme_from_css
-from .token_lint import lint_tokens
+from .token_lint import lint_tokens, theme_font_size_scale
 from .tree import (
     diagnostic_tree_from_pen,
     expected_tree_from_pen,
@@ -179,7 +179,28 @@ def check_workspace(
         except _INPUT_ERRORS as error:
             checks.error("resolve-components", error)
     theme = _read_theme(checks, workspace, theme_css)
-    expected, diagnostic = _check_design(checks, workspace, pen, theme)
+    profile = _resolve_profile(checks, workspace, contract)
+    scale = (profile or {}).get("typography", {}).get("font_size_scale")
+    scale_origin = (
+        "profile-exact"
+        if scale is not None
+        else "legacy-fallback-invalid-profile"
+        if _profile_invalid(checks)
+        else "theme-plus-defaults"
+    )
+    if profile is not None and scale is not None:
+        checks.run(
+            "typography-scale",
+            lambda: {
+                "issues": typography_theme_issues(profile, theme_font_size_scale(theme)),
+                "font_size_scale": scale,
+                "source": profile["typography"]["source"],
+                "policy": "exact-profile; theme declarations must agree",
+            },
+        )
+    expected, diagnostic = _check_design(
+        checks, workspace, pen, theme, fontsize_scale=scale, scale_origin=scale_origin
+    )
     if (
         diagnostic is not None
         and contract_report is not None
@@ -188,7 +209,7 @@ def check_workspace(
         # Reuse contract state/repeat/condition projection; design shows alternatives,
         # while runtime captures show one observed state at a time.
         checks.run("contract-constraints", lambda: _apply_constraints(diagnostic, contract))
-    _check_profile(checks, workspace, diagnostic, contract)
+    _check_profile(checks, diagnostic, profile)
     if pen is not None and contract is not None and contract_report is not None:
         if any(issue.get("severity") == "error" for issue in contract_report["issues"]):
             checks.missing(
@@ -281,7 +302,13 @@ def _read_theme(
 
 
 def _check_design(
-    checks: _Checks, workspace: Path, pen: JsonObject | None, theme: JsonObject | None
+    checks: _Checks,
+    workspace: Path,
+    pen: JsonObject | None,
+    theme: JsonObject | None,
+    *,
+    fontsize_scale: list[float] | None = None,
+    scale_origin: str = "theme-plus-defaults",
 ) -> tuple[JsonObject | None, JsonObject | None]:
     if pen is None:
         checks.missing(
@@ -353,21 +380,28 @@ def _check_design(
     checks.run(
         "lint-tokens",
         lambda: {
-            **lint_tokens(path, pen_data=pen, theme=theme, diagnostic_regions=expected is None),
+            **lint_tokens(
+                path,
+                pen_data=pen,
+                theme=theme,
+                diagnostic_regions=expected is None,
+                fontsize_scale=fontsize_scale,
+            ),
+            "fontsize_scale_origin": scale_origin,
             "scope": "active-regions" if expected is not None else "all-physical-regions",
         },
     )
     return expected, diagnostic
 
 
-def _check_profile(
-    checks: _Checks, workspace: Path, expected: JsonObject | None, contract: JsonObject | None
-) -> None:
+def _resolve_profile(
+    checks: _Checks, workspace: Path, contract: JsonObject | None
+) -> JsonObject | None:
     """Read confined optional policy inputs and record unavailable selection honestly."""
     path = workspace / "design-profile.json"
     config = checks.optional("design-profile-input", path)
     if any(row.name == "design-profile-input" and row.status == "ERROR" for row in checks.results):
-        return
+        return None
     sources: dict[str, bytes] = {}
     try:
         index = checks.reader.root / ".conventions/index.md"
@@ -375,9 +409,24 @@ def _check_profile(
             sources[".conventions/index.md"] = checks.reader.read(index)
         for name in (config or {}).get("sources", []):
             sources[name] = checks.reader.read(workspace / name)
-        profile = resolve_profile(config, contract=contract, convention_sources=sources)
+        return resolve_profile(config, contract=contract, convention_sources=sources)
     except _INPUT_ERRORS as error:
         checks.error("design-profile", error)
+        return None
+
+
+def _profile_invalid(checks: _Checks) -> bool:
+    return any(
+        row.name in {"design-profile-input", "design-profile"} and row.status == "ERROR"
+        for row in checks.results
+    )
+
+
+def _check_profile(
+    checks: _Checks, expected: JsonObject | None, profile: JsonObject | None
+) -> None:
+    """Audit available design metrics against the single resolved profile snapshot."""
+    if _profile_invalid(checks):
         return
     if expected is None:
         checks.missing("design-profile", "No usable design regions supplied")

@@ -26,6 +26,8 @@ All notable public changes will be recorded here. Penflow follows semantic versi
 
 ### Fixed
 
+- Normal `check` resolves the product profile before token lint and honors an optional exact `typography.font_size_scale`, exposing conflicting theme declarations without silently adding default/theme values. Missing scales keep existing behavior; invalid profiles do not suppress independent checks.
+
 - C51 derives permission-denial duties from all grants for the effective action and entity. Singleton or fully authorized actor domains need no impossible denial witness; each grant still requires its own allowed actor, and real unauthorized actors retain mandatory denial checks.
 
 - Standalone read-only validation no longer depends on unrelated Doctor project hygiene.

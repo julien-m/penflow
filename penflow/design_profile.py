@@ -16,7 +16,7 @@ from collections.abc import Iterator
 
 from .compare import _canonical_padding
 from .schema_cache import validator_for
-from .tree import flatten_nodes
+from .tree import MAX_ABSOLUTE_OBSERVATION, flatten_nodes
 
 JsonObject = dict[str, Any]
 _PROFILE_DATA = Path(__file__).parent / "profiles" / "design-profiles.json"
@@ -35,6 +35,11 @@ def validate_profile(config: JsonObject) -> None:
     errors = sorted(validator_for("design-profile.schema.json").iter_errors(config), key=str)
     if errors:
         raise ValueError(f"profile.schema: {errors[0].message}")
+    for size in config.get("typography", {}).get("font_size_scale", []):
+        if not 0 < size <= MAX_ABSOLUTE_OBSERVATION or not _number(size):
+            raise ValueError(
+                "profile.typography.invalid: font sizes must be positive finite numbers"
+            )
     for constraint in [*config.get("rules", []), *config.get("overrides", [])]:
         _validate_limits(constraint)
     ids = [rule["id"] for rule in config.get("rules", [])]
@@ -108,6 +113,33 @@ def resolve_profile(
             "scope": "versioned numeric convention snapshot; external source freshness unverified",
         },
     }
+
+
+def typography_theme_issues(
+    profile: JsonObject, theme_font_sizes: tuple[float, ...]
+) -> list[JsonObject]:
+    """Report theme declarations outside an already validated exact product scale.
+
+    The profile remains authoritative; conflicts never extend its allowlist.
+    Source labels explain operator-resolved policy, not Markdown interpretation.
+    """
+    typography = profile.get("typography")
+    if typography is None:
+        return []
+    allowed = typography["font_size_scale"]
+    return [
+        {
+            "severity": "error",
+            "code": "profile.typography.theme_conflict",
+            "path": "$.typography.font_size_scale",
+            "value": value,
+            "allowed_values": list(allowed),
+            "source": typography["source"],
+            "message": "Theme font size is outside the exact product profile scale",
+        }
+        for value in theme_font_sizes
+        if value not in allowed
+    ]
 
 
 def audit_design_profile(expected: JsonObject, profile: JsonObject | None) -> JsonObject:
