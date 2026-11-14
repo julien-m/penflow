@@ -25,3 +25,10 @@ User-authorized exception: tool repair implemented directly with ordinary LiveSp
 - Clarified one canonical canvas per product across features in the current workflow, integration guide and README. No technical one-editor-per-chat restriction, Python behavior change, consumer upgrade or new certification gate.
 - Validation: `uv run --offline pytest -q tests/test_review_workflow_docs.py` exited 0, 4 passed in 0.15 s. Added local links resolve and `git diff --check` exited 0. No runtime suite repeated for this documentation-only clarification.
 - The independent coordinating reviewer accepted the full correction and live records, with no material findings; no tests were duplicated during review.
+
+## 2026-11-14 — Contract-only semantic export correction
+
+- Reproduced ordinary export blocked by unrelated invalid canvas using the real module CLI; strict projection consumes only its contract.
+- Validation: 142 affected tests passed; the final boundary/documentation/artifact selection passed 62 tests. Ruff and format checks passed for 284 files; mypy passed for 134 source files. Installed wheel passed four isolated CLI cases: valid contract with invalid canvas, invalid-contract output preservation, foreign-output preservation and outside-project refusal.
+- Same native independent reviewer: accepted, no material findings, 33 independent tests passed. Read [implementation](implementation.md) and [the migration boundary](../../../docs/review-led-migration.md#contract-only-semantic-producer-correction).
+- User authorized public PR/main delivery of this correction. Private SDK port, bindings, environments and Atlas canvas/runtime execution remain outside this source task.

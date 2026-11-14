@@ -1,5 +1,11 @@
 # Changelog — Review led checks
 
+## 2026-11-14 — Contract-only semantic export
+
+- Remove unrelated canvas/hygiene Doctor vetoes only from ordinary contract-to-semantic projection; retain shared writer locking and exact Git-backed project selection.
+- Validate before publication, preserve invalid-contract outputs and refuse unsafe/unowned destinations; retain bounded stable reads and atomic writes.
+- Keep other producers and historical verification governed as before. Read [progress](progress.md) for targeted tests, installed-wheel smoke and the same reviewer's acceptance. Public delivery is authorized; no private consumer adoption is included.
+
 ## 2026-11-14 — Automatic parallel work
 
 - Automatically delegate ready independent preparation, design, disjoint same-canvas edits and verification according to available slots/access; assign named regions and coordinate shared objects through an integration owner.

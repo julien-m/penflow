@@ -16,3 +16,9 @@ updated: 2026-11-13
 The independent native review was performed in the coordinating chat without implementer history. It found an unbounded/FIFO reader; its correction limits only the new check path to regular files at most 64 MiB and protects recheck too. The same reviewer accepted that correction and the consumer port. No second review or synthetic certificate was created here. Essential appearance/runtime observations remain unverified by this nonvisual CLI change.
 
 For the 2026-11-14 operator clarification under FR-005, read [the editor observations](../../../docs/pen-dev-editor-observations.md). Live isolated tests distinguish opening acknowledgements, connected editors, exact file targeting and persistence while retaining one design canvas per product. This documentation correction changes no Python runtime, installed consumer or historical diagnostic verdict.
+
+## 2026-11-14 — Contract-only semantic export correction
+
+FR-003 now routes ordinary semantic export through [the prepared publication boundary](../../../penflow/semantic_export.py), called by [the CLI handler](../../../penflow/cli_commands_a.py) under [the existing project writer lock](../../../penflow/cli_governance.py). Strict contract projection and semantic validation precede publication; bounded reads, exact project/no-symlink paths, source stability, output ownership/identity and atomic replacement protect caller data. Other producers and explicit historical verification retain Doctor governance. Read [the real CLI regressions](../../../tests/test_semantic_export_boundary.py).
+
+The same independent native reviewer accepted this bounded correction with no material findings after 33 independent tests, including all 16 boundary tests. No new certificate or whole-feature review was introduced.

@@ -33,3 +33,17 @@ Report dictionary: kind=`penflow-check-report`, version=1, workspace=resolved ca
 ## Delivery and rollback
 
 Create migration guidance with scope/limitations, isolated wheel check and comparison measurements. Run pytest, ruff and mypy appropriate to changes; preserve all failures for review. Dispatch one fresh native reviewer without implementer history, correct material findings and ask the same reviewer to inspect corrections. Update mappings/registry/changelog and commit only these files. No installation, global sync, Atlas/runtime/SDK edit, publish or merge. Rollback selects the prior commit/package and explicit historical commands; retain artifacts and concurrent consumer changes.
+
+## Targeted fix — contract-only semantic export
+
+Actual inputs: explicit project boundary, strict v2 contract.json bytes and output path/previous output ownership. The transformation reads no .pen, theme, UI mapping, temporary run or renderer. Canvas health/hygiene therefore cannot veto this producer. Preserve existing project path resolution and shared lifecycle writer lock; skip Doctor/canvas/run-allocation only for ordinary export-semantic-tree. Historical run/C51 and every other producer keep their current path.
+
+| Requirement / convention | Scoped decision | Verification |
+|---|---|---|
+| FR-003 input relevance / modular boundary | cli_governance routes only this contract producer through existing confined paths and lock; no global disable | Real subprocess CLI with invalid canvas and untidy metadata succeeds on valid contract |
+| Validated source / honest result | Reuse strict contract→semantic engine and existing semantic validator; validate before publication | Invalid contract/output never published; source changes detected |
+| Data ownership / bounded I/O | New semantic_export boundary reuses InputReader and atomic JSON writer; reject source aliases, symlinks/nonregular/hardlinks, non-JSON or foreign/invalid existing output | Outside-project/alias/foreign output preserved; own semantic output can regenerate |
+| Independent history | No cleanup/reconciliation or canvas mutation for this pure projection; shared writer lock remains | No canvas rewrite/managed runs/index mutation; other governed producers remain blocked when appropriate |
+| Compatibility / proportional verification | Keep legacy Python write_semantic_tree API and historical run unchanged; targeted CLI/export/governance/contract suites and same reviewer follow-up | Existing export interfaces, installed-wheel smoke and required CI |
+
+No Atlas, private SDK, installed environment, binding, dependency or global instruction mutation. New output ownership is limited to the selected semantic artifact, not a project-wide certification.

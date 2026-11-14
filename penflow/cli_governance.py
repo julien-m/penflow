@@ -88,11 +88,26 @@ _PRODUCER_PATH_ARGUMENTS: dict[str, tuple[str, ...]] = {
 
 
 def _run_governed_producer(args: argparse.Namespace) -> int:
-    """Execute one producer under the consumer Doctor and managed-run lock."""
+    """Execute a producer under its relevant project/write boundary."""
     context = resolve_project_context(args.project)
     owner = capture_owner_identity()
     command = str(args.command)
+    if command == "export-semantic-tree":
+        try:
+            # The shared lock is still a write: never follow a redirected lock root.
+            context.resolve_path(".penflow-tmp")
+        except (OSError, ValueError) as error:
+            raise ProjectBoundaryError(str(error)) from error
     with LifecycleLock.acquire(context.project_root, owner, operation=f"producer:{command}"):
+        if command == "export-semantic-tree":
+            args.semantic_export_context = context
+            from .cli_verification import is_verification_request
+
+            if not is_verification_request(args):
+                # Contract-only projection needs the existing path boundary and
+                # writer lock, not unrelated canvas hygiene or managed cleanup.
+                _resolve_producer_paths(args, context)
+                return int(args.func(args) or 0)
         preflight = run_project_doctor(context)
         if preflight.exit_code != 0:
             from .cli_verification import is_verification_request, render_verification_boundary
@@ -249,15 +264,7 @@ def _govern_producer_paths(
 ) -> None:
     """Resolve producer paths inside one consumer root and reject peer canvases."""
     command = str(args.command)
-    for attribute in _PRODUCER_PATH_ARGUMENTS.get(command, ()):
-        value = getattr(args, attribute, None)
-        if value is None:
-            continue
-        try:
-            resolved = context.resolve_path(value)
-        except (FileNotFoundError, ValueError) as error:
-            raise ProjectBoundaryError(str(error)) from error
-        setattr(args, attribute, str(resolved))
+    _resolve_producer_paths(args, context)
 
     if canonical_relative is None:
         raise ProjectBoundaryError("Doctor did not resolve a canonical ui.pen")
@@ -290,3 +297,17 @@ def _govern_producer_paths(
 
 
 # @spec FR-011: Scriptable Doctor CLI boundary — .specs/features/074-penflow-doctor-consumer-project-hygiene/spec.md#fr-011
+
+
+def _resolve_producer_paths(args: argparse.Namespace, context: ProjectContext) -> None:
+    """Reuse exact project confinement and no-symlink policy for producer arguments."""
+    command = str(args.command)
+    for attribute in _PRODUCER_PATH_ARGUMENTS.get(command, ()):
+        value = getattr(args, attribute, None)
+        if value is None:
+            continue
+        try:
+            resolved = context.resolve_path(value)
+        except (FileNotFoundError, ValueError) as error:
+            raise ProjectBoundaryError(str(error)) from error
+        setattr(args, attribute, str(resolved))
