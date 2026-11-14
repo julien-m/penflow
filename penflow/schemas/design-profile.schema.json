@@ -8,6 +8,17 @@
     "version": {"const": 1},
     "surface": {"enum": ["desktop-app", "web-page", "landing", "mobile"]},
     "platform": {"enum": ["web", "ios", "android"]},
+    "typography": {
+      "type": "object", "additionalProperties": false,
+      "required": ["font_size_scale", "source"],
+      "properties": {
+        "font_size_scale": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": {"type": "number", "exclusiveMinimum": 0, "maximum": 1000000000000}
+        },
+        "source": {"type": "string", "pattern": ".*\\S.*"}
+      }
+    },
     "sources": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": ".*\\S.*"}},
     "rules": {"type": "array", "items": {"$ref": "#/$defs/rule"}},
     "overrides": {"type": "array", "items": {"$ref": "#/$defs/override"}}

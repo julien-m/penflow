@@ -168,6 +168,15 @@ _FONTSIZE_VARIABLES = (
 _RADIUS_VARIABLE_PREFIX = "pf-radius-"
 
 
+def theme_font_size_scale(theme: dict[str, Any] | None) -> tuple[float, ...]:
+    """Return declared theme font sizes using the same resolution as token lint.
+
+    This does not add defaults or impose a product policy; composing checks use
+    it to surface a contradictory theme without changing exact profile values.
+    """
+    return _resolve_theme(theme)[3]
+
+
 def _resolve_theme(
     theme: dict[str, Any] | None,
 ) -> tuple[

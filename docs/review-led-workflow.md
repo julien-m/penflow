@@ -49,6 +49,14 @@ flowchart LR
 - After a mutation timeout, read the affected region before any replay. Coordinate saves through the exposed mechanism, then verify the intended changes and actual persistence; one agent's successful call is not proof that every concurrent edit was saved. Respect precise tool refusals and permissions; report the affected capability without inventing success or blocking unrelated work.
 - Assemble the actual changes and check outcomes for one common independent final review, including each agent's limitations. Do not add a review per worker, agent-count gate or certification receipt. Read [the editor observations and user-confirmed shared-canvas provenance](pen-dev-editor-observations.md) for what was observed and what Julien confirmed; do not repeat a plugin capability test as a prerequisite.
 
+## Resolved product typography
+
+Read the actual convention sources referenced by the project index and apply its platform exclusions. Materialize surface/platform, component/variant rules and the exact product typography once in `design-profile.json`; read [the exact-scale contract](theme-contract.md#exact-product-typography-in-normal-check). Normal check resolves that profile before token lint and automatically uses `typography.font_size_scale`.
+
+The exact profile takes precedence over theme tokens and bundled defaults; contradictory theme declarations are findings, never an implicit union. An absent scale preserves the old theme-plus-default behavior; an invalid profile stays ERROR while independent diagnostics continue with an explicitly labelled legacy fallback. Keep real findings and valid design sizes rather than normalizing the design merely to make checks green.
+
+`sources[]` hashes project-contained bytes for provenance. It does not follow Markdown links, apply exclusions or translate arbitrary prose into executable rules. Keep those resolution decisions in the product contract and source references; no external-path/symlink bypass or certification workflow is introduced.
+
 ## Native design semantics and coverage
 
 - Normal check expands bounded local reusable components, nested instances and explicit descendant/property/children replacements in memory. Source bytes stay unchanged. Library definitions are audited as design inputs, not required runtime screens. Semantic identities are preserved; ambiguous or duplicate mappings need correction rather than guessed renaming. Imported-library references remain explicitly unobserved; missing/cyclic/non-reusable local targets are errors.

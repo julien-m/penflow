@@ -21,3 +21,9 @@ Reviewer: “Review accepted. All material findings were corrected; no unresolve
 Independent focused tests: 94 passed. Reviewer accepted the frozen-input full 1,922-pass suite, six separately executed browser tests, Ruff/mypy, build and isolated-wheel results as delivery evidence. Missing native geometry remains NOT_OBSERVED; imported components remain unresolved; producer metadata does not establish freshness, build identity, interactions or aesthetic fidelity.
 
 Skill/reference delta accepted as reference documentation of automatically executed diagnostics, preserving existing operator discipline. The reviewer requested the nonblocking README anchor correction; it was applied before commit.
+
+## Targeted typography correction
+
+The same feature083 reviewer inspected only the product profile→lint correction, its schema/API handoff, precedence, error independence, docs and regression coverage. No additional whole-feature review or certification was introduced.
+
+Verdict (translated): targeted correction accepted; no material defect identified. Independent verification:116 tests passed, including35 historical token-lint tests. Exact profile values take precedence without implicit union, theme contradictions remain visible and invalid profiles do not block independent diagnostics. Browser inputs are unchanged, so the previous evidence remains applicable. Acceptance covers the reviewed public delta only, not a private port or Atlas adoption.

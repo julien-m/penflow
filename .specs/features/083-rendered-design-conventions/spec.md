@@ -50,3 +50,7 @@ AC-001: FR-001/002 profiles, reasoned overrides, malformed/contradictory data an
 AC-002: FR-003/004 sizes/fonts/padding/viewport/ratios/no-runtime/responsive/masks/units/fill-hug.
 AC-003: FR-005 live bad→corrected independent DOM observation.
 AC-004: FR-006 full regression, isolated wheel, final independent review, CI and protected merge.
+
+## Typography handoff correction
+
+FR-001/002 and AC-001 include the resolved product typography used by normal token lint. A supplied profile typography scale is exact; conflicting theme declarations remain explicit findings. Absence preserves legacy scale behavior, while invalid policy input cannot suppress independent diagnostics. Source provenance does not imply automatic interpretation of Markdown.
