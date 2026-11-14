@@ -1,5 +1,13 @@
 # Changelog — Review led checks
 
+## 2026-11-14 — Automatic parallel work
+
+- Automatically delegate ready independent preparation, design, disjoint same-canvas edits and verification according to available slots/access; assign named regions and coordinate shared objects through an integration owner.
+- Require complete worker briefs, preserve concurrent edits, reconcile uncertain mutations and verify persistence; combine outcomes into one independent final review without fixed quotas or new gates.
+- Preserve Julien's confirmation of an earlier shared-canvas multi-agent test separately from phases 1–7 (two documents/background) and phase 8 (two native children lacked editor access while their parent retained it; no mutation).
+- Keep access failures local: children can prepare scripts/design/review while a connected agent applies prepared edits to the existing canvas. Do not impose a universal single operator or open substitute canvases.
+- Read [the parallel workflow](../../../docs/review-led-workflow.md#automatic-parallel-work-in-one-canvas) and [the bounded observations](../../../docs/pen-dev-editor-observations.md). The four existing documentation test modules passed (53 tests); local links and whitespace were checked. No new plugin test was run for this correction.
+
 ## 2026-11-14 — Existing canvas and editor connection
 
 - Restore the single product canvas rule prominently in the normal workflow and integration guide; enrich existing screens across features instead of creating a canvas per feature.

@@ -8,6 +8,8 @@ Select the exact consumer root and keep its `penflow/` workspace local. The curr
 
 Keep one canonical `.pen` for the product, including subsequent features. Reuse its screens and add journeys/states in that canvas; do not create `feature-name/ui.pen` for every increment. If multiple design files already exist, inspect and consolidate their useful content through the editor, preserving screens and references before removing any source. Read [the editor connection guidance](review-led-workflow.md#existing-canvas-and-editor-connection) before interpreting an opening or connection error.
 
+Automatically distribute ready, independent tasks to available subagents, including disjoint named screens/frames/components in that same canvas. Coordinate shared nodes, variables and components through an integration owner; preserve concurrent edits, reconcile uncertain mutations and verify saves. Give every worker its own complete brief and combine results into one final review. Read [the parallel work rules](review-led-workflow.md#automatic-parallel-work-in-one-canvas); unavailable subagents do not block progress.
+
 ## Current checks
 
 ```bash

@@ -106,6 +106,8 @@ Read [the workflow](docs/review-led-workflow.md) for the review contract and [mi
 
 Keep one canonical design file per product and enrich it across features. Multiple editor views are a separate technical capability, not a reason to duplicate existing mockups. Read [the editor connection guidance](docs/review-led-workflow.md#existing-canvas-and-editor-connection) for background operation, file targeting and save verification.
 
+Automatically use available subagents for ready, independent work, including parallel edits to separately owned screens/frames/components in that same canvas. An integration owner coordinates shared nodes, variables and components; workers preserve concurrent edits, reconcile timeouts and verify persistence. Preparers and verifiers may also work in parallel; combine their outcomes into one independent final review. Read [the parallel work rules](docs/review-led-workflow.md#automatic-parallel-work-in-one-canvas) for complete briefs and coordination; no fixed agent quota or extra plugin test is required, and work continues if subagents are unavailable.
+
 ## Historical Complete Verification (C51)
 
 The explicitly requested C51 workflow produces one versioned `run-report.json` and revalidates it at the consumer's final transition. Its profile comes from the requested deliverable: `design` checks the approved contract and native design; `implementation` adds the actual application build, executed scenarios and observed outcomes. Missing runtime evidence never changes an implementation request into a design request.
