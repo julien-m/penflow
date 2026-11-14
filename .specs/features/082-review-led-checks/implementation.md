@@ -14,3 +14,5 @@ updated: 2026-11-13
 | FR-006 | Read [migration/rollback](../../../docs/review-led-migration.md), [progress](progress.md) and [change](changelog.md) | Local source candidate only; installed consumer migration owned by coordinating session |
 
 The independent native review was performed in the coordinating chat without implementer history. It found an unbounded/FIFO reader; its correction limits only the new check path to regular files at most 64 MiB and protects recheck too. The same reviewer accepted that correction and the consumer port. No second review or synthetic certificate was created here. Essential appearance/runtime observations remain unverified by this nonvisual CLI change.
+
+For the 2026-11-14 operator clarification under FR-005, read [the editor observations](../../../docs/pen-dev-editor-observations.md). Live isolated tests distinguish opening acknowledgements, connected editors, exact file targeting and persistence while retaining one design canvas per product. This documentation correction changes no Python runtime, installed consumer or historical diagnostic verdict.

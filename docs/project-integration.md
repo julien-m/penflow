@@ -6,6 +6,8 @@ Read [the normal review led workflow](review-led-workflow.md) for delivery and [
 
 Select the exact consumer root and keep its `penflow/` workspace local. The current behavior contract lives in `penflow/flow-ui-contract/contract.json`; the design is `penflow/ui.pen`. Semantic/expected trees, context maps and code IR are derived artifacts produced when useful. Runtime adapters own `actual-ui-tree.json`; Penflow never launches the app, browser, Xcode or simulator.
 
+Keep one canonical `.pen` for the product, including subsequent features. Reuse its screens and add journeys/states in that canvas; do not create `feature-name/ui.pen` for every increment. If multiple design files already exist, inspect and consolidate their useful content through the editor, preserving screens and references before removing any source. Read [the editor connection guidance](review-led-workflow.md#existing-canvas-and-editor-connection) before interpreting an opening or connection error.
+
 ## Current checks
 
 ```bash
