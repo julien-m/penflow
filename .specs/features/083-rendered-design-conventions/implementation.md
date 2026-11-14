@@ -22,4 +22,4 @@
 
 ## Delivery
 
-Public PR/CI publication pending at this checkpoint. The implementation is accepted; publication results are recorded in progress and changelog when observed.
+Implementation commit `a9c6510` is published in [PR 26](https://github.com/julien-m/penflow/pull/26). The accepted implementation and this documentation follow-up share the same reviewed code inputs. The PR records the live protected CI and merge outcome.
