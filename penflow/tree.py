@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from .models import PenNode
-from .pen import parse_pen, validate_pen_context
+from .pen import parse_diagnostic_regions, parse_pen, validate_pen_context
 from .schema_cache import validator_for
 from .verification_json import canonical_bytes
 
@@ -52,8 +52,24 @@ def _screen_to_expected(root: PenNode) -> dict[str, Any]:
         "screen_id": root.semantic_id or root.id,
         "pencil_id": root.id,
         "name": root.name,
+        **({"variant": root.context.variant} if root.context.variant else {}),
         "viewport": root.bbox.to_dict(),
         "root": expected,
+    }
+
+
+def diagnostic_tree_from_pen(path: str | Path, pen_data: dict[str, Any]) -> dict[str, Any]:
+    """Read every physical region without implying an active-screen choice.
+
+    Source Pencil IDs retain identity when logical IDs collide. This tree is
+    for scoped diagnostics and explicitly selected runtime matches only.
+    """
+    return {
+        "version": 1,
+        "source": str(path),
+        "scope": "all-physical-regions; active-selection-unverified",
+        "screens": [_screen_to_expected(root) for root in parse_diagnostic_regions(pen_data)],
+        "issues": [],
     }
 
 
@@ -185,7 +201,7 @@ def flatten_nodes(
 def _tree_identity_issues(tree: dict[str, Any]) -> list[dict[str, Any]]:
     # Check each screen's unique identities, finite geometry, then typed numeric observations.
     issues: list[dict[str, Any]] = []
-    screens: set[tuple[str, str | None, str | None]] = set()
+    screens: set[tuple[str, str | None, str | None, str | None]] = set()
     scoped: dict[str, set[bool]] = {}
     for index, screen in enumerate(tree["screens"]):
         path = f"$.screens[{index}]"
@@ -195,7 +211,13 @@ def _tree_identity_issues(tree: dict[str, Any]) -> list[dict[str, Any]]:
         # Only state captures may be distinguished by facts; a stateless capture is unique.
         scoped_facts = "state" in screen and "facts" in screen
         facts = json.dumps(screen.get("facts"), sort_keys=True) if scoped_facts else None
-        identity = (screen["screen_id"], screen.get("state"), facts)
+        # Qualified responsive captures may select distinct physical design frames.
+        # Plain legacy duplicates still fail; viewport alone never selects a variant.
+        design_id = screen.get("design_screen_id") if "measurement" in tree else None
+        if design_id is not None and (not isinstance(design_id, str) or not design_id.strip()):
+            issues.append(_issue("error", path, "invalid design screen identity"))
+            design_id = None
+        identity = (screen["screen_id"], screen.get("state"), facts, design_id)
         if identity in screens:
             message = "duplicate screen state" if identity[1] else "duplicate screen identity"
             issues.append(_issue("error", path, message))

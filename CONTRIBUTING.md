@@ -13,7 +13,7 @@ uv run penflow --help
 
 ## Before changing code
 
-- Maintainers specify features with [LiveSpec](https://github.com/julien-m/livespec); the `.specs/` working tree stays local and is not published. Describe the intended contract in the pull request instead.
+- Maintainers specify features with [LiveSpec](https://github.com/julien-m/livespec); the full `.specs/` working tree stays local. Maintainers may explicitly publish scoped review led feature records, without private history or consumer evidence. Describe the resulting behavior in the pull request.
 - Preserve the runtime-agnostic boundary. External adapters produce runtime observations; Penflow validates local artifacts.
 - Never commit credentials, personal data, machine-specific paths, run archives, or consumer evidence. Local agent and spec tooling (`.specs/`, `.agent-sync.local/`, `.claude/`, `.codex/`, `.conventions/`, `AGENTS.md`) is intentionally ignored.
 - Add deterministic tests for behavior changes and update README commands when the public workflow changes.

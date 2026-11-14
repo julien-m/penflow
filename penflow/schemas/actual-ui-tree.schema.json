@@ -336,6 +336,27 @@
                 "center",
                 "outer"
               ]
+            },
+            "lineHeight": {
+              "type": "number",
+              "minimum": 0
+            },
+            "iconSize": {
+              "type": "number",
+              "minimum": 0
+            },
+            "aspectRatio": {
+              "type": "number",
+              "minimum": 0
+            },
+            "objectFit": {
+              "enum": [
+                "fill",
+                "contain",
+                "cover",
+                "none",
+                "scale-down"
+              ]
             }
           }
         },

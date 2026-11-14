@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Penflow design convention profile selection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "surface", "platform"],
+  "properties": {
+    "version": {"const": 1},
+    "surface": {"enum": ["desktop-app", "web-page", "landing", "mobile"]},
+    "platform": {"enum": ["web", "ios", "android"]},
+    "sources": {"type": "array", "uniqueItems": true, "items": {"type": "string", "pattern": ".*\\S.*"}},
+    "rules": {"type": "array", "items": {"$ref": "#/$defs/rule"}},
+    "overrides": {"type": "array", "items": {"$ref": "#/$defs/override"}}
+  },
+  "$defs": {
+    "selector": {
+      "type": "object", "additionalProperties": false, "minProperties": 1,
+      "properties": {
+        "role": {"type": "string", "minLength": 1},
+        "intent": {"type": "string", "minLength": 1},
+        "variant": {"type": "string", "minLength": 1},
+        "semantic_id": {"type": "string", "minLength": 1},
+        "screen_id": {"type": "string", "minLength": 1}
+      }
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "min": {"type": "number", "minimum": 0},
+        "max": {"type": "number", "minimum": 0},
+        "values": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": ["number", "string"]}}
+      },
+      "anyOf": [{"required": ["min"]}, {"required": ["max"]}, {"required": ["values"]}]
+    },
+    "rule": {
+      "allOf": [{"$ref": "#/$defs/limits"}],
+      "type": "object", "unevaluatedProperties": false,
+      "required": ["id", "selector", "property", "source"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "selector": {"$ref": "#/$defs/selector"},
+        "property": {"enum": ["bbox.width", "bbox.height", "aspectRatio", "hitArea.width", "hitArea.height", "visual.fontSize", "visual.fontFamily", "visual.fontWeight", "visual.lineHeight", "lineHeightRatio", "visual.iconSize", "visual.padding", "paddingHorizontal", "paddingVertical", "visual.gap", "visual.layout", "visual.alignItems"]},
+        "source": {"type": "string", "pattern": ".*\\S.*"}
+      }
+    },
+    "override": {
+      "allOf": [{"$ref": "#/$defs/limits"}],
+      "type": "object", "unevaluatedProperties": false,
+      "required": ["rule", "node", "reason"],
+      "properties": {
+        "rule": {"type": "string", "minLength": 1},
+        "node": {"type": "string", "minLength": 1},
+        "screen_id": {"type": "string", "minLength": 1},
+        "reason": {"type": "string", "pattern": ".*\\S.*"}
+      }
+    }
+  }
+}

@@ -46,6 +46,11 @@ class PenNode:
     order: int = 0
     # Design-source sizing per dimension: fixed, fill, hug or unspecified (C51 F3).
     sizing: dict[str, str] | None = None
+    hit_area: dict[str, Any] | None = None
+    unresolved_ref: str | None = None
+    reusable: bool = False
+    dimension_tokens: dict[str, str] = field(default_factory=dict)
+    text_growth: str | None = None
 
     @property
     def semantic_id(self) -> str | None:
@@ -65,6 +70,11 @@ class PenNode:
         return {
             "id": self.semantic_id or self.id,
             "pencil_id": self.id,
+            "source_type": self.type,
+            **({"text_growth": self.text_growth} if self.text_growth is not None else {}),
+            **({"dimension_tokens": dict(self.dimension_tokens)} if self.dimension_tokens else {}),
+            **({"component_template": True} if self.reusable else {}),
+            **({"unresolved_ref": self.unresolved_ref} if self.unresolved_ref is not None else {}),
             "semantic_id": self.semantic_id,
             "role": self.role,
             "name": self.name,
@@ -73,6 +83,7 @@ class PenNode:
             "visual": self.visual,
             "context": self.context.to_dict(),
             **({"sizing": dict(self.sizing)} if self.sizing is not None else {}),
+            **({"hitArea": dict(self.hit_area)} if self.hit_area is not None else {}),
             "children": [child.to_expected() for child in self.children],
         }
 

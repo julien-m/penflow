@@ -6,6 +6,9 @@ All notable public changes will be recorded here. Penflow follows semantic versi
 
 ### Added
 
+- Normal `check` automatically audits sourced surface profiles and independently captured rendered dimensions/styles, with explicit material drift, measurement errors and unobserved coverage. Local native components, themes/tokens, viewport/state/variant and unit normalization reuse the existing tree engine.
+- External Web DOM adapter and native-design-to-runtime demonstration detecting an oversized control and observing its correction.
+
 - `penflow check`: read-only diagnostics from current local inputs, with explicit missing observations, independent-check continuation and bounded regular-file reads.
 - Review led skill/workflow guidance with retained opt-in historical certification instructions and migration/rollback documentation.
 
@@ -17,7 +20,7 @@ All notable public changes will be recorded here. Penflow follows semantic versi
 ### Changed
 
 - GitHub Actions references are pinned to commit SHAs, and CI builds both distribution formats.
-- Local LiveSpec specs, agent tooling, and generated evidence are no longer tracked and were removed from Git history before publication.
+- Legacy local LiveSpec history, agent tooling and generated private evidence were removed before publication; scoped review led feature records are intentionally maintained as public implementation contracts.
 - Test helpers read machine-specific runtime paths from environment variables instead of hard-coded absolute paths.
 - Feature 045 accepts mutation-free local form submits while preserving strict request duties for mutation-bearing submits.
 

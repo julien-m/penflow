@@ -168,8 +168,8 @@ def test_concurrent_input_edit_is_reported(
 
     original = checks.audit_visual
 
-    def mutate(tree_path: str | Path, *, tree_data: dict, theme: dict | None) -> dict:
-        result = original(tree_path, tree_data=tree_data, theme=theme)
+    def mutate(tree_path: str | Path, *, tree_data: dict, theme: dict | None, **kwargs) -> dict:
+        result = original(tree_path, tree_data=tree_data, theme=theme, **kwargs)
         path = workspace / "ui.pen"
         path.write_bytes(path.read_bytes() + b"\n")
         return result

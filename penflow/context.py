@@ -33,6 +33,7 @@ ALLOWED_KEYS = {
     "mask",
     "mask_text",
     "tolerance",
+    "override_reason",
 }
 
 ROLE_ALIASES = {
@@ -94,6 +95,7 @@ class Context:
     permission: str | None = None
     mask: bool | str | None = None
     mask_text: bool | str | None = None
+    override_reason: str | None = None
     tolerance: dict[str, Any] = field(default_factory=dict)
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -191,6 +193,17 @@ def _metadata_issues(node_id: str, context: Context) -> list[ContextIssue]:
         keys = ", ".join(sorted(context.extra))
         issues.append(
             ContextIssue("warning", "context.extra_keys", f"unknown context keys: {keys}", node_id)
+        )
+    if context.override_reason is not None and (
+        not isinstance(context.override_reason, str) or not context.override_reason.strip()
+    ):
+        issues.append(
+            ContextIssue(
+                "error",
+                "context.override_reason_invalid",
+                "override_reason must be nonempty text",
+                node_id,
+            )
         )
     semantic_id = context.semantic_id
     if semantic_id and not IDENT_RE.match(str(semantic_id)):

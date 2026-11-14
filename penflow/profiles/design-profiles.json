@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "description": "Versioned numeric convention snapshots; source references identify the selected policy, not proof of a live external file.",
+  "common-web": [
+    {"id":"spacing-gap","selector":{"role":"container"},"property":"visual.gap","values":[0,2,4,8,12,16,24,32,40,48,64,80],"source":"ai-ressources/design/tokens/spacing.md#spacing-scale"},
+    {"id":"spacing-padding","selector":{"role":"container"},"property":"visual.padding","values":[0,2,4,8,12,16,24,32,40,48,64,80],"source":"ai-ressources/design/tokens/spacing.md#spacing-scale"},
+    {"id":"input-height","selector":{"role":"input"},"property":"bbox.height","min":40,"max":48,"source":"ai-ressources/design/components/forms.md#field-anatomy--heights"},
+    {"id":"button-font","selector":{"role":"button"},"property":"visual.fontSize","min":13,"max":16,"source":"ai-ressources/design/components/buttons.md#size-matrix-reference"},
+    {"id":"button-padding-horizontal","selector":{"role":"button"},"property":"paddingHorizontal","min":12,"max":24,"source":"ai-ressources/design/components/buttons.md#size-matrix-reference"},
+    {"id":"button-line-height","selector":{"role":"button"},"property":"lineHeightRatio","min":1.3,"source":"ai-ressources/design/tokens/typography.md#line-height"}
+  ],
+  "desktop-app:web": [
+    {"id":"button-height","selector":{"role":"button"},"property":"bbox.height","min":28,"max":40,"source":"ai-ressources/design/components/buttons.md#size-matrix-reference (sm/md; lg requires an explicit product override)"},
+    {"id":"heading-font","selector":{"role":"heading"},"property":"visual.fontSize","min":20,"max":36,"source":"ai-ressources/design/systems/web-standards.md#web-type-scale (H1-H4; display requires explicit product override)"}
+  ],
+  "web-page:web": [
+    {"id":"button-height","selector":{"role":"button"},"property":"bbox.height","min":28,"max":48,"source":"ai-ressources/design/components/buttons.md#size-matrix-reference"},
+    {"id":"heading-font","selector":{"role":"heading"},"property":"visual.fontSize","min":20,"max":36,"source":"ai-ressources/design/systems/web-standards.md#web-type-scale"}
+  ],
+  "landing:web": [
+    {"id":"button-height","selector":{"role":"button"},"property":"bbox.height","min":44,"max":48,"source":"ai-ressources/design/components/buttons.md#size-matrix-reference (lg primary CTAs)"},
+    {"id":"heading-font","selector":{"role":"heading"},"property":"visual.fontSize","min":20,"max":64,"source":"ai-ressources/design/systems/web-standards.md#web-type-scale (H4 through display)"},
+    {"id":"navigation-height","selector":{"role":"navigation"},"property":"bbox.height","max":80,"source":"ai-ressources/design/components/navigation.md#marketing-navigation-taste-rules"}
+  ],
+  "mobile:web": [
+    {"id":"button-hit-width","selector":{"role":"button"},"property":"hitArea.width","min":48,"source":"ai-ressources/design/systems/web-standards.md#margins--content-width"},
+    {"id":"button-hit-height","selector":{"role":"button"},"property":"hitArea.height","min":48,"source":"ai-ressources/design/systems/web-standards.md#margins--content-width"}
+  ],
+  "mobile:ios": [
+    {"id":"button-hit-width","selector":{"role":"button"},"property":"hitArea.width","min":44,"source":"ai-ressources/design/systems/apple-hig.md#tap-targets"},
+    {"id":"button-hit-height","selector":{"role":"button"},"property":"hitArea.height","min":44,"source":"ai-ressources/design/systems/apple-hig.md#tap-targets"},
+    {"id":"input-height","selector":{"role":"input"},"property":"bbox.height","min":36,"source":"ai-ressources/design/systems/apple-hig.md#component-specs--quick-reference"}
+  ],
+  "mobile:android": [
+    {"id":"button-hit-width","selector":{"role":"button"},"property":"hitArea.width","min":48,"source":"ai-ressources/design/systems/material-design.md#layout-grid"},
+    {"id":"button-hit-height","selector":{"role":"button"},"property":"hitArea.height","min":48,"source":"ai-ressources/design/systems/material-design.md#layout-grid"},
+    {"id":"input-height","selector":{"role":"input"},"property":"bbox.height","min":56,"source":"ai-ressources/design/systems/material-design.md#component-specs--quick-reference"}
+  ]
+}

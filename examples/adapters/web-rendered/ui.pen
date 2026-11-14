@@ -1,0 +1,37 @@
+{
+  "version": "2.8",
+  "children": [
+    {
+      "id": "workspace-design", "type": "frame", "name": "Workspace desktop measurement fixture",
+      "x": 200, "y": 100, "width": 640, "height": 400,
+      "layout": "vertical", "alignItems": "start", "gap": 24, "padding": 24,
+      "context": "semantic_id=workspace; role=screen",
+      "children": [
+        {
+          "id": "actions-design", "type": "frame", "name": "Filter actions",
+          "x": 24, "y": 24, "width": 592, "height": 64,
+          "layout": "horizontal", "alignItems": "center", "gap": 8, "padding": [12, 16],
+          "context": "semantic_id=workspace.actions; role=container",
+          "children": [
+            {
+              "id": "apply-design", "type": "frame", "name": "Apply filters",
+              "x": 16, "y": 12, "width": 120, "height": 40,
+              "layout": "horizontal", "alignItems": "center", "justifyContent": "center", "gap": 8,
+              "padding": [8, 16], "fill": "#253b53",
+              "context": "semantic_id=workspace.apply; role=button; intent=apply-filters; action=apply-filters; test_id=workspace.apply",
+              "children": [
+                {
+                  "id": "apply-label-design", "type": "text", "name": "Apply filters label", "content": "Apply filters",
+                  "width": "fit_content", "height": "fit_content",
+                  "fontFamily": "Arial", "fontSize": 14, "fontWeight": "500", "lineHeight": 1.4285714285714286,
+                  "fill": "#ffffff",
+                  "context": "semantic_id=workspace.apply.label; role=text"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

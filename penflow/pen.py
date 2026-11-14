@@ -34,6 +34,11 @@ VISUAL_KEYS = {
     "padding",
     # @spec FR-001: alignItems reaches expected trees — .specs/features/048-compare-layout-spacing-properties/spec.md#fr-001
     "alignItems",
+    "lineHeight",
+    "lineHeightUnit",
+    "iconSize",
+    "aspectRatio",
+    "objectFit",
 }
 
 
@@ -77,9 +82,22 @@ def _parse_all_regions(data: dict[str, Any]) -> list[PenNode]:
     ]
 
 
+def parse_diagnostic_regions(data: dict[str, Any]) -> list[PenNode]:
+    """Read physical regions without selecting an active revision.
+
+    Callers must disclose all-regions scope alongside lifecycle findings.
+    This does not authorize publication or resolve lifecycle ambiguity.
+    """
+    return _parse_all_regions(data)
+
+
 def _parse_node(data: dict[str, Any], parent_id: str | None, order: int) -> PenNode:
     context = Context.from_raw(data.get("context"))
     visual = {key: data[key] for key in VISUAL_KEYS if key in data}
+    if data.get("type") == "text" and "lineHeight" in visual:
+        # Native TextStyle defines lineHeight as a fontSize multiplier:
+        # https://docs.pen.dev/for-developers/the-pen-format#typescript-schema
+        visual["lineHeightUnit"] = "multiplier"
     raw_semantic = data.get("semantic")
     semantic = raw_semantic if isinstance(raw_semantic, dict) else {}
     node = PenNode(
@@ -94,6 +112,15 @@ def _parse_node(data: dict[str, Any], parent_id: str | None, order: int) -> PenN
         parent_id=parent_id,
         order=order,
         sizing={key: design_sizing(data.get(key)) for key in ("width", "height")},
+        hit_area=data.get("hitArea"),
+        unresolved_ref=data.get("unresolved_ref"),
+        reusable=data.get("reusable") is True,
+        text_growth=data.get("textGrowth", "auto") if data.get("type") == "text" else None,
+        dimension_tokens={
+            axis: data[axis]
+            for axis in ("width", "height")
+            if isinstance(data.get(axis), str) and data[axis].startswith("$")
+        },
     )
     for child_index, child in enumerate(data.get("children", []) or []):
         if isinstance(child, dict):
@@ -188,6 +215,7 @@ def bbox_issues(data: dict[str, Any]) -> list[ContextIssue]:
             if (
                 isinstance(value, str)
                 and value.strip()
+                and not value.startswith("$")
                 and not _PEN_SIZING_KEYWORD_RE.match(value.strip())
             ):
                 issues.append(

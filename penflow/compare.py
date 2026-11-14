@@ -21,6 +21,8 @@ DEFAULT_TOLERANCE = {
     "order": 0,
     # @spec FR-003: spacing tolerance for gap/padding — .specs/features/048-compare-layout-spacing-properties/spec.md#fr-003
     "spacing_px": 2,
+    # Relative shape ratio: two percent tolerates subpixel rounding without stretching.
+    "ratio": 0.02,
 }
 
 # Historical lenient threshold (pre-049) vs the strict default (feature 049).
@@ -56,6 +58,7 @@ def compare_trees(
     *,
     threshold: float = 0.9,
     mandatory: bool = False,
+    rendered: bool = False,
 ) -> dict[str, Any]:
     """Compare validated trees by screen, semantic node identity, geometry, and style.
 
@@ -95,7 +98,12 @@ def compare_trees(
             continue
         expected_flat = flatten_nodes(expected_screen["root"])
         checks, failed, screen_issues = _compare_screen(
-            expected_screen, expected_flat, screen_captures, actual, mandatory=mandatory
+            expected_screen,
+            expected_flat,
+            screen_captures,
+            actual,
+            mandatory=mandatory,
+            rendered=rendered,
         )
         total_checks += checks
         failed_checks += failed
@@ -112,6 +120,7 @@ def _compare_screen(
     actual: dict[str, Any],
     *,
     mandatory: bool,
+    rendered: bool = False,
 ) -> tuple[int, int, list[dict[str, Any]]]:
     """Compare one expected screen with its capture, or with one capture per state.
 
@@ -183,7 +192,9 @@ def _compare_screen(
             expected_nodes,
             flatten_nodes(capture.get("root", {})),
             scope,
-            masked=(lambda node: False) if mandatory else _is_masked,
+            masked=(lambda node: False)
+            if mandatory
+            else (_rendered_masked if rendered else _is_masked),
             facts=capture.get("facts"),
         )
         seen |= join.applicable
@@ -191,7 +202,11 @@ def _compare_screen(
         checks += join.checks
         failed += join.failed
         for expected_node, actual_node in join.pairs:
-            node_issues = compare_node(expected_node, actual_node, mandatory=mandatory)
+            if rendered and capture.get("_geometry_unobserved"):
+                expected_node = {**expected_node, "_unobserved_axes": ["x", "y", "width", "height"]}
+            node_issues = compare_node(
+                expected_node, actual_node, mandatory=mandatory, rendered=rendered
+            )
             failed += sum(1 for issue in node_issues if issue["severity"] in {"error", "warning"})
             checks += max(0, len(node_issues) - 1)
             issues.extend(node_issues)
@@ -233,7 +248,11 @@ def _comparison_report(
 
 
 def compare_node(
-    expected: dict[str, Any], actual: dict[str, Any], *, mandatory: bool = False
+    expected: dict[str, Any],
+    actual: dict[str, Any],
+    *,
+    mandatory: bool = False,
+    rendered: bool = False,
 ) -> list[dict[str, Any]]:
     """Compare one pair of normalized semantic nodes.
 
@@ -258,7 +277,13 @@ def compare_node(
         if expected.get(key) and expected.get(key) != actual.get(key):
             issues.append(_issue("error", f"node.{key}", semantic_id, f"{key} differs"))
 
-    if mandatory or not _text_masked(expected):
+    text_masked = (
+        bool(expected.get("context", {}).get("mask_text"))
+        and bool(expected.get("context", {}).get("override_reason"))
+        if rendered
+        else _text_masked(expected)
+    )
+    if mandatory or not text_masked:
         expected_text = expected.get("text")
         actual_text = actual.get("text")
         if expected_text not in (None, "") and expected_text != actual_text:
@@ -302,7 +327,8 @@ def compare_node(
             expected.get("bbox", {}),
             actual.get("bbox", {}),
             tolerance,
-            mandatory=mandatory,
+            mandatory=mandatory or rendered,
+            skip_axes=set(expected.get("_unobserved_axes", ())) if rendered else set(),
         )
     )
     issues.extend(
@@ -346,6 +372,12 @@ def _is_masked(node: dict[str, Any]) -> bool:
     return bool(context.get("mask")) or role in MASK_ROLES or context.get("variant") == "volatile"
 
 
+def _rendered_masked(node: dict[str, Any]) -> bool:
+    """New rendered checks honor only explicit masks with a product justification."""
+    context = node.get("context", {})
+    return bool(context.get("mask")) and bool(context.get("override_reason"))
+
+
 def _text_masked(node: dict[str, Any]) -> bool:
     context = node.get("context", {})
     return bool(context.get("mask_text")) or context.get("variant") in {"dynamic", "volatile"}
@@ -358,13 +390,14 @@ def _compare_bbox(
     tolerance: dict[str, Any],
     *,
     mandatory: bool = False,
+    skip_axes: frozenset[str] | set[str] = frozenset(),
 ) -> list[dict[str, Any]]:
     issues: list[dict[str, Any]] = []
     if not mandatory and not _bbox_is_measurable(expected):
         return issues
     limit = float(tolerance.get("bbox_px", DEFAULT_TOLERANCE["bbox_px"]))
     for key in ("x", "y", "width", "height"):
-        if key not in expected or key not in actual:
+        if key in skip_axes or key not in expected or key not in actual:
             continue
         if abs(float(expected[key]) - float(actual[key])) > limit:
             issues.append(_issue("warning", f"node.bbox.{key}", semantic_id, f"bbox {key} differs"))
@@ -408,10 +441,17 @@ def _compare_visual(
         "strokeThickness",
         "strokeWidth",
         "strokeAlignment",
+        "objectFit",
     ):
         if key in expected and key in actual and expected[key] != actual[key]:
             issues.append(_issue("warning", f"node.visual.{key}", semantic_id, f"{key} differs"))
-    for key, limit_name in (("cornerRadius", "radius_px"), ("fontSize", "font_px")):
+    for key, limit_name in (
+        ("cornerRadius", "radius_px"),
+        ("fontSize", "font_px"),
+        ("lineHeight", "font_px"),
+        ("iconSize", "bbox_px"),
+        ("aspectRatio", "ratio"),
+    ):
         if key in expected and key in actual:
             limit = float(tolerance.get(limit_name, DEFAULT_TOLERANCE[limit_name]))
             if abs(float(expected[key]) - float(actual[key])) > limit:
