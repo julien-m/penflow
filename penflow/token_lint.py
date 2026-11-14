@@ -10,7 +10,7 @@ from typing import Any
 
 from .color import parse_color, resolve_variable
 from .models import PenNode
-from .pen import all_nodes, load_pen, parse_pen
+from .pen import all_nodes, load_pen, parse_diagnostic_regions, parse_pen
 
 REPORT_KIND = "penflow-token-lint-report"
 REPORT_VERSION = 1
@@ -35,6 +35,7 @@ def lint_tokens(
     radius_scale: tuple[float, ...] | list[float] | None = None,
     fontsize_scale: tuple[float, ...] | list[float] | None = None,
     pen_data: dict[str, Any] | None = None,
+    diagnostic_regions: bool = False,
 ) -> dict[str, Any]:
     # @spec FR-003: Deterministic token lint engine — .specs/features/046-lint-design-tokens/spec.md#fr-003
     # @spec FR-007: Round-trip guarantee with drafted pens — .specs/features/046-lint-design-tokens/spec.md#fr-007
@@ -50,6 +51,8 @@ def lint_tokens(
             `DEFAULT_RADIUS_SCALE` (resolved theme radius is always included).
         fontsize_scale: Allowed fontSize values; defaults to
             `DEFAULT_FONTSIZE_SCALE`.
+        diagnostic_regions: Inspect physical regions without active selection;
+            the composing caller must disclose scope and lifecycle findings.
         pen_data: Optional preloaded Pencil document; takes precedence over
             reading `pen_path`, which remains recorded in the report inputs.
     Returns:
@@ -58,7 +61,7 @@ def lint_tokens(
     raw = load_pen(pen_path) if pen_data is None else pen_data
     raw_variables = raw.get("variables")
     variables: dict[str, Any] = raw_variables if isinstance(raw_variables, dict) else {}
-    nodes = all_nodes(parse_pen(raw))
+    nodes = all_nodes(parse_diagnostic_regions(raw) if diagnostic_regions else parse_pen(raw))
     spacing = tuple(spacing_scale) if spacing_scale is not None else DEFAULT_SPACING_SCALE
     radius = tuple(radius_scale) if radius_scale is not None else DEFAULT_RADIUS_SCALE
     palette, theme_fonts, theme_radius, theme_fontsize, theme_radius_scale = _resolve_theme(theme)

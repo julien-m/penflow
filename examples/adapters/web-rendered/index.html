@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rendered measurement fixture</title>
+<style>
+  /* Illustrative fixture tokens, independent of the authored Pencil source. */
+  :root { --space-sm: .5rem; --space-md: .75rem; --space-base: 1rem; --space-lg: 1.5rem; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Arial, sans-serif; line-height: 1.5; }
+  main { min-block-size: 25rem; display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-lg); padding: var(--space-lg); }
+  section { inline-size: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); padding: var(--space-md) var(--space-base); }
+  button { display: flex; align-items: center; justify-content: center; gap: var(--space-sm); min-block-size: 2.5rem; inline-size: 7.5rem; border: 0; padding: var(--space-sm) var(--space-base); font: 500 .875rem / 1.4285714286 Arial, sans-serif; color: #fff; background: #253b53; cursor: pointer; }
+  button:hover { background: #344f6c; }
+  button:focus-visible { outline: 2px solid #253b53; outline-offset: 2px; }
+  html[data-oversized] button { padding-block: 2rem; font-size: 1.25rem; }
+</style>
+<main data-penflow-screen="workspace" data-semantic="workspace" data-design-screen-id="workspace-design">
+  <section aria-label="Filter actions" data-semantic="workspace.actions">
+    <button data-testid="workspace.apply" data-semantic="workspace.apply"><span data-semantic="workspace.apply.label">Apply filters</span></button>
+  </section>
+</main>
+<script>
+  if (new URLSearchParams(location.search).has("oversized")) document.documentElement.dataset.oversized = "true";
+</script>
+</html>

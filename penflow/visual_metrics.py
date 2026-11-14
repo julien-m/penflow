@@ -50,6 +50,7 @@ def audit_visual(
     layout_snapshot: str | Path | dict[str, Any] | None = None,
     tree_data: dict[str, Any] | None = None,
     intrinsic_text_ids: frozenset[str] = frozenset(),
+    explicit_hit_areas: bool = False,
 ) -> dict[str, Any]:
     # @spec FR-001: Deterministic visual metrics engine — .specs/features/050-deterministic-visual-metrics-audit/spec.md#fr-001
     """Audit computable visual metrics in an expected UI tree.
@@ -59,6 +60,8 @@ def audit_visual(
         theme_css: Theme source path recorded in the report.
         layout_snapshot: Optional measured geometry for overlap and parent bounds.
         tree_data: Authenticated in-memory tree instead of another file read.
+        explicit_hit_areas: Delegate hit-area minima to the resolved surface
+            profile instead of treating a visual bbox as an interactive region.
         intrinsic_text_ids: Source-derived auto text IDs with authenticated native
             geometry; measured intrinsic width replaces the text estimate only.
 
@@ -93,6 +96,7 @@ def audit_visual(
                 variables,
                 snapshot_bboxes=snapshot_bboxes,
                 intrinsic_text_ids=intrinsic_text_ids,
+                explicit_hit_areas=explicit_hit_areas,
             )
         )
     issues.sort(key=issue_sort_key)
@@ -148,6 +152,7 @@ def _audit_screen(
     *,
     snapshot_bboxes: dict[tuple[str | None, str], dict[str, Any]] | None,
     intrinsic_text_ids: frozenset[str] = frozenset(),
+    explicit_hit_areas: bool = False,
 ) -> list[dict[str, Any]]:
     by_key: dict[str, dict[str, Any]] = {
         str(node["_semantic_key"]): node for node in nodes if node.get("_semantic_key")
@@ -160,7 +165,7 @@ def _audit_screen(
             # as contrast backgrounds (a masked container still has a color).
             continue
         issues.extend(_contrast_issues(screen_id, node, by_key, fills))
-        issues.extend(_touch_target_issues(screen_id, node))
+        issues.extend(_touch_target_issues(screen_id, node, explicit_hit_areas=explicit_hit_areas))
         if not (snapshot_bboxes is not None and node.get("pencil_id") in intrinsic_text_ids):
             issues.extend(_text_overflow_issues(screen_id, node))
     geometry_nodes = overlay_geometry_nodes(screen_id, nodes, snapshot_bboxes)
@@ -316,10 +321,23 @@ def _is_bold(font_weight: Any) -> bool:
     return False
 
 
-def _touch_target_issues(screen_id: str, node: dict[str, Any]) -> list[dict[str, Any]]:
+def _touch_target_issues(
+    screen_id: str, node: dict[str, Any], *, explicit_hit_areas: bool = False
+) -> list[dict[str, Any]]:
     # @spec FR-003: touch targets on interactive roles — .specs/features/050-deterministic-visual-metrics-audit/spec.md#fr-003
     if node.get("role") not in INTERACTIVE_ROLES:
         return []
+    if explicit_hit_areas:
+        # Surface profiles own hit minima; compact visuals do not describe hit regions.
+        return [
+            visual_issue(
+                "visual.hit_area.profile_scoped",
+                "info",
+                screen_id,
+                node,
+                "Hit area compliance is separate from visual size; see design-profile coverage",
+            )
+        ]
     bbox = node.get("bbox")
     if not isinstance(bbox, dict):
         return []

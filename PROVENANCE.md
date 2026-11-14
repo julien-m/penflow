@@ -13,7 +13,7 @@ Before the repository became public, its Git history was rewritten with `git fil
 - the maintainer's local LiveSpec working tree (`.specs/`), local agent tooling (`.agent-sync.local/`, `.conventions/`, `AGENTS.md`), and generated run evidence were removed from every commit;
 - machine-specific absolute paths were replaced with neutral placeholders in the remaining history.
 
-Feature specifications stay in the maintainer's local LiveSpec workspace. Code and test comments such as `@spec FR-001` keep that traceability without publishing the specs themselves.
+The full maintainer LiveSpec workspace stays local. Scoped review led feature records and their registry are intentionally versioned as public implementation contracts; they do not include the removed private history or consumer evidence. Code/test traceability comments remain supported.
 
 ## Adding assets or evidence
 

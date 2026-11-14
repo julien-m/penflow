@@ -1,6 +1,7 @@
 """Normalize equivalent measured style representations without changing their values."""
 
 import re
+import math
 from typing import Any
 
 from .color import parse_color
@@ -8,36 +9,76 @@ from .verification_files import VerificationInputError
 
 
 def resolve_design_variables(
-    tree: dict[str, Any], variables: dict[str, Any], *, pen_data: dict[str, Any] | None = None
+    tree: dict[str, Any],
+    variables: dict[str, Any],
+    *,
+    pen_data: dict[str, Any] | None = None,
+    native_theme_semantics: bool = False,
 ) -> None:
     """Resolve only exact native variable references from the authenticated Pencil source."""
-    themes = _source_themes(pen_data or {})
+    themes = _source_themes(pen_data or {}, inherit=native_theme_semantics)
     pending = [screen["root"] for screen in tree["screens"]]
     while pending:
         node = pending.pop()
         node["visual"] = _resolved_value(
-            node.get("visual", {}), variables, set(), themes.get(node.get("pencil_id"), {})
+            node.get("visual", {}),
+            variables,
+            set(),
+            themes.get(node.get("pencil_id"), {}),
+            native_theme_semantics,
         )
+        for axis, reference in node.get("dimension_tokens", {}).items():
+            value = _resolved_value(
+                reference,
+                variables,
+                set(),
+                themes.get(node.get("pencil_id"), {}),
+                native_theme_semantics,
+            )
+            if (
+                axis not in {"width", "height"}
+                or isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or not 0 <= value <= 1e12
+            ):
+                raise VerificationInputError("verification.style.dimension_invalid")
+            node["bbox"][axis] = value
+            node.setdefault("sizing", {})[axis] = "fixed"
         pending.extend(node.get("children", []))
 
+    for screen in tree["screens"]:
+        for axis in screen["root"].get("dimension_tokens", {}):
+            screen.setdefault("viewport", {})[axis] = screen["root"]["bbox"][axis]
 
-def _source_themes(pen: dict[str, Any]) -> dict[str, dict[str, str]]:
+
+def _source_themes(pen: dict[str, Any], *, inherit: bool = False) -> dict[str, dict[str, str]]:
     """Read explicitly selected node themes; never infer selection from runtime colors."""
     result = {}
-    pending = list(pen.get("children", []))
+    defaults = (
+        {
+            axis: values[0]
+            for axis, values in pen.get("themes", {}).items()
+            if isinstance(values, list) and values and isinstance(values[0], str)
+        }
+        if inherit
+        else {}
+    )
+    pending = [(node, defaults) for node in pen.get("children", [])]
     while pending:
-        node = pending.pop()
+        node, parent = pending.pop()
         theme = node.get("theme", {})
         if not isinstance(theme, dict) or any(
             not isinstance(key, str) or not isinstance(value, str) for key, value in theme.items()
         ):
             raise VerificationInputError("verification.style.theme_invalid")
-        result[node["id"]] = theme
-        pending.extend(node.get("children", []))
+        effective = parent | theme if inherit else theme
+        result[node["id"]] = effective
+        pending.extend((child, effective) for child in node.get("children", []))
     return result
 
 
-def _selected_value(value: Any, theme: dict[str, str]) -> Any:
+def _selected_value(value: Any, theme: dict[str, str], ordered: bool = False) -> Any:
     if not isinstance(value, list):
         return value
     candidates = []
@@ -48,27 +89,42 @@ def _selected_value(value: Any, theme: dict[str, str]) -> Any:
             or not isinstance(entry["theme"], dict)
         ):
             raise VerificationInputError("verification.style.themed_value_invalid")
-        if entry["theme"] and all(theme.get(key) == item for key, item in entry["theme"].items()):
+        if (ordered or entry["theme"]) and all(
+            theme.get(key) == item for key, item in entry["theme"].items()
+        ):
             candidates.append(entry["value"])
+    # Native format specifies last matching theme entry, including fallback {}.
+    # Historical strict diagnostics keep their former unique-selection policy.
+    if ordered and candidates:
+        return candidates[-1]
     if len(candidates) != 1:
         raise VerificationInputError("verification.style.variable_unresolved_or_ambiguous")
     return candidates[0]
 
 
 def _resolved_value(
-    value: Any, variables: dict[str, Any], seen: set[str], theme: dict[str, str]
+    value: Any,
+    variables: dict[str, Any],
+    seen: set[str],
+    theme: dict[str, str],
+    ordered: bool = False,
 ) -> Any:
     if isinstance(value, dict):
-        return {key: _resolved_value(item, variables, seen, theme) for key, item in value.items()}
+        return {
+            key: _resolved_value(item, variables, seen, theme, ordered)
+            for key, item in value.items()
+        }
     if isinstance(value, list):
-        return [_resolved_value(item, variables, seen, theme) for item in value]
+        return [_resolved_value(item, variables, seen, theme, ordered) for item in value]
     if not isinstance(value, str) or not value.startswith("$"):
         return value
     name = value[1:]
     record = variables.get(name)
     if name in seen or not isinstance(record, dict) or "value" not in record:
         raise VerificationInputError("verification.style.variable_unresolved_or_ambiguous")
-    return _resolved_value(_selected_value(record["value"], theme), variables, seen | {name}, theme)
+    return _resolved_value(
+        _selected_value(record["value"], theme, ordered), variables, seen | {name}, theme, ordered
+    )
 
 
 def normalize_observed_styles(tree: dict[str, Any]) -> None:
@@ -78,6 +134,12 @@ def normalize_observed_styles(tree: dict[str, Any]) -> None:
         node = pending.pop()
         visual = node.get("visual", {})
         _normalize_border(visual)
+        # Native frame alignment uses start/end for CSS flex-start/flex-end.
+        alignment = visual.get("alignItems")
+        if isinstance(alignment, str):
+            visual["alignItems"] = {"flex-start": "start", "flex-end": "end"}.get(
+                alignment, alignment
+            )
         for key in ("fill", "stroke"):
             value = visual.get(key)
             if isinstance(value, str):
