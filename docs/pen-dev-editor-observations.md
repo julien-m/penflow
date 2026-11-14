@@ -23,3 +23,15 @@ The live records are retained in the pinned chat **pen.dev — tests arrière-pl
 - Two connected documents can be targeted independently in one chat. Do not invent a one-editor-per-chat restriction. This capability does not change the single product canvas rule: read [the normal workflow](review-led-workflow.md#existing-canvas-and-editor-connection) and enrich existing product screens in place.
 - Target the exact file and read back uncertain mutations before retrying. Persistence can lag editor changes; distinguish immediate, delayed and unverified saves. Changed file metadata/digest plus plugin readback was the save evidence here; the tests did not close/reopen the app or independently reload the edited file to prove durability.
 - Long unattended runs, locked sessions, application restarts and computer sleep were not tested. No headless editor guarantee, plugin code fix, runtime adapter or new certification prerequisite is introduced.
+
+## Additional native-subagent observation
+
+Phase 8 was already running when the coordinator requested STOP and completed at approximately 05:12 UTC on 2026-11-14. Both native children exposed the plugin tools, but `get_app_state` and read-only `execute(filePath=A)` returned `No pen.dev editor is open`. The parent still read A correctly. No mutation was attempted, and disk digest/mtime remained unchanged; no editor was opened or navigation performed. Records in the same test run are `phase-8-native-subagents.json`, `phase-8-alpha.json` and `phase-8-beta.json`.
+
+This establishes an access limit for those two native child contexts in that configuration, not a universal multi-agent restriction. It does not refute Julien's earlier shared-canvas test. Delegate preparation, scripts, design and review in parallel when a child lacks canvas access; a connected agent can apply prepared edits to the existing canvas. No further plugin test is a prerequisite.
+
+## User-confirmed shared-canvas capability
+
+On 2026-11-14 Julien explicitly confirmed that several agents writing in the same canvas had already been tested, and requested automatic parallel use. This is user-provided provenance, separate from the operator observations above: phases 1–7 exercised two documents in one chat and background operation; they did not demonstrate two agents editing one canvas. No additional plugin test is required to apply the requested workflow.
+
+Read [the normative parallel work rules](review-led-workflow.md#automatic-parallel-work-in-one-canvas) before assigning tasks: keep one product document, give writers disjoint named regions, coordinate shared objects through an integration owner, preserve concurrent edits and verify saves. The rule applies according to current access and permissions; an exact refusal still limits its affected action.
