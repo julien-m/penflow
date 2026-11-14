@@ -26,6 +26,8 @@ All notable public changes will be recorded here. Penflow follows semantic versi
 
 ### Fixed
 
+- Ordinary `export-semantic-tree` no longer depends on unrelated canvas/hygiene Doctor findings. It retains project confinement and writer locking, validates before atomic publication, and refuses source aliases or unowned outputs. Other producers and historical diagnostics keep their governance.
+
 - Normal `check` resolves the product profile before token lint and honors an optional exact `typography.font_size_scale`, exposing conflicting theme declarations without silently adding default/theme values. Missing scales keep existing behavior; invalid profiles do not suppress independent checks.
 
 - C51 derives permission-denial duties from all grants for the effective action and entity. Singleton or fully authorized actor domains need no impossible denial witness; each grant still requires its own allowed actor, and real unauthorized actors retain mandatory denial checks.

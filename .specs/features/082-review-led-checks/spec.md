@@ -43,3 +43,20 @@ Scenario: Cleanup cannot safely complete
 ```
 
 AC-001 covers FR-001/002: no-Git operation, continued checks, missing/invalid runtime, deterministic output and no workspace writes. AC-002 covers FR-003: read-only input validation with Doctor-incompatible hygiene; explicit C51 regressions remain covered. AC-003 covers FR-004: cleanup refusal preserves both success and failure. AC-004 covers FR-005/006: current guidance selects the review workflow, archived diagnostics remain available, independent review and migration report recorded.
+
+## Targeted contract-only producer correction
+
+FR-003 also applies input-relevant governance to ordinary export-semantic-tree: its data input is the strict v2 contract and its output is one selected semantic JSON artifact. It retains existing exact project/path resolution, shared writer locking, validation and safe atomic publication. Canvas/hygiene preflight and managed-run cleanup are not prerequisites for this projection. Other producers and explicit historical diagnostics retain their checks. The maintainer authorizes this targeted correction's public commit/PR/merge; no private consumer activation is authorized in this scope.
+
+```gherkin
+Scenario: Independent canvas is invalid
+  Given a valid strict contract and an independently invalid canonical canvas
+  When ordinary semantic export runs through the public CLI
+  Then it publishes a validated semantic tree within the selected project
+  And the canvas, source, ignore metadata and Git index remain unchanged
+
+Scenario: Contract or output is unsafe
+  Given an invalid contract or an escaping, aliased or unowned output
+  When semantic export runs
+  Then publication is refused and existing data is preserved
+```

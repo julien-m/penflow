@@ -73,8 +73,9 @@ def main(
 
     Side effects:
         Structured command and governance results are written to stdout; usage
-        and contract-boundary errors are written to stderr. Every non-exempt
-        producer runs the Doctor health boundary. Read-only diagnostics inspect
+        and contract-boundary errors are written to stderr. Contract-only semantic
+        export uses a confined publication boundary; other non-exempt producers
+        run the Doctor health boundary. Read-only diagnostics inspect
         their explicit inputs; C51 requests retain historical governance.
     """
     parser = build_parser()

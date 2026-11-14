@@ -63,10 +63,10 @@ from .run_lifecycle import (
     capture_owner_identity,
 )
 from .run_pipeline import RunPipelineError
-from .semantic import write_semantic_tree
+from .semantic_export import SemanticExportError, prepare_semantic_export
 from .semantic_draft import write_pen_draft_from_semantic_tree
 from .semantic_enrichment import enrich_pen_from_semantic_tree
-from .semantic_validation import validate_semantic_tree, validate_semantic_tree_file
+from .semantic_validation import validate_semantic_tree_file
 from .strict_closure import StrictClosureError
 from .tree import load_tree, validate_actual_tree, write_expected_tree
 
@@ -253,9 +253,14 @@ def cmd_export_expected(args: argparse.Namespace) -> int:
 
 def cmd_export_semantic_tree(args: argparse.Namespace) -> int:
     # @spec FR-005: export-semantic-tree validates its output — .specs/features/049-strict-mode-default-blocking-drift/spec.md#fr-005
-    tree = write_semantic_tree(args.specs_dir, args.out)
-    issues = validate_semantic_tree(tree)
-    code = _exit_code(issues, _is_lenient(args))
+    try:
+        prepared = prepare_semantic_export(args.semantic_export_context, args.specs_dir, args.out)
+        tree, issues = prepared.tree, prepared.issues
+        code = _exit_code(issues, _is_lenient(args))
+        if code == 0:
+            prepared.publish(allow_warnings=_is_lenient(args))
+    except SemanticExportError as error:
+        raise ProjectBoundaryError(str(error)) from error
     _print(
         {
             "status": _status(code),
