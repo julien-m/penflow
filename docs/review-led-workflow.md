@@ -21,6 +21,12 @@ flowchart LR
 - Preserve exact consumer project boundaries and ambiguous-write/deletion protections. Prefer the selected `ui.pen` canvas; keep real active/draft/archive revisions intact. Read-only validators inspect explicit files without Doctor hygiene. Canvas producers still use their existing confined Doctor/managed-run boundary; contract-only semantic export uses the scoped boundary described below; `doctor --fix` is explicit setup/repair, never an automatic certificate retry loop. On an ordinary producer, a refused postflight cleanup is a separate `penflow-cleanup-finding` JSON line on stderr; product stdout/exit remain intact and unproven data stays untouched. Historical `run` retains its old cleanup behavior.
 - Update specs/mappings/changelog/registry as ordinary confined documents; mark Implemented after independent review accepts the behavior. Commit, publish, merge or install only within user authorization. Never silently upgrade an installed consumer or resume a mission under another policy.
 
+## Reference screens
+
+- Choose the reference screens while defining the user journey, before drawing the mockup. Add an entry to `flow-ui-contract/contract.json` under `screens[]` only for a distinct destination or a meaningful step with its own user goal, such as verifying identity to continue onboarding. The journey explains why the step matters, including when the UI presents it in a modal.
+- Keep local changes under the existing `screen_id`. Opening a filter, expanding a panel, changing a selection or showing a validation error uses the same reference screen. Record the relevant states and transitions in the contract and verify them on that screen.
+- Align the mockup and the implementation with the contract's reference screen IDs. During review, check that each added screen maps to a distinct destination or meaningful journey step and that each local interaction keeps the same screen ID. A separate capture for a state can serve as evidence under that ID.
+
 ## Conventions, design and rendered measurements
 
 ```mermaid
