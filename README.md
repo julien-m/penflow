@@ -90,6 +90,8 @@ transition to be observed. See the local submit clarification of the JSON-only c
 
 `flow-ui-contract/contract.json` is the canonical strict v2 business contract. Flow/screen Markdown is a deterministic, hash-bound projection produced by `export-flow-docs`; legacy Markdown is accepted only through explicit migration. Strict coverage is bidirectional: every contract node has one Pencil anchor and every authored Pencil node is explicitly semantic, inherited, or decorative.
 
+Read [the reference screen rules](docs/review-led-workflow.md#reference-screens) when defining a user journey. Declare screens for distinct destinations or meaningful steps and keep local interaction states under the existing screen ID.
+
 ## Current Checks and Delivery
 
 The normal workflow runs useful checks and one independent native final review. Inspect current files without setting up a Git repository, Doctor receipts, upstream approval history or a runtime build manifest:
