@@ -204,6 +204,7 @@ READ_ONLY_COMMANDS: Final = frozenset(
         "validate-report",
         "authority",
         "check",
+        "visual-alignment",
     }
 )
 LIFECYCLE_EXEMPT_COMMANDS: Final = frozenset({"doctor", "--help", "--version"})

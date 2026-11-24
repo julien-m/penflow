@@ -13,11 +13,11 @@
 
 **Deterministic design contracts for [pen.dev](https://pen.dev) mockups.**
 
-Penflow is a Python CLI that turns a pen.dev `.pen` file into a verifiable contract. It parses `.pen` JSON, validates the semantic `context` attached to screens and components, exports the *expected* UI tree, validates the *actual* UI tree produced by your app's runtime adapter, and compares both structurally. Every result is a deterministic JSON report, so agents and CI can tell whether an implementation still matches its design.
+Penflow is a Python CLI that turns a pen.dev `.pen` file into a verifiable contract. It parses `.pen` JSON, validates the semantic `context` attached to screens and components, exports the *expected* UI tree, validates the *actual* UI tree produced by your app's runtime adapter, and compares both structurally. Deterministic JSON diagnostics let agents and CI compare design and implementation. The Markdown visual alignment report helps reviewers decide what to correct.
 
 Penflow is the design-contract companion of [LiveSpec](https://github.com/julien-m/livespec): LiveSpec keeps specifications alive next to the code, Penflow keeps UI mockups and runtime screens aligned with those specifications. Penflow stays runtime-agnostic: browsers, simulators, application runtimes, and pen.dev itself stay outside the Python core.
 
-> **Status:** alpha (`0.1.0`, not yet published to PyPI). Commands and report schemas may still change.
+> **Status:** alpha (`0.2.0`, not yet published to PyPI). Commands and report schemas may still change.
 
 The project is licensed under the [MIT License](LICENSE). Before contributing or reporting a vulnerability, **read** [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md). Release status and provenance limits are recorded in [CHANGELOG.md](CHANGELOG.md), [RELEASE.md](RELEASE.md), and [PROVENANCE.md](PROVENANCE.md).
 
@@ -47,11 +47,21 @@ To build the same wheel and source archive checked by CI:
 ```bash
 uv build
 python3 -m venv /tmp/penflow-release-check
-/tmp/penflow-release-check/bin/python -m pip install dist/penflow-0.1.0-py3-none-any.whl
+/tmp/penflow-release-check/bin/python -m pip install dist/penflow-0.2.0-py3-none-any.whl
 /tmp/penflow-release-check/bin/penflow --help
 ```
 
 The release checklist in [RELEASE.md](RELEASE.md) defines the version/tag/build order. Do not publish an artifact whose version differs between `pyproject.toml`, `penflow.__version__`, and the tag.
+
+### Review visual alignment
+
+Run a visual review once you have the reference, the runtime capture and the full rendered comparison.
+
+```bash
+penflow visual-alignment review.json --evidence-root ./captures > visual-alignment.md
+```
+
+The report checks the declared screen, state, variant and logical viewport before presenting up to three prioritized, source-linked review observations per case. It retains the diagnostic verdict and individual findings. Read [the visual alignment guide](docs/visual-alignment.md) for the manifest, evidence requirements and before/after workflow.
 
 ### Quick start
 
