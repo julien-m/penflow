@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 
+from penflow import cli
 from penflow.cli import main
 from penflow.rendered_measurements import compare_rendered
 
@@ -447,3 +448,26 @@ def test_png_header_without_image_data_is_incompatible(
     assert "**Incompatible**" in output
     assert "incomplete PNG" in output
     assert "Apply the compact control variant" not in output
+
+
+@pytest.mark.parametrize("explicit_project", [False, True])
+def test_cli_resolves_evidence_relative_to_manifest_or_explicit_project(
+    review: tuple[Path, JsonObject],
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    explicit_project: bool,
+) -> None:
+    evidence, manifest = review
+    monkeypatch.chdir(evidence.parent)
+    manifest_path = (evidence.parent if explicit_project else evidence) / "review.json"
+    _write_json(manifest_path, manifest)
+    args = ["visual-alignment", str(manifest_path.relative_to(evidence.parent))]
+    if explicit_project:
+        args.extend(["--project", "evidence"])
+
+    # Exercise the parser before the legacy test harness can supply a project.
+    assert cli.main(args) == 0
+    captured = capsys.readouterr()
+    assert not captured.err
+    assert "**Comparable**" in captured.out
+    assert "Apply the compact control variant" in captured.out
