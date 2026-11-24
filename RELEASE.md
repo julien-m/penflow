@@ -1,13 +1,10 @@
 # Release Process
 
-`main` is the integration branch. A release is complete only after an authorized maintainer performs every step below; this document does not claim that `0.2.0` has been published.
+`main` is the protected integration branch. A new stable package version becomes available to managed consumers after the exact commit passes the main push CI and Security checks. The [consumer release workflow](.github/workflows/publish-consumer-release.yml) builds and publishes the approved payload as a GitHub release.
 
-1. Confirm the version matches in `pyproject.toml`, `penflow.__version__`, the changelog, and the intended `v<version>` tag.
-2. Run the checks from [CONTRIBUTING.md](CONTRIBUTING.md) on a clean checkout.
-3. Build with `uv build`; inspect the wheel and source archive for `LICENSE`, schemas, and `penflow/demo-assets/checkout-screen.png`.
-4. Install the wheel into a fresh Python 3.12 environment outside the checkout and run `penflow --help` plus a disposable `penflow demo` smoke test.
-5. Review [PROVENANCE.md](PROVENANCE.md) and [third-party-notices.md](third-party-notices.md). Stop if source rights, generated evidence, secrets, or private paths are unresolved.
-6. Commit the changelog date, create an annotated `v<version>` tag, and push the commit and tag without rewriting history.
-7. Publish only through an explicitly authorized registry/release workflow, then verify the public artifact digest and installation path.
+1. Match the semantic version in `pyproject.toml`, `penflow.__version__`, the dependency lock and changelog. Plan a new version whenever consumers should adopt a change.
+2. Run the checks from [CONTRIBUTING.md](CONTRIBUTING.md), review [PROVENANCE.md](PROVENANCE.md) and [third-party-notices.md](third-party-notices.md), then merge through the protected branch.
+3. Inspect the `Publish consumer release` workflow for that exact main commit. The read-only build job exports locked requirements and smoke-tests the installed wheel. The publisher verifies the draft assets before making the release visible.
+4. Verify the release tag, commit and digests. Use [the consumer runtime guide](docs/consumer-runtime.md) to verify acquisition and installed CLI identity.
 
-Release credentials must remain outside the repository and logs. A local `uv build` proves buildability only; it does not prove registry publication, signature, provenance clearance, or runtime certification.
+A subsequent main commit with an already published version preserves the original tag and release assets. If publishing fails, rerun the failed workflow for the original qualified commit. A partial draft can resume when its recorded source and existing assets agree. Registry publication outside GitHub requires separate authorization. Keep release credentials outside source and logs.

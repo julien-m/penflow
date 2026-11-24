@@ -2,6 +2,12 @@
 
 All notable public changes will be recorded here. Penflow follows semantic versioning once releases are tagged.
 
+## [0.3.0] - 2026-11-24
+
+### Added
+
+- Check and publish versioned Penflow consumer wheels and synchronize a verified runtime at consumer startup.
+
 ## [Unreleased]
 
 ### Added
