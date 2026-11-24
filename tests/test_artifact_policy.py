@@ -128,6 +128,7 @@ def test_command_registry_matches_the_normative_closed_sets() -> None:
             "validate-report",
             "authority",
             "check",
+            "visual-alignment",
         }
     )
     assert LIFECYCLE_EXEMPT_COMMANDS == frozenset({"doctor", "--help", "--version"})

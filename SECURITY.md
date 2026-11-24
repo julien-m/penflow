@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes target the latest commit on `main` until versioned releases are published. The `0.1.0` package metadata currently describes an alpha source distribution, not a support promise for a published registry artifact.
+Security fixes target the latest commit on `main` until versioned releases are published. The `0.2.0` package metadata currently describes an alpha source distribution, not a support promise for a published registry artifact.
 
 ## Report a vulnerability
 

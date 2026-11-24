@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Visual alignment review input",
+  "type": "object",
+  "required": ["version", "cases"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"type": "integer", "const": 1},
+    "locale": {"enum": ["en", "fr"]},
+    "cases": {"type": "array", "minItems": 1, "maxItems": 100, "items": {"$ref": "#/$defs/case"}}
+  },
+  "$defs": {
+    "text": {"type": "string", "minLength": 1, "maxLength": 2000, "pattern": "\\S"},
+    "label": {"type": "string", "minLength": 1, "maxLength": 200, "pattern": "\\S"},
+    "nullableLabel": {"anyOf": [{"$ref": "#/$defs/label"}, {"type": "null"}]},
+    "side": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "screen": {"$ref": "#/$defs/nullableLabel"},
+        "state": {"$ref": "#/$defs/nullableLabel"},
+        "variant": {"$ref": "#/$defs/nullableLabel"},
+        "viewport": {
+          "type": ["array", "null"], "minItems": 2, "maxItems": 2,
+          "items": {"type": "integer", "minimum": 1, "maximum": 100000}
+        },
+        "frame": {"$ref": "#/$defs/nullableLabel"},
+        "composite": {"type": "boolean"}
+      }
+    },
+    "imageScale": {"type": "number", "exclusiveMinimum": 0, "maximum": 16},
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "side_by_side": {"$ref": "#/$defs/text"},
+        "design": {"$ref": "#/$defs/text"},
+        "runtime": {"$ref": "#/$defs/text"},
+        "scale": {"$ref": "#/$defs/imageScale"},
+        "design_scale": {"$ref": "#/$defs/imageScale"},
+        "runtime_scale": {"$ref": "#/$defs/imageScale"}
+      },
+      "not": {
+        "required": ["side_by_side"],
+        "anyOf": [
+          {"required": ["design"]}, {"required": ["runtime"]},
+          {"required": ["design_scale"]}, {"required": ["runtime_scale"]}
+        ]
+      }
+    },
+    "pair": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "design": {"$ref": "#/$defs/side"},
+        "runtime": {"$ref": "#/$defs/side"},
+        "images": {"$ref": "#/$defs/images"},
+        "report": {"$ref": "#/$defs/text"}
+      }
+    },
+    "citation": {
+      "type": "object",
+      "required": ["path", "note"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {"$ref": "#/$defs/text"},
+        "note": {"$ref": "#/$defs/text"},
+        "pointer": {"type": "string", "maxLength": 1000, "pattern": "^(?:/(?:[^~]|~[01])*)?$"}
+      }
+    },
+    "evidence": {
+      "type": "array", "maxItems": 20, "items": {"$ref": "#/$defs/citation"}
+    },
+    "finding": {
+      "type": "object",
+      "required": ["priority", "title", "action", "basis", "region", "expected", "observed", "proposal", "verify"],
+      "additionalProperties": false,
+      "properties": {
+        "priority": {"type": "integer", "minimum": 1},
+        "title": {"$ref": "#/$defs/label"},
+        "action": {"enum": ["product_fix", "recapture", "clarify_design", "approved_divergence"]},
+        "basis": {"enum": ["visual", "measurement", "decision", "missing_observation"]},
+        "region": {"$ref": "#/$defs/text"},
+        "expected": {"$ref": "#/$defs/text"},
+        "observed": {"$ref": "#/$defs/text"},
+        "proposal": {"$ref": "#/$defs/text"},
+        "verify": {"$ref": "#/$defs/text"},
+        "evidence": {"$ref": "#/$defs/evidence"},
+        "approval": {"$ref": "#/$defs/citation"},
+        "follow_up": {
+          "type": "object",
+          "required": ["observed", "evidence"],
+          "additionalProperties": false,
+          "properties": {
+            "observed": {"$ref": "#/$defs/text"},
+            "evidence": {"$ref": "#/$defs/evidence", "minItems": 1}
+          }
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "required": ["title", "before"],
+      "additionalProperties": false,
+      "properties": {
+        "title": {"$ref": "#/$defs/label"},
+        "before": {"$ref": "#/$defs/pair"},
+        "after": {"$ref": "#/$defs/pair"},
+        "findings": {"type": "array", "maxItems": 100, "items": {"$ref": "#/$defs/finding"}}
+      }
+    }
+  }
+}

@@ -7,3 +7,4 @@ This scoped public record accompanies feature 082. The maintainer's existing ful
 | 082 — Review led checks | Implemented | 2026-11-13 | Read [spec](features/082-review-led-checks/spec.md) | Read [changelog](features/082-review-led-checks/changelog.md) |
 
 | 083 — Rendered design conventions | Implemented | 2026-11-14 | Read [spec](features/083-rendered-design-conventions/spec.md) | Read [changelog](features/083-rendered-design-conventions/changelog.md) |
+| 084 — Visual alignment report | Implemented | 2026-11-24 | Read [spec](features/084-visual-alignment-report/spec.md) | Read [changelog](features/084-visual-alignment-report/changelog.md) |

@@ -125,7 +125,8 @@ def _dispatch(
     policy = command_policy_for(str(args.command))
     if policy.category is CommandClassification.LIFECYCLE_EXEMPT:
         return int(args.func(args) or 0)
-    if str(args.command) == "check":
+    # These reports derive the default project from their workspace or manifest.
+    if str(args.command) in {"check", "visual-alignment"}:
         return int(args.func(args) or 0)
     if getattr(args, "project", None) is None:
         args.project = "."

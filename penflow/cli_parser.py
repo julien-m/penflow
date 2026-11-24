@@ -37,6 +37,7 @@ from .cli_commands_b import (
     cmd_validate_visual_evidence,
 )
 from .cli_authority import register_authority
+from .cli_visual_alignment import register_visual_alignment
 from .cli_checks import register_checks
 from .cli_reporting import _add_lenient
 from .token_lint import DEFAULT_FONTSIZE_SCALE, DEFAULT_RADIUS_SCALE, DEFAULT_SPACING_SCALE
@@ -337,6 +338,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
     register_checks(sub)
+    register_visual_alignment(sub)
     _register_doctor_run(sub)
     _register_inspect_persistence(sub)
     _register_validation_contracts(sub)

@@ -1,6 +1,6 @@
 # Release Process
 
-`main` is the integration branch. A release is complete only after an authorized maintainer performs every step below; this document does not claim that `0.1.0` has been published.
+`main` is the integration branch. A release is complete only after an authorized maintainer performs every step below; this document does not claim that `0.2.0` has been published.
 
 1. Confirm the version matches in `pyproject.toml`, `penflow.__version__`, the changelog, and the intended `v<version>` tag.
 2. Run the checks from [CONTRIBUTING.md](CONTRIBUTING.md) on a clean checkout.

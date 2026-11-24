@@ -47,3 +47,7 @@ compare-report.md
 !examples/full/actual-ui-tree.json
 !examples/full/expected-ui-tree.json
 !examples/full/.mockup-validation/compare-report.json
+
+# Local consumer review inputs and output
+/examples/visual-alignment/atlas.json
+/examples/visual-alignment/atlas.md

@@ -25,6 +25,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .png_header import png_header_dimensions
 from .pencil_persistence import validate_pencil_persistence_receipt
 from .schema_cache import validator_for
 
@@ -34,7 +35,6 @@ EXPORT_OPERATOR_VERSION = 1
 NATIVE_OPERATION = "export_nodes"
 _REQUEST_SCHEMA = "export-operator-request.schema.json"
 
-_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _CROP_RATIO_TOLERANCE = 0.02
 
 
@@ -589,7 +589,7 @@ def _export_result(
         )
     export_sha_by_key.setdefault(actual_sha, key)
 
-    dimensions = _png_dimensions(data)
+    dimensions = png_header_dimensions(data)
     if dimensions is None:
         checks["exports_png"] = False
         issues.append(
@@ -714,7 +714,7 @@ def _reference_results(
                     "declared reference digest does not match recomputed bytes",
                 )
             )
-        if _png_dimensions(data) is None:
+        if png_header_dimensions(data) is None:
             checks["reference_png"] = False
             issues.append(
                 _issue("export.reference.not_png", f"{ipref}.path", "reference is not a valid PNG")
@@ -796,16 +796,6 @@ def _reference_results(
 
 
 # --- primitive helpers -----------------------------------------------------
-
-
-def _png_dimensions(data: bytes) -> tuple[int, int] | None:
-    if len(data) < 24 or data[:8] != _PNG_SIGNATURE or data[12:16] != b"IHDR":
-        return None
-    width = int.from_bytes(data[16:20], "big")
-    height = int.from_bytes(data[20:24], "big")
-    if width <= 0 or height <= 0:
-        return None
-    return width, height
 
 
 def _load_json(
