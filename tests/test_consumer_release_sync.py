@@ -469,3 +469,28 @@ def test_publication_requires_both_current_workflows_on_the_exact_commit(
 
     monkeypatch.setitem(checks_passed.__globals__, "_run", query)
     assert checks_passed(repo, commit) == (security == "success")
+
+
+@pytest.mark.parametrize("available", [True, False])
+def test_publisher_waits_for_read_after_write_visibility(
+    monkeypatch: pytest.MonkeyPatch, available: bool
+) -> None:
+    publisher = runpy.run_path(str(SCRIPT.with_name("build-consumer-release.py")))
+    wait_for_release = publisher["_wait_for_release"]
+    scope = wait_for_release.__globals__
+    expected = {"draft": True}
+    records = [None, {"draft": False}, expected if available else None]
+    pauses: list[float] = []
+    monkeypatch.setitem(scope, "RELEASE_READ_ATTEMPTS", len(records))
+    monkeypatch.setitem(scope, "_release_record", lambda repo, tag: records.pop(0))
+    monkeypatch.setattr(scope["time"], "sleep", pauses.append)
+
+    if available:
+        assert (
+            wait_for_release("example/penflow", "v3.2.1", lambda release: release["draft"])
+            == expected
+        )
+    else:
+        with pytest.raises(ValueError, match="after the release write"):
+            wait_for_release("example/penflow", "v3.2.1", lambda release: release["draft"])
+    assert len(pauses) == 2

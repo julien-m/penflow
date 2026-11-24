@@ -10,7 +10,9 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import tomllib
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +22,8 @@ REQUIREMENTS = "penflow-runtime-requirements.txt"
 VERSION = re.compile(r"(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
 SHA = re.compile(r"[0-9a-f]{40}")
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
+RELEASE_READ_ATTEMPTS = 10
+RELEASE_READ_INTERVAL = 3
 REQUIRED_WORKFLOWS = {
     "CI": ".github/workflows/ci.yml",
     "Security": ".github/workflows/security.yml",
@@ -153,6 +157,19 @@ def _release_record(repository: str, tag: str) -> JsonObject | None:
     return matches[0] if matches else None
 
 
+def _wait_for_release(
+    repository: str, tag: str, visible: Callable[[JsonObject], bool]
+) -> JsonObject:
+    # GitHub's release list can lag behind a successful draft, asset or publication write.
+    for attempt in range(RELEASE_READ_ATTEMPTS):
+        release = _release_record(repository, tag)
+        if release is not None and visible(release):
+            return release
+        if attempt + 1 < RELEASE_READ_ATTEMPTS:
+            time.sleep(RELEASE_READ_INTERVAL)
+    raise ValueError(f"GitHub did not expose the verified state for {tag} after the release write")
+
+
 def _assets(release: JsonObject) -> dict[str, str]:
     assets = release["assets"]
     digests = {asset["name"]: asset["digest"] for asset in assets}
@@ -250,8 +267,8 @@ def _publish(out: Path, version: str, commit: str, repository: str) -> None:
             f"Consumer wheel built from CI- and Security-qualified commit {commit}.",
             "--draft",
         )
-        release = _release_record(repository, tag)
-    if release is None or not release["draft"] or release["target_commitish"] != commit:
+        release = _wait_for_release(repository, tag, lambda record: record["draft"])
+    if not release["draft"] or release["target_commitish"] != commit:
         raise ValueError(f"could not establish a draft for {tag} at the qualified commit")
 
     # A retry may finish a partial draft, provided every existing asset matches byte for byte.
@@ -262,10 +279,16 @@ def _publish(out: Path, version: str, commit: str, repository: str) -> None:
     missing = [str(path) for path in paths if path.name not in actual]
     if missing:
         _run("gh", "release", "upload", tag, *missing, "--repo", repository)
-    current = _release_record(repository, tag)
+    current = _wait_for_release(
+        repository,
+        tag,
+        lambda record: (
+            all(asset["state"] == "uploaded" and asset["digest"] for asset in record["assets"])
+            and len(record["assets"]) >= len(expected)
+        ),
+    )
     if (
-        current is None
-        or not current["draft"]
+        not current["draft"]
         or current["target_commitish"] != commit
         or current["prerelease"]
         or _assets(current) != expected
@@ -286,8 +309,8 @@ def _publish(out: Path, version: str, commit: str, repository: str) -> None:
         "--raw-field",
         "make_latest=legacy",
     )
-    published = _release_record(repository, tag)
-    if published is None or _tag_commit(repository, tag) != commit:
+    published = _wait_for_release(repository, tag, lambda record: not record["draft"])
+    if _tag_commit(repository, tag) != commit:
         raise ValueError(f"published {tag} did not resolve to the qualified commit")
     _verify_published(repository, tag, version, published)
     print(f"Published {tag} from {commit}")
