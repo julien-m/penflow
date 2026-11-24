@@ -12,6 +12,6 @@ updated: 2026-11-24
 | Build stable assets and qualify publication | Done |
 | Implement pin-aware runtime selection and cache | Done |
 | Implement and test the consumer startup boundary | Done |
-| Observe publication and replay against GitHub | Pending merge |
+| Observe publication and replay against GitHub | Done |
 
 Read [the implementation record](implementation.md) for the verification scope.
