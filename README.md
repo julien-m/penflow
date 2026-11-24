@@ -17,7 +17,7 @@ Penflow is a Python CLI that turns a pen.dev `.pen` file into a verifiable contr
 
 Penflow is the design-contract companion of [LiveSpec](https://github.com/julien-m/livespec): LiveSpec keeps specifications alive next to the code, Penflow keeps UI mockups and runtime screens aligned with those specifications. Penflow stays runtime-agnostic: browsers, simulators, application runtimes, and pen.dev itself stay outside the Python core.
 
-> **Status:** alpha (`0.2.0`, not yet published to PyPI). Commands and report schemas may still change.
+> **Status:** alpha (`0.3.0`). Commands and report schemas may still change.
 
 The project is licensed under the [MIT License](LICENSE). Before contributing or reporting a vulnerability, **read** [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md). Release status and provenance limits are recorded in [CHANGELOG.md](CHANGELOG.md), [RELEASE.md](RELEASE.md), and [PROVENANCE.md](PROVENANCE.md).
 
@@ -47,11 +47,15 @@ To build the same wheel and source archive checked by CI:
 ```bash
 uv build
 python3 -m venv /tmp/penflow-release-check
-/tmp/penflow-release-check/bin/python -m pip install dist/penflow-0.2.0-py3-none-any.whl
+/tmp/penflow-release-check/bin/python -m pip install dist/penflow-0.3.0-py3-none-any.whl
 /tmp/penflow-release-check/bin/penflow --help
 ```
 
 The release checklist in [RELEASE.md](RELEASE.md) defines the version/tag/build order. Do not publish an artifact whose version differs between `pyproject.toml`, `penflow.__version__`, and the tag.
+
+### Managed consumer runtime
+
+GitHub releases provide checked wheels and a hashed dependency export. Consumers with a pinned LiveSpec Python can resolve and verify the release at startup. Read [the consumer runtime guide](docs/consumer-runtime.md) for runner integration and exact-tag replay.
 
 ### Review visual alignment
 

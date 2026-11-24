@@ -1,0 +1,99 @@
+name: Publish consumer release
+
+on:
+  workflow_run:
+    workflows: [CI, Security]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: penflow-consumer-release
+  queue: max
+
+jobs:
+  build:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      qualified: ${{ steps.qualify.outputs.qualified }}
+
+    permissions:
+      contents: read
+      actions: read
+
+    steps:
+      - name: Check out the exact source of the check
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Require CI and Security on the exact source
+        id: qualify
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          qualified="$(python -I tools/build-consumer-release.py --qualify)"
+          echo "qualified=$qualified" >> "$GITHUB_OUTPUT"
+
+      - name: Setup uv
+        if: steps.qualify.outputs.qualified == 'true'
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          version: "0.12.5"
+
+      - name: Build and smoke-test consumer assets
+        if: steps.qualify.outputs.qualified == 'true'
+        run: python -I tools/build-consumer-release.py --out "$RUNNER_TEMP/penflow-consumer-release"
+
+      - name: Pass the checked release assets to the publishing job
+        if: steps.qualify.outputs.qualified == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: penflow-consumer-release
+          path: ${{ runner.temp }}/penflow-consumer-release/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    if: needs.build.outputs.qualified == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Check out the CI-qualified publisher
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Download the checked release assets
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: penflow-consumer-release
+          path: ${{ runner.temp }}/penflow-consumer-release/
+
+      - name: Publish consumer assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -I tools/build-consumer-release.py --out "$RUNNER_TEMP/penflow-consumer-release" --publish
