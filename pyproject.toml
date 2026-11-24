@@ -27,7 +27,7 @@ dependencies = [
     "PyYAML>=6.0",
     "jsonschema>=4",
     "referencing>=0.37,<0.38",
-    "mistune==3.3.4",
+    "mistune==3.4.0",
 ]
 
 [project.optional-dependencies]
