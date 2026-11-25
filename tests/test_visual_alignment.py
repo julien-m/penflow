@@ -24,14 +24,27 @@ def _write_json(path: Path, value: JsonObject) -> None:
     path.write_text(json.dumps(value), encoding="utf-8")
 
 
-def _write_png(path: Path, viewport: list[int], shade: int = 70, *, joined: bool = True) -> None:
-    """Write valid grayscale evidence with either a runtime panel or a vis-à-vis."""
+def _write_png(
+    path: Path,
+    viewport: list[int],
+    shade: int = 70,
+    *,
+    joined: bool = True,
+    color_type: int = 0,
+    extra_chunks: tuple[tuple[bytes, bytes], ...] = (),
+) -> None:
+    """Write valid grayscale or indexed evidence for the CLI."""
     width, height = viewport
     design = bytes([30]) * width if joined else b""
     pixels = design + bytes([shade]) * width
     scanline = b"\x00" + pixels
-    header = struct.pack(">IIBBBBB", len(pixels), height, 8, 0, 0, 0, 0)
-    chunks = ((b"IHDR", header), (b"IDAT", zlib.compress(scanline * height)), (b"IEND", b""))
+    header = struct.pack(">IIBBBBB", len(pixels), height, 8, color_type, 0, 0, 0)
+    chunks = (
+        (b"IHDR", header),
+        *extra_chunks,
+        (b"IDAT", zlib.compress(scanline * height)),
+        (b"IEND", b""),
+    )
     image = bytearray(b"\x89PNG\r\n\x1a\n")
     for kind, data in chunks:
         image.extend(struct.pack(">I", len(data)))
@@ -343,6 +356,69 @@ def test_follow_up_requires_a_comparable_new_capture(
         assert "reuse the same runtime image data" in output
     elif after_pair == "combined":
         assert "separate design and runtime PNGs" in output
+
+
+# @spec AC-002: Qualify fresh follow-up captures with identical compressed samples.
+@pytest.mark.parametrize(
+    ("kind", "before_payload", "after_payload", "changed_rendering"),
+    [
+        (b"PLTE", b"\xff\x00\x00", b"\x00\x00\xff", True),
+        (b"tRNS", b"\xff", b"\x00", True),
+        (b"gAMA", struct.pack(">I", 45455), struct.pack(">I", 100000), True),
+        (b"tEXt", b"Author\x00Reviewer", b"Author\x00Editor", False),
+    ],
+    ids=["palette", "transparency", "gamma", "author"],
+)
+def test_follow_up_qualifies_rendering_changes_with_identical_idat(
+    review: tuple[Path, JsonObject],
+    capsys: pytest.CaptureFixture[str],
+    kind: bytes,
+    before_payload: bytes,
+    after_payload: bytes,
+    changed_rendering: bool,
+) -> None:
+    evidence, manifest = review
+    case = manifest["cases"][0]
+    before = case["before"]
+    viewport = before["design"]["viewport"]
+    _write_png(evidence / "design.png", viewport, joined=False)
+    before["images"] = {"design": "design.png", "runtime": "before.png"}
+    after = case["after"] = deepcopy(before)
+    after["images"]["runtime"] = "after.png"
+    after["report"] = "after-check.json"
+
+    for pair, payload in ((before, before_payload), (after, after_payload)):
+        # Both files use the same scanlines of palette index zero.
+        palette = (b"PLTE", b"\x80\x00\x00")
+        extra_chunks: tuple[tuple[bytes, bytes], ...]
+        if kind == b"PLTE":
+            extra_chunks = ((kind, payload),)
+        elif kind == b"gAMA":
+            extra_chunks = ((kind, payload), palette)
+        else:
+            extra_chunks = (palette, (kind, payload))
+        _write_png(
+            evidence / pair["images"]["runtime"],
+            viewport,
+            shade=0,
+            joined=False,
+            color_type=3,
+            extra_chunks=extra_chunks,
+        )
+        _write_json(
+            evidence / pair["report"], _rendered_report(pair, evidence, expanded=pair is before)
+        )
+
+    observed = "Reviewed the follow-up appearance"
+    case["findings"][0]["follow_up"] = {
+        "observed": observed,
+        "evidence": [{"path": "after.png", "note": "Runtime after the correction"}],
+    }
+
+    output = _run(review, capsys)
+
+    assert ("reuse the same runtime image data" in output) is not changed_rendering
+    assert (observed in output) is changed_rendering
 
 
 def test_outside_root_symlink_cannot_supply_a_capture(
