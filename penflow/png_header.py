@@ -4,6 +4,21 @@ from hashlib import sha256
 from zlib import crc32
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+# Chunks that affect interpretation or presentation of a static PNG raster.
+_RASTER_CHUNKS = {
+    b"IHDR",
+    b"PLTE",
+    b"tRNS",
+    b"cHRM",
+    b"gAMA",
+    b"iCCP",
+    b"sBIT",
+    b"sRGB",
+    b"cICP",
+    b"mDCV",
+    b"cLLI",
+    b"bKGD",
+}
 
 
 def png_header_dimensions(data: bytes) -> tuple[int, int] | None:
@@ -16,7 +31,7 @@ def png_header_dimensions(data: bytes) -> tuple[int, int] | None:
 
 
 def inspect_png(data: bytes) -> tuple[tuple[int, int], str] | None:
-    """Verify PNG chunk boundaries and CRCs and fingerprint compressed image data.
+    """Verify PNG chunk boundaries and CRCs and fingerprint the encoded raster.
 
     Returns None for a missing or corrupt container. The scan does not decode pixels.
     """
@@ -27,6 +42,7 @@ def inspect_png(data: bytes) -> tuple[tuple[int, int], str] | None:
     offset, header_size, chunk_overhead = len(PNG_SIGNATURE), 13, 12
     stream = memoryview(data)
     image_data = sha256()
+    raster = sha256()
     has_image_data = False
     while offset + chunk_overhead <= len(stream):
         length = int.from_bytes(stream[offset : offset + 4], "big")
@@ -38,15 +54,18 @@ def inspect_png(data: bytes) -> tuple[tuple[int, int], str] | None:
             return None  # A readable signature cannot establish a complete capture.
         if kind == b"IHDR" and (length != header_size or offset != len(PNG_SIGNATURE)):
             return None  # A PNG has exactly one initial header.
-        if kind == b"IDAT" and length:
+        if kind in _RASTER_CHUNKS:
+            # Hash framed chunks so different types or payload boundaries stay distinct.
+            raster.update(stream[offset : end - 4])
+        elif kind == b"IDAT" and length:
             image_data.update(stream[offset + 8 : end - 4])
             has_image_data = True
         if kind == b"IEND":
             # Trailing bytes or an empty data stream are not complete capture evidence.
-            return (
-                (size, image_data.hexdigest())
-                if end == len(stream) and not length and has_image_data
-                else None
-            )
+            if end != len(stream) or length or not has_image_data:
+                return None
+            # Include the concatenated stream without making IDAT boundaries significant.
+            raster.update(image_data.digest())
+            return size, raster.hexdigest()
         offset = end
     return None
